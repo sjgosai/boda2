@@ -40,7 +40,7 @@ class ExampleData(torch.nn.Module):
         Args:
             None
         Returns:
-            None
+            Training_DataLoader
         """
         raise NotImplementedError
         return Training_DataLoader
@@ -51,7 +51,7 @@ class ExampleData(torch.nn.Module):
         Args:
             None
         Returns:
-            None
+            Validation_DataLoader
         """
         raise NotImplementedError
         return Validation_DataLoader
@@ -62,7 +62,7 @@ class ExampleData(torch.nn.Module):
         Args:
             None
         Returns:
-            None
+            Testing_DataLoader
         """
         raise NotImplementedError
         return Testing_DataLoader
