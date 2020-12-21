@@ -10,15 +10,11 @@ import numpy as np
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset
+import sys
 
-#from ..common import constants            #doesn't work yet
-
-#---------------------- provisional code -----------------------
-
-STANDARD_NT = ['A','G','T','C']
-MPRA_UPSTREAM  = 'ACGAAAATGTTGGATGCTCATACTCGTCCTTTTTCAATATTATTGAAGCATTTATCAGGGTTACTAGTACGTCTCTCAAGGATAAGTAAGTAATATTAAGGTACGGGAGGTATTGGACAGGCCGCAATAAAATATCTTTATTTTCATTACATCTGTGTGTTGGTTTTTTGTGTGAATCGATAGTACTAACATACGCTCTCCATCAAAACAAAACGAAACAAAACAAACTAGCAAAATAGGCTGTCCCCAGTGCAAGTGCAGGTGCCAGAACATTTCTCTGGCCTAACTGGCCGCTTGACG'
-MPRA_DOWNSTREAM= 'CACTGCGGCTCCTGCGATCTAACTGGCCGGTACCTGAGCTCGCTAGCCTCGAGGATATCAAGATCTGGCCTCGGCGGCCAAGCTTAGACACTAGAGGGTATATAATGGAAGCTCGACTTCCAGCTTGGCAATCCGGTACTGTTGGTAAAGCCACCATGGTGAGCAAGGGCGAGGAGCTGTTCACCGGGGTGGTGCCCATCCTGGTCGAGCTGGACGGCGACGTAAACGGCCACAAGTTCAGCGTGTCCGGCGAGGGCGAGGGCGATGCCACCTACGGCAAGCTGACCCTGAAGTTCATCT'
-
+sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')
+import boda
+from boda.common import constants           
 
 #------------------------- HELPER FUNCTIONS ------------------------------------
 
@@ -92,8 +88,8 @@ class ExampleLightingData(pl.LightningDataModule):
         seqTensors = []
         activities = []
         for idx,(sequence, activity) in enumerate(data):
-            paddedSeq = pad_sequence(sequence, self.paddedSeqLen, MPRA_UPSTREAM, MPRA_DOWNSTREAM)
-            seqTensor = dna2tensor(paddedSeq, vocab=STANDARD_NT)
+            paddedSeq = pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
+            seqTensor = dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
             seqTensors.append(seqTensor)
             activities.append(activity)
             if (idx+1)%5000 == 0:
@@ -122,6 +118,7 @@ class ExampleLightingData(pl.LightningDataModule):
     
     
 #---------------------------- EXAMPLE --------------------------------------------------
+
 # DataModule = ExampleLightingData('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
 #                                   'CMS_example_summit_shift_SKNSH_20201013.out')
 # DataModule.setup()
