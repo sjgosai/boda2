@@ -31,7 +31,6 @@ def pad_sequence(sequence, paddedSeqLen, upStreamSeq, downStreamSeq):
     paddedSequence = upPad + sequence + downPad            
     return paddedSequence
 
-
 def dna2tensor(sequence, vocab):
     seqTensor = torch.zeros((len(sequence), len(vocab)))
     for letterIdx, letter in enumerate(sequence):
