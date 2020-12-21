@@ -122,8 +122,8 @@ class ExampleLightingData(pl.LightningDataModule):
     
     
 #---------------------------- EXAMPLE --------------------------------------------------
-#DataModule = ExampleLightingData('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
-                                  'CMS_example_summit_shift_SKNSH_20201013.out')
+# DataModule = ExampleLightingData('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
+#                                   'CMS_example_summit_shift_SKNSH_20201013.out')
 # DataModule.setup()
 # TrainDataloader = DataModule.train_dataloader()
 # ValDataloader = DataModule.val_dataloader()
