@@ -25,7 +25,7 @@ MPRA_DOWNSTREAM= 'CACTGCGGCTCCTGCGATCTAACTGGCCGGTACCTGAGCTCGCTAGCCTCGAGGATATCAAG
 def pad_sequence(sequence, paddedSeqLen, upStreamSeq, downStreamSeq):
     origSeqLen = len(sequence)
     paddingLen = paddedSeqLen - origSeqLen
-    assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq))
+    assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq)), 'Not enough padding available'
     upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
     downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
     paddedSequence = upPad + sequence + downPad            
