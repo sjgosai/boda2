@@ -45,8 +45,7 @@ class ExampleLightingData(pl.LightningDataModule):
     def __init__(self, file_seqID: str = './', file_seqFunc: str = './', 
                  ValSize_pct=5, TestSize_pct=5,
                  batchSize=32,
-                 paddedSeqLen=600):
-        
+                 paddedSeqLen=600):       
         super().__init__()
         self.data_name  = 'ExampleLightingData'
         self.file_seqID = file_seqID
@@ -54,14 +53,12 @@ class ExampleLightingData(pl.LightningDataModule):
         self.ValSize_pct = ValSize_pct
         self.TestSize_pct = TestSize_pct
         self.batchSize = batchSize
-        self.paddedSeqLen = paddedSeqLen
-        
+        self.paddedSeqLen = paddedSeqLen        
         
     def parse_MPRAfiles(self):
         fasta_dict = {}
         data = []
-        with open(self.file_seqID, 'r') as f:
-            
+        with open(self.file_seqID, 'r') as f:           
             for line in f:
                 if '>' == line[0]:
                     my_id = line.rstrip()[1:]
@@ -81,12 +78,10 @@ class ExampleLightingData(pl.LightningDataModule):
                     print(f'For key: {entry[0]}, cannot convert value: {entry[activity_idx]}')
                     data.append( [fasta_dict[ entry[0] ], np.nan] )                        
         return data
-        
-        
+                
     def prepare_data(self):        
         raise NotImplementedError
-        
-      
+             
     def setup(self):
         #------ parse data from original MPRA files ------
         data = self.parse_MPRAfiles()
@@ -114,7 +109,7 @@ class ExampleLightingData(pl.LightningDataModule):
         self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
                                                                                [self.train_size, self.val_size, self.test_size],
                                                                                generator=torch.Generator().manual_seed(1))
-            
+           
     def train_dataloader(self):
         return DataLoader(self.dataset_train, batch_size=self.batchSize)
     
