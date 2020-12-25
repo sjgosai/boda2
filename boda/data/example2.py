@@ -45,54 +45,58 @@ class MPRADataModule(pl.LightningDataModule):
         self.TestSize_pct = TestSize_pct
         self.batchSize = batchSize
         self.paddedSeqLen = paddedSeqLen        
-                
+
+    @staticmethod
+    def parse_MPRAfiles(file_seqID, file_seqFunc, MPRA_column):
+        fasta_dict = {}
+        data = []
+        with open(file_seqID, 'r') as f:           
+            for line in f:
+                if '>' == line[0]:
+                    my_id = line.rstrip()[1:]
+                    fasta_dict[my_id] = ''
+                else:
+                    fasta_dict[my_id] += line.rstrip()                            
+        with open(file_seqFunc, 'r') as f:
+            header = f.readline().rstrip()
+            activity_idx = header.split().index(MPRA_column)
+            for line in f:
+                entry = line.rstrip().split()
+                try:
+                    data.append( [fasta_dict[ entry[0] ], float(entry[activity_idx])] )
+                except KeyError:
+                    print(f'Could not find key: {entry[0]}')
+                except ValueError:
+                    print(f'For key: {entry[0]}, cannot convert value: {entry[activity_idx]}')
+                    #data.append( [fasta_dict[ entry[0] ], np.nan] )                        
+        return data
+    
+    @staticmethod
+    def pad_sequence(sequence, paddedSeqLen, upStreamSeq, downStreamSeq):
+        origSeqLen = len(sequence)
+        paddingLen = paddedSeqLen - origSeqLen
+        assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq)), 'Not enough padding available'
+        upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
+        downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
+        paddedSequence = upPad + sequence + downPad            
+        return paddedSequence
+    
+    @staticmethod
+    def dna2tensor(sequence, vocab):
+        seqTensor = np.zeros((len(sequence), len(vocab)))
+        for letterIdx, letter in enumerate(sequence):
+            seqTensor[letterIdx, vocab.index(letter)] = 1
+        seqTensor = torch.Tensor(seqTensor)
+        return seqTensor 
+    
+    #------------------------ KEY METHODS ------------------------
+           
     def prepare_data(self):        
         raise NotImplementedError
              
-    def setup(self):      
-        #--------- helper functions ---------
-        def parse_MPRAfiles(file_seqID, file_seqFunc, MPRA_column):
-            fasta_dict = {}
-            data = []
-            with open(file_seqID, 'r') as f:           
-                for line in f:
-                    if '>' == line[0]:
-                        my_id = line.rstrip()[1:]
-                        fasta_dict[my_id] = ''
-                    else:
-                        fasta_dict[my_id] += line.rstrip()                            
-            with open(file_seqFunc, 'r') as f:
-                header = f.readline().rstrip()
-                activity_idx = header.split().index(MPRA_column)
-                for line in f:
-                    entry = line.rstrip().split()
-                    try:
-                        data.append( [fasta_dict[ entry[0] ], float(entry[activity_idx])] )
-                    except KeyError:
-                        print(f'Could not find key: {entry[0]}')
-                    except ValueError:
-                        print(f'For key: {entry[0]}, cannot convert value: {entry[activity_idx]}')
-                        #data.append( [fasta_dict[ entry[0] ], np.nan] )                        
-            return data
-       
-        def pad_sequence(sequence, paddedSeqLen, upStreamSeq, downStreamSeq):
-            origSeqLen = len(sequence)
-            paddingLen = paddedSeqLen - origSeqLen
-            assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq)), 'Not enough padding available'
-            upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
-            downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
-            paddedSequence = upPad + sequence + downPad            
-            return paddedSequence
-        
-        def dna2tensor(sequence, vocab):
-            seqTensor = np.zeros((len(sequence), len(vocab)))
-            for letterIdx, letter in enumerate(sequence):
-                seqTensor[letterIdx, vocab.index(letter)] = 1
-            seqTensor = torch.Tensor(seqTensor)
-            return seqTensor  
-        
+    def setup(self):             
         #--------- parse data from original MPRA files ---------
-        self.raw_data = parse_MPRAfiles(self.file_seqID, self.file_seqFunc, self.MPRA_column)
+        self.raw_data = self.parse_MPRAfiles(self.file_seqID, self.file_seqFunc, self.MPRA_column)
         self.num_examples = len(self.raw_data)
         
         #--------- pad dna sequences, convert to one-hots, create tensors ---------          
@@ -100,8 +104,8 @@ class MPRADataModule(pl.LightningDataModule):
         seqTensors = []
         activities = []
         for idx,(sequence, activity) in enumerate(self.raw_data):
-            paddedSeq = pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
-            seqTensor = dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
+            paddedSeq = self.pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
+            seqTensor = self.dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
             seqTensors.append(seqTensor)
             activities.append(activity)
             if (idx+1)%10000 == 0:
@@ -130,6 +134,8 @@ class MPRADataModule(pl.LightningDataModule):
     
     
 #------------------------------- EXAMPLE --------------------------------------------------
+import time
+start_time = time.perf_counter()
 
 DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
                                   'CMS_example_summit_shift_SKNSH_20201013.out')
@@ -137,3 +143,7 @@ DataModule.setup()
 TrainDataloader = DataModule.train_dataloader()
 ValDataloader = DataModule.val_dataloader()
 TestDataloader = DataModule.test_dataloader()
+
+end_time = time.perf_counter()
+run_time = end_time - start_time
+print(f"Finished in {run_time:.4f} secs")
