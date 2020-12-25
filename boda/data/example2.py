@@ -114,9 +114,9 @@ class MPRADataModule(pl.LightningDataModule):
         activitiesTensor = torch.Tensor(activities)        
         self.dataset_full = TensorDataset(sequencesTensor, activitiesTensor)  
         
-        #--------- split dataset in train/val/test sets ---------
-        self.val_size = int(np.floor(self.num_examples * self.ValSize_pct/100))      #we might need to pre-separate examples
-        self.test_size = int(np.floor(self.num_examples * self.TestSize_pct/100))
+        #--------- split dataset in train/val/test sets ---------     
+        self.val_size = self.num_examples * self.ValSize_pct // 100             # might need to pre-separate examples
+        self.test_size = self.num_examples * self.TestSize_pct // 100
         self.train_size = self.num_examples - self.val_size - self.test_size
         self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
                                                                                [self.train_size, self.val_size, self.test_size],
@@ -134,16 +134,16 @@ class MPRADataModule(pl.LightningDataModule):
     
     
 #------------------------------- EXAMPLE --------------------------------------------------
-# import time
-# start_time = time.perf_counter()
+import time
+start_time = time.perf_counter()
 
-# DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
-#                                   'CMS_example_summit_shift_SKNSH_20201013.out')
-# DataModule.setup()
-# TrainDataloader = DataModule.train_dataloader()
-# ValDataloader = DataModule.val_dataloader()
-# TestDataloader = DataModule.test_dataloader()
+DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
+                                  'CMS_example_summit_shift_SKNSH_20201013.out')
+DataModule.setup()
+TrainDataloader = DataModule.train_dataloader()
+ValDataloader = DataModule.val_dataloader()
+TestDataloader = DataModule.test_dataloader()
 
-# end_time = time.perf_counter()
-# run_time = end_time - start_time
-# print(f"Finished in {run_time:.4f} secs")
+end_time = time.perf_counter()
+run_time = end_time - start_time
+print(f"Finished in {run_time:.4f} secs")
