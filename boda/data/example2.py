@@ -12,7 +12,7 @@ import pytorch_lightning as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset
 import sys
 
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')
+sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
 import boda
 from boda.common import constants           
 
