@@ -89,8 +89,8 @@ class MPRADataModule(pl.LightningDataModule):
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor 
     
-    #------------------------ KEY METHODS ------------------------
-           
+    #------------------------------ KEY METHODS ------------------------------
+          
     def prepare_data(self):        
         raise NotImplementedError
              
@@ -134,16 +134,16 @@ class MPRADataModule(pl.LightningDataModule):
     
     
 #------------------------------- EXAMPLE --------------------------------------------------
-import time
-start_time = time.perf_counter()
+# import time
+# start_time = time.perf_counter()
 
-DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
-                                  'CMS_example_summit_shift_SKNSH_20201013.out')
-DataModule.setup()
-TrainDataloader = DataModule.train_dataloader()
-ValDataloader = DataModule.val_dataloader()
-TestDataloader = DataModule.test_dataloader()
+# DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
+#                                   'CMS_example_summit_shift_SKNSH_20201013.out')
+# DataModule.setup()
+# TrainDataloader = DataModule.train_dataloader()
+# ValDataloader = DataModule.val_dataloader()
+# TestDataloader = DataModule.test_dataloader()
 
-end_time = time.perf_counter()
-run_time = end_time - start_time
-print(f"Finished in {run_time:.4f} secs")
+# end_time = time.perf_counter()
+# run_time = end_time - start_time
+# print(f"Finished in {run_time:.4f} secs")
