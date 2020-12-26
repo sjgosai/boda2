@@ -6,6 +6,7 @@ Created on Mon Nov  2 11:51:51 2020
 @author: castrr
 """
 
+import argparse
 import numpy as np
 import torch
 import pytorch_lightning as pl
@@ -24,20 +25,20 @@ Arguments:
     file_seqID - Path to the file containing IDs of DNA sequences
     file_seqFunc - Path to the file containing a map of IDs to MPRA data
     MPRA_column - The name of the column of the desired activity in file_seqFunc
-    ValSize_pct - percentage of examples to form the validation set
-    TestSize_pct - percentage of examples to form the test set
-    bathSize - number of examples in each mini batch
-    paddedSeqLen - desired total sequence length after padding
+    ValSize_pct - Percentage of examples to form the validation set
+    TestSize_pct - Percentage of examples to form the test set
+    bathSize - Number of examples in each mini batch
+    paddedSeqLen - Desired total sequence length after padding
 '''
-class MPRADataModule(pl.LightningDataModule):    
-    
+class MPRADataModule(pl.LightningDataModule):
+        
     def __init__(self, file_seqID: str = './', file_seqFunc: str = './',
                  MPRA_column='log2FoldChange',
                  ValSize_pct=5, TestSize_pct=5,
                  batchSize=32,
                  paddedSeqLen=600):       
         super().__init__()
-        self.data_name  = 'ExampleLightingData'
+        self.dataName  = 'MPRA_data'
         self.file_seqID = file_seqID
         self.file_seqFunc = file_seqFunc
         self.MPRA_column = MPRA_column
@@ -46,6 +47,31 @@ class MPRADataModule(pl.LightningDataModule):
         self.batchSize = batchSize
         self.paddedSeqLen = paddedSeqLen        
 
+    #------------------------------ STATIC METHODS ------------------------------
+    
+    @staticmethod
+    def parse_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        
+        parser.add_argument('--MPRA_column', type=str, default='log2FoldChange', 
+                            help='The name of the column of the desired activity in file_seqFunc') 
+        
+        parser.add_argument('--ValSize_pct', type=float, default=5, 
+                            help='Percentage of examples to form the validation set')  
+        
+        parser.add_argument('--TestSize_pct', type=float, default=5, 
+                            help='Percentage of examples to form the test set')  
+        
+        parser.add_argument('--bathSize', type=int, default=32, 
+                            help='Number of examples in each mini batch')  
+        
+        parser.add_argument('--paddedSeqLen', type=int, default=600, 
+                            help='Desired total sequence length after padding')  
+        
+        args = parser.parse_args()
+        print(f'DataModule arguments: {vars(args)}')
+        return parser
+    
     @staticmethod
     def parse_MPRAfiles(file_seqID, file_seqFunc, MPRA_column):
         fasta_dict = {}
@@ -89,10 +115,8 @@ class MPRADataModule(pl.LightningDataModule):
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor 
     
-    #------------------------------ KEY METHODS ------------------------------
-          
-    def prepare_data(self):        
-        raise NotImplementedError
+    
+    #------------------------------ KEY METHODS ------------------------------        
              
     def setup(self):             
         #--------- parse data from original MPRA files ---------
@@ -115,7 +139,7 @@ class MPRADataModule(pl.LightningDataModule):
         self.dataset_full = TensorDataset(sequencesTensor, activitiesTensor)  
         
         #--------- split dataset in train/val/test sets ---------     
-        self.val_size = self.num_examples * self.ValSize_pct // 100             # might need to pre-separate examples
+        self.val_size = self.num_examples * self.ValSize_pct // 100          #might need to pre-separate examples in future data
         self.test_size = self.num_examples * self.TestSize_pct // 100
         self.train_size = self.num_examples - self.val_size - self.test_size
         self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
@@ -132,18 +156,18 @@ class MPRADataModule(pl.LightningDataModule):
         return DataLoader(self.dataset_test, batch_size=self.batchSize)
 
     
-    
+   
 #------------------------------- EXAMPLE --------------------------------------------------
-# import time
-# start_time = time.perf_counter()
+import time
+start_time = time.perf_counter()
 
-# DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
-#                                   'CMS_example_summit_shift_SKNSH_20201013.out')
-# DataModule.setup()
-# TrainDataloader = DataModule.train_dataloader()
-# ValDataloader = DataModule.val_dataloader()
-# TestDataloader = DataModule.test_dataloader()
+DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
+                                  'CMS_example_summit_shift_SKNSH_20201013.out')
+DataModule.setup()
+TrainDataloader = DataModule.train_dataloader()
+ValDataloader = DataModule.val_dataloader()
+TestDataloader = DataModule.test_dataloader()
 
-# end_time = time.perf_counter()
-# run_time = end_time - start_time
-# print(f"Finished in {run_time:.4f} secs")
+end_time = time.perf_counter()
+run_time = end_time - start_time
+print(f"Finished in {run_time:.4f} secs")
