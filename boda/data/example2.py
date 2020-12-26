@@ -36,8 +36,8 @@ class MPRADataModule(pl.LightningDataModule):
                  MPRA_column='log2FoldChange',
                  ValSize_pct=5, TestSize_pct=5,
                  batchSize=32,
-                 paddedSeqLen=600):       
-        super().__init__()
+                 paddedSeqLen=600, **kwargs):       
+        super().__init__(**kwargs)
         self.dataName  = 'MPRA_data'
         self.file_seqID = file_seqID
         self.file_seqFunc = file_seqFunc
