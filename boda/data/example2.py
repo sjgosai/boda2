@@ -109,9 +109,9 @@ class MPRADataModule(pl.LightningDataModule):
     
     @staticmethod
     def dna2tensor(sequence, vocab):
-        seqTensor = np.zeros((len(sequence), len(vocab)))
+        seqTensor = np.zeros((len(vocab), len(sequence)))
         for letterIdx, letter in enumerate(sequence):
-            seqTensor[letterIdx, vocab.index(letter)] = 1
+            seqTensor[vocab.index(letter), letterIdx] = 1
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor 
     
