@@ -112,6 +112,7 @@ class MPRAregressionModel(pl.LightningModule):
         pbar = {'train_acc': acc}
         return {'loss': loss, 'progress_bar': pbar}
     
+    #doesn't work yet
     def validation_step(self, batch, batch_idx):
         results = self.training_step(batch, batch_idx)
         results['progress_bar']['val_acc'] = results['progress_bar']['train_acc']
