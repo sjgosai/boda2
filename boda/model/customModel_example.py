@@ -112,13 +112,13 @@ class MPRAregressionModel(pl.LightningModule):
         pbar = {'train_acc': acc}
         return {'loss': loss, 'progress_bar': pbar}
     
-    #doesn't work yet
     def validation_step(self, batch, batch_idx):
         results = self.training_step(batch, batch_idx)
         results['progress_bar']['val_acc'] = results['progress_bar']['train_acc']
         del results['progress_bar']['train_acc']
         return results
     
+    #doesn't work yet
     def validation_epoch_end(self, val_step_outputs):
         avg_val_loss = torch.tensor([x['loss'] for x in val_step_outputs]).mean()
         avg_val_acc = torch.tensor([x['progress_bar']['val_acc'] for x in val_step_outputs]).mean()
