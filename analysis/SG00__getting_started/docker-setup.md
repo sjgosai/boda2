@@ -1,8 +1,20 @@
+# NVIDIA Docker Container Tool-kit
+
+## Check if installed
+If this runs, you're good to go.
+```
+sudo docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
+
+If this failed, move on to steps below. See References below for helpful links.
+
 ## Uninstall previous versions of Docker
 
 ```
 sudo apt-get remove docker docker-engine docker.io containerd runc
 ```
+
+# Setup instructions
 
 ## Install Docker CE with convenience scripts
 
@@ -65,4 +77,8 @@ sudo chown "$USER":"$USER" /home/"$USER"/.docker -R
 sudo chmod g+rwx "$HOME/.docker" -R
 ```
 
+# References
 
+https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
+https://docs.docker.com/engine/install/ubuntu/
+https://docs.docker.com/engine/install/linux-postinstall/
