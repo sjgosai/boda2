@@ -36,7 +36,8 @@ class MPRADataModule(pl.LightningDataModule):
                  MPRA_column='log2FoldChange',
                  ValSize_pct=5, TestSize_pct=5,
                  batchSize=32,
-                 paddedSeqLen=600, **kwargs):       
+                 paddedSeqLen=600, 
+                 numWorkers=8, **kwargs):       
         super().__init__(**kwargs)
         self.dataName  = 'MPRA_data'
         self.file_seqID = file_seqID
@@ -46,6 +47,7 @@ class MPRADataModule(pl.LightningDataModule):
         self.TestSize_pct = TestSize_pct
         self.batchSize = batchSize
         self.paddedSeqLen = paddedSeqLen        
+        self.numWorkers = numWorkers
 
     #------------------------------ STATIC METHODS ------------------------------
     
@@ -147,16 +149,18 @@ class MPRADataModule(pl.LightningDataModule):
                                                                                generator=torch.Generator().manual_seed(1))
            
     def train_dataloader(self):
-        return DataLoader(self.dataset_train, batch_size=self.batchSize)
+        return DataLoader(self.dataset_train, batch_size=self.batchSize,
+                          shuffle=True, num_workers=self.numWorkers)
     
     def val_dataloader(self):
-        return DataLoader(self.dataset_val, batch_size=self.batchSize)
+        return DataLoader(self.dataset_val, batch_size=self.batchSize,
+                          shuffle=False, num_workers=self.numWorkers)
 
     def test_dataloader(self):
-        return DataLoader(self.dataset_test, batch_size=self.batchSize)
+        return DataLoader(self.dataset_test, batch_size=self.batchSize,
+                          shuffle=False, num_workers=self.numWorkers)
 
     
-   
 #------------------------------- EXAMPLE --------------------------------------------------
 if __name__ == '__main__':   
     import time
