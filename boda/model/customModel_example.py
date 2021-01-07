@@ -18,9 +18,52 @@ from pytorch_lightning.metrics.functional import accuracy
 
 
 '''
+Custom MPRA activity predictor
 
 '''
 class MPRAregressionModel(pl.LightningModule):
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        
+        #training params
+        parser.add_argument('--LR', type=float, default=0.0005)
+        parser.add_argument('--momentum', type=float, default=0.9)
+        parser.add_argument('--weightDecay', type=float, default=1e-8)
+        parser.add_argument('--dropout', type=float, default=0.2)
+        parser.add_argument('--optimizer', type=str, default='Adam')
+        
+        #input shape
+        parser.add_argument('--seqLen', type=int, default=600)
+        parser.add_argument('--numFeatures', type=int, default=4)
+        parser.add_argument('--targetLen', type=int, default=1)
+        
+        #network params
+        parser.add_argument('--numChannles1', type=int, default=20)
+        parser.add_argument('--kernelSize1', type=int, default=6)
+        parser.add_argument('--stride1', type=int, default=3)
+        parser.add_argument('--padding1', type=int, default=0)
+        parser.add_argument('--dilation1', type=int, default=1)
+        
+        parser.add_argument('--poolKernel1', type=int, default=4)
+        parser.add_argument('--poolStride1', type=int, default=2)
+        
+        parser.add_argument('--numChannles2', type=int, default=10)
+        parser.add_argument('--kernelSize2', type=int, default=4)
+        parser.add_argument('--stride2', type=int, default=2)
+        parser.add_argument('--padding2', type=int, default=0)
+        parser.add_argument('--dilation2', type=int, default=1)
+        
+        parser.add_argument('--poolKernel2', type=int, default=2)
+        parser.add_argument('--poolStride2', type=int, default=2)
+        
+        parser.add_argument('--linearLayerLen1', type=int, default=50)
+        parser.add_argument('--linearLayerLen2', type=int, default=10)
+        
+        args = parser.parse_args()
+        print(f'ModelModule parameters: {vars(args)}')
+        return parser
     
     def __init__(self, modelParams):
         super().__init__()
@@ -35,6 +78,7 @@ class MPRAregressionModel(pl.LightningModule):
         self.seqLen = modelParams['seqLen']
         self.numFeatures = modelParams['numFeatures']
         self.targetLen = modelParams['targetLen']
+        self.example_input_array = torch.rand(1, self.numFeatures, self.seqLen)
         
         #network params
         self.numChannels1 = modelParams['numChannles1']
@@ -94,7 +138,7 @@ class MPRAregressionModel(pl.LightningModule):
                 nn.Dropout(p=self.dropout),
                 nn.Linear(self.linearLayerLen1, self.linearLayerLen2),
                 nn.Tanh(),
-                nn.Dropout(p=self.dropout),
+                nn.Dropout(p=0.5*self.dropout),
                 nn.Linear(self.linearLayerLen2, self.targetLen) )
  
     def forward(self, x):
@@ -107,7 +151,7 @@ class MPRAregressionModel(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss, on_epoch=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -115,6 +159,12 @@ class MPRAregressionModel(pl.LightningModule):
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
         self.log('val_loss', loss, prog_bar=True)
+        
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.loss(y_hat, y)
+        self.log('test_loss', loss)
     
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
