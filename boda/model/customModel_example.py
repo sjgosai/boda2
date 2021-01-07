@@ -18,9 +18,52 @@ from pytorch_lightning.metrics.functional import accuracy
 
 
 '''
+Custom MPRA activity predictor
 
 '''
 class MPRAregressionModel(pl.LightningModule):
+
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        
+        #training params
+        parser.add_argument('--LR', type=float, default=0.0005)
+        parser.add_argument('--momentum', type=float, default=0.9)
+        parser.add_argument('--weightDecay', type=float, default=1e-8)
+        parser.add_argument('--dropout', type=float, default=0.2)
+        parser.add_argument('--optimizer', type=str, default='Adam')
+        
+        #input shape
+        parser.add_argument('--seqLen', type=int, default=600)
+        parser.add_argument('--numFeatures', type=int, default=4)
+        parser.add_argument('--targetLen', type=int, default=1)
+        
+        #network params
+        parser.add_argument('--numChannles1', type=int, default=20)
+        parser.add_argument('--kernelSize1', type=int, default=6)
+        parser.add_argument('--stride1', type=int, default=3)
+        parser.add_argument('--padding1', type=int, default=0)
+        parser.add_argument('--dilation1', type=int, default=1)
+        
+        parser.add_argument('--poolKernel1', type=int, default=4)
+        parser.add_argument('--poolStride1', type=int, default=2)
+        
+        parser.add_argument('--numChannles2', type=int, default=10)
+        parser.add_argument('--kernelSize2', type=int, default=4)
+        parser.add_argument('--stride2', type=int, default=2)
+        parser.add_argument('--padding2', type=int, default=0)
+        parser.add_argument('--dilation2', type=int, default=1)
+        
+        parser.add_argument('--poolKernel2', type=int, default=2)
+        parser.add_argument('--poolStride2', type=int, default=2)
+        
+        parser.add_argument('--linearLayerLen1', type=int, default=50)
+        parser.add_argument('--linearLayerLen2', type=int, default=10)
+        
+        args = parser.parse_args()
+        print(f'Model parameters: {vars(args)}')
+        return parser
     
     def __init__(self, modelParams):
         super().__init__()
@@ -35,6 +78,7 @@ class MPRAregressionModel(pl.LightningModule):
         self.seqLen = modelParams['seqLen']
         self.numFeatures = modelParams['numFeatures']
         self.targetLen = modelParams['targetLen']
+        self.example_input_array = torch.rand(1, self.numFeatures, self.seqLen)
         
         #network params
         self.numChannels1 = modelParams['numChannles1']
@@ -94,7 +138,7 @@ class MPRAregressionModel(pl.LightningModule):
                 nn.Dropout(p=self.dropout),
                 nn.Linear(self.linearLayerLen1, self.linearLayerLen2),
                 nn.Tanh(),
-                nn.Dropout(p=self.dropout),
+                nn.Dropout(p=0.5*self.dropout),
                 nn.Linear(self.linearLayerLen2, self.targetLen) )
  
     def forward(self, x):
@@ -103,27 +147,24 @@ class MPRAregressionModel(pl.LightningModule):
         y_hat = self.linearLayers(linearInput)
         return y_hat
     
-    def training_step(self, bath, batch_idx):
+    def training_step(self, batch, batch_idx):
         x, y = batch
-        y = y.view(-1, 1)
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        acc = accuracy(y_hat, y)
-        pbar = {'train_acc': acc}
-        return {'loss': loss, 'progress_bar': pbar}
+        self.log('train_loss', loss, on_epoch=True)
+        return loss
     
     def validation_step(self, batch, batch_idx):
-        results = self.training_step(batch, batch_idx)
-        results['progress_bar']['val_acc'] = results['progress_bar']['train_acc']
-        del results['progress_bar']['train_acc']
-        return results
-    
-    #doesn't work yet
-    def validation_epoch_end(self, val_step_outputs):
-        avg_val_loss = torch.tensor([x['loss'] for x in val_step_outputs]).mean()
-        avg_val_acc = torch.tensor([x['progress_bar']['val_acc'] for x in val_step_outputs]).mean()
-        pbar = {'avg_val_acc': avg_val_acc}
-        return {'val_loss': avg_val_loss, 'progress_bar': pbar}
+        x, y = batch
+        y_hat = self(x)
+        loss = F.mse_loss(y_hat, y)
+        self.log('val_loss', loss, prog_bar=True)
+        
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.loss(y_hat, y)
+        self.log('test_loss', loss)
     
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
@@ -143,30 +184,38 @@ class MPRAregressionModel(pl.LightningModule):
     
     
 #------------------------------- EXAMPLE --------------------------------------------------
-modelParams = {'LR': 0.0002,
-               'momentum': 0.9,
-               'weightDecay': 1e-8,
-               'dropout': 0.2,
-               'optimizer': 'Adam',
-               'seqLen': 600,
-               'numFeatures': 4,
-               'targetLen': 1,
-               'numChannles1': 20,
-               'kernelSize1': 6,
-               'stride1': 3,
-               'padding1': 0,
-               'dilation1': 1,
-               'poolKernel1': 4,
-               'poolStride1': 2,
-               'numChannles2': 10,
-               'kernelSize2': 4,
-               'stride2': 4,
-               'padding2': 0,
-               'dilation2': 1,
-               'poolKernel2': 2,
-               'poolStride2': 2,
-               'linearLayerLen1': 50,
-               'linearLayerLen2': 10 }
-
-model = MPRAregressionModel(modelParams)
-summary(model, (model.numFeatures, model.seqLen) )
+if __name__ == '__main__':   
+    
+    #OPTION 1: use add_model_specific_args to create the dictionary of parameters:
+    parser = argparse.ArgumentParser(description="MPRAmodel", add_help=False)
+    parser = MPRAregressionModel.add_model_specific_args(parser)
+    paramDict = vars(parser.parse_args())   
+    model = MPRAregressionModel(paramDict)
+    summary(model, (model.numFeatures, model.seqLen) )
+    
+    #OPTION 2: write manually a dictionary of parameters:
+    # modelParams_2 = {'LR':0.0005,
+    #                'momentum':0.9,
+    #                'weightDecay':1e-8,
+    #                'dropout':0.2,
+    #                'optimizer':'Adam',
+    #                'seqLen':600,
+    #                'numFeatures':4,
+    #                'targetLen':1,
+    #                'numChannles1':20,
+    #                'kernelSize1':12,
+    #                'stride1':3,
+    #                'padding1':0,
+    #                'dilation1':1,
+    #                'poolKernel1':8,
+    #                'poolStride1':2,
+    #                'numChannles2':10,
+    #                'kernelSize2':4,
+    #                'stride2':4,
+    #                'padding2':0,
+    #                'dilation2':1,
+    #                'poolKernel2':2,
+    #                'poolStride2':2,
+    #                'linearLayerLen1':30,
+    #                'linearLayerLen2':20 }    
+    # model_2 = MPRAregressionModel(modelParams_2)
