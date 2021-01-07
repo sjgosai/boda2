@@ -62,7 +62,7 @@ class MPRAregressionModel(pl.LightningModule):
         parser.add_argument('--linearLayerLen2', type=int, default=10)
         
         args = parser.parse_args()
-        print(f'ModelModule parameters: {vars(args)}')
+        print(f'Model parameters: {vars(args)}')
         return parser
     
     def __init__(self, modelParams):
@@ -185,30 +185,37 @@ class MPRAregressionModel(pl.LightningModule):
     
 #------------------------------- EXAMPLE --------------------------------------------------
 if __name__ == '__main__':   
-    modelParams = {'LR': 0.0002,
-                   'momentum': 0.9,
-                   'weightDecay': 1e-8,
-                   'dropout': 0.2,
-                   'optimizer': 'Adam',
-                   'seqLen': 600,
-                   'numFeatures': 4,
-                   'targetLen': 1,
-                   'numChannles1': 20,
-                   'kernelSize1': 6,
-                   'stride1': 3,
-                   'padding1': 0,
-                   'dilation1': 1,
-                   'poolKernel1': 4,
-                   'poolStride1': 2,
-                   'numChannles2': 10,
-                   'kernelSize2': 4,
-                   'stride2': 4,
-                   'padding2': 0,
-                   'dilation2': 1,
-                   'poolKernel2': 2,
-                   'poolStride2': 2,
-                   'linearLayerLen1': 50,
-                   'linearLayerLen2': 10 }
     
-    model = MPRAregressionModel(modelParams)
+    #OPTION 1: use add_model_specific_args to create the dictionary of parameters:
+    parser = argparse.ArgumentParser(description="MPRAmodel", add_help=False)
+    parser = MPRAregressionModel.add_model_specific_args(parser)
+    paramDict = vars(parser.parse_args())   
+    model = MPRAregressionModel(paramDict)
     summary(model, (model.numFeatures, model.seqLen) )
+    
+    #OPTION 2: write manually a dictionary of parameters:
+    # modelParams_2 = {'LR':0.0005,
+    #                'momentum':0.9,
+    #                'weightDecay':1e-8,
+    #                'dropout':0.2,
+    #                'optimizer':'Adam',
+    #                'seqLen':600,
+    #                'numFeatures':4,
+    #                'targetLen':1,
+    #                'numChannles1':20,
+    #                'kernelSize1':12,
+    #                'stride1':3,
+    #                'padding1':0,
+    #                'dilation1':1,
+    #                'poolKernel1':8,
+    #                'poolStride1':2,
+    #                'numChannles2':10,
+    #                'kernelSize2':4,
+    #                'stride2':4,
+    #                'padding2':0,
+    #                'dilation2':1,
+    #                'poolKernel2':2,
+    #                'poolStride2':2,
+    #                'linearLayerLen1':30,
+    #                'linearLayerLen2':20 }    
+    # model_2 = MPRAregressionModel(modelParams_2)
