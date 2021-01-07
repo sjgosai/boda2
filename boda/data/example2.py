@@ -134,9 +134,9 @@ class MPRADataModule(pl.LightningDataModule):
             activities.append(activity)
             if (idx+1)%10000 == 0:
                 print(f'{idx+1}/{self.num_examples} sequences padded and one-hotted...')                                         
-        sequencesTensor = torch.stack(seqTensors)
-        activitiesTensor = torch.Tensor(activities)        
-        self.dataset_full = TensorDataset(sequencesTensor, activitiesTensor)  
+        self.sequencesTensor = torch.stack(seqTensors)
+        self.activitiesTensor = torch.Tensor(activities)        
+        self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
         
         #--------- split dataset in train/val/test sets ---------     
         self.val_size = self.num_examples * self.ValSize_pct // 100          #might need to pre-separate examples in future data
@@ -158,16 +158,13 @@ class MPRADataModule(pl.LightningDataModule):
     
    
 #------------------------------- EXAMPLE --------------------------------------------------
-import time
-start_time = time.perf_counter()
-
-DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
-                                  'CMS_example_summit_shift_SKNSH_20201013.out')
-DataModule.setup()
-TrainDataloader = DataModule.train_dataloader()
-ValDataloader = DataModule.val_dataloader()
-TestDataloader = DataModule.test_dataloader()
-
-end_time = time.perf_counter()
-run_time = end_time - start_time
-print(f"Finished in {run_time:.4f} secs")
+if __name__ == '__main__':   
+    import time
+    start_time = time.perf_counter()
+    
+    DataModule = MPRADataModule('CMS_MRPA_092018_60K.balanced.collapsed.seqOnly.fa', 
+                                      'CMS_example_summit_shift_SKNSH_20201013.out')
+    DataModule.setup()    
+    end_time = time.perf_counter()
+    run_time = end_time - start_time
+    print(f"Finished in {run_time:.4f} secs")
