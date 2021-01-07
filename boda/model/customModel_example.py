@@ -114,7 +114,6 @@ class MPRAregressionModel(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        acc = functional.mae(y_hat, y)
         self.log('val_loss', loss, prog_bar=True)
     
     def configure_optimizers(self):
