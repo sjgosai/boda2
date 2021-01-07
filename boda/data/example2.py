@@ -71,7 +71,7 @@ class MPRADataModule(pl.LightningDataModule):
                             help='Desired total sequence length after padding')  
         
         args = parser.parse_args()
-        print(f'DataModule arguments: {vars(args)}')
+        print(f'DataModule paramaters: {vars(args)}')
         return parser
     
     @staticmethod
