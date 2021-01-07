@@ -103,27 +103,19 @@ class MPRAregressionModel(pl.LightningModule):
         y_hat = self.linearLayers(linearInput)
         return y_hat
     
-    def training_step(self, bath, batch_idx):
+    def training_step(self, batch, batch_idx):
         x, y = batch
-        y = y.view(-1, 1)
         y_hat = self(x)
         loss = F.mse_loss(y_hat, y)
-        acc = accuracy(y_hat, y)
-        pbar = {'train_acc': acc}
-        return {'loss': loss, 'progress_bar': pbar}
+        self.log('train_loss', loss)
+        return loss
     
     def validation_step(self, batch, batch_idx):
-        results = self.training_step(batch, batch_idx)
-        results['progress_bar']['val_acc'] = results['progress_bar']['train_acc']
-        del results['progress_bar']['train_acc']
-        return results
-    
-    #doesn't work yet
-    def validation_epoch_end(self, val_step_outputs):
-        avg_val_loss = torch.tensor([x['loss'] for x in val_step_outputs]).mean()
-        avg_val_acc = torch.tensor([x['progress_bar']['val_acc'] for x in val_step_outputs]).mean()
-        pbar = {'avg_val_acc': avg_val_acc}
-        return {'val_loss': avg_val_loss, 'progress_bar': pbar}
+        x, y = batch
+        y_hat = self(x)
+        loss = F.mse_loss(y_hat, y)
+        acc = functional.mae(y_hat, y)
+        self.log('val_loss', loss, prog_bar=True)
     
     def configure_optimizers(self):
         if self.optimizer == 'Adam':
@@ -143,30 +135,31 @@ class MPRAregressionModel(pl.LightningModule):
     
     
 #------------------------------- EXAMPLE --------------------------------------------------
-modelParams = {'LR': 0.0002,
-               'momentum': 0.9,
-               'weightDecay': 1e-8,
-               'dropout': 0.2,
-               'optimizer': 'Adam',
-               'seqLen': 600,
-               'numFeatures': 4,
-               'targetLen': 1,
-               'numChannles1': 20,
-               'kernelSize1': 6,
-               'stride1': 3,
-               'padding1': 0,
-               'dilation1': 1,
-               'poolKernel1': 4,
-               'poolStride1': 2,
-               'numChannles2': 10,
-               'kernelSize2': 4,
-               'stride2': 4,
-               'padding2': 0,
-               'dilation2': 1,
-               'poolKernel2': 2,
-               'poolStride2': 2,
-               'linearLayerLen1': 50,
-               'linearLayerLen2': 10 }
-
-model = MPRAregressionModel(modelParams)
-summary(model, (model.numFeatures, model.seqLen) )
+if __name__ == '__main__':   
+    modelParams = {'LR': 0.0002,
+                   'momentum': 0.9,
+                   'weightDecay': 1e-8,
+                   'dropout': 0.2,
+                   'optimizer': 'Adam',
+                   'seqLen': 600,
+                   'numFeatures': 4,
+                   'targetLen': 1,
+                   'numChannles1': 20,
+                   'kernelSize1': 6,
+                   'stride1': 3,
+                   'padding1': 0,
+                   'dilation1': 1,
+                   'poolKernel1': 4,
+                   'poolStride1': 2,
+                   'numChannles2': 10,
+                   'kernelSize2': 4,
+                   'stride2': 4,
+                   'padding2': 0,
+                   'dilation2': 1,
+                   'poolKernel2': 2,
+                   'poolStride2': 2,
+                   'linearLayerLen1': 50,
+                   'linearLayerLen2': 10 }
+    
+    model = MPRAregressionModel(modelParams)
+    summary(model, (model.numFeatures, model.seqLen) )
