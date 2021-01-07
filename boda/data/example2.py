@@ -50,7 +50,7 @@ class MPRADataModule(pl.LightningDataModule):
     #------------------------------ STATIC METHODS ------------------------------
     
     @staticmethod
-    def parse_args(parent_parser):
+    def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         
         parser.add_argument('--MPRA_column', type=str, default='log2FoldChange', 
