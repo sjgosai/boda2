@@ -1,29 +1,15 @@
-%%sh
+#!/bin/bash
 
-REPO=${1:-"headjack"}
-IMAGE_TAG=${2:-"latest"}
-for_cpu=${3:-false}
+docker_registry=$1
+container_name=$2
+container_version=$3
+PORT_A=${4:-8888}
+PORT_B=${5:-6006}
+for_cpu=${6:-false}
 
-account=$(aws sts get-caller-identity --query Account --output text)
+container=${docker_registry}/${container_name}:${container_version}
 
-# Get the region defined in the current configuration (default to us-west-2 if none defined)
-region=$(aws configure get region)
-region=${region:-us-east-1}
-
-PORT=8888
-container=${account}.dkr.ecr.${region}.amazonaws.com/$REPO:$IMAGE_TAG
-cmd_on_start="jupyter notebook --ip 0.0.0.0 --port ${PORT} --no-browser --allow-root"
-
-
-# Get the login command from ECR and execute it directly
-$(aws ecr get-login --region us-east-1 --no-include-email)
-
-# Get the login command from ECR in order to pull down the SageMaker PyTorch image
-$(aws ecr get-login --registry-ids 763104351884 --region us-east-1 --no-include-email)
-
-echo "Pulling container ${container}"
-echo "docker run --gpus all -it --shm-size=64g -p ${PORT}:${PORT} -p 6006:6006 -v /home/${USER}:/home/${USER} $container $cmd_on_start"
-echo ${cmd_on_start}
+cmd_on_start="jupyter notebook --ip 0.0.0.0 --port ${PORT_A} --no-browser --allow-root"
 
 if $for_cpu
 then
@@ -32,4 +18,4 @@ else
     gpu_flag='--gpus all'
 fi
 
-docker run $gpu_flag -it --shm-size=64g -p $PORT:$PORT -p 6006:6006 -v /home/${USER}:/home/${USER} -v ~/.aws:/root/.aws $container $cmd_on_start
+docker run $gpu_flag -it --shm-size=64g -p ${PORT_A}:${PORT_A} -p ${PORT_B}:${PORT_B} -v /home/${USER}:/home/${USER} -v ~/.gsutil:/root/.gsutil $container $cmd_on_start

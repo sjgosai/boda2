@@ -1,5 +1,6 @@
-# Available images: https://github.com/aws/deep-learning-containers/blob/master/available_images.md
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training:1.6.0-gpu-py36-cu101-ubuntu16.04
+# Available images: 
+# $ gcloud container images list --repository="gcr.io/deeplearning-platform-release"
+FROM gcr.io/deeplearning-platform-release/pytorch-gpu.1-7
 
 ENV SHELL=/bin/bash
 
@@ -17,14 +18,14 @@ WORKDIR /usr/src/cifar10/
 RUN pip install --upgrade pip==20.2.3
 RUN pip install --no-cache-dir --use-feature=2020-resolver -r requirements.txt
 
-# Installing Headjack
+# Installing BODA
 RUN pip install -e .
 
 # Transfering source code for model training, etc.
 ENV PATH="/opt/ml/code:${PATH}"
 ADD src /opt/ml/code
 
-ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
-ENV SAGEMAKER_PROGRAM main.py
+ENV MAIN_SUBMIT_DIRECTORY /opt/ml/code
+ENV MAIN_PROGRAM main.py
 
 WORKDIR /
