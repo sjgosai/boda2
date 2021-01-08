@@ -18,14 +18,13 @@ WORKDIR /usr/src/cifar10/
 RUN pip install --upgrade pip==20.2.3
 RUN pip install --no-cache-dir --use-feature=2020-resolver -r requirements.txt
 
-# Installing BODA
+# Installing CIFAR10 as a package
 RUN pip install -e .
 
 # Transfering source code for model training, etc.
 ENV PATH="/opt/ml/code:${PATH}"
 ADD src /opt/ml/code
 
-ENV MAIN_SUBMIT_DIRECTORY /opt/ml/code
-ENV MAIN_PROGRAM main.py
-
 WORKDIR /
+
+ENTRYPOINT ["python", "/opt/ml/code/main.py"]
