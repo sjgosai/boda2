@@ -87,7 +87,7 @@ In November 2020, Google released the "Unified" version of GAIP. Haven't tried i
 
 ## References and notes for later:
 
-Google AI Platform [Classic](https://cloud.google.com/ai-platform) and [Unified](https://cloud.google.com/ai-platform-unified/docs) docs
+Google AI Platform [Classic](https://cloud.google.com/ai-platform/docs) and [Unified](https://cloud.google.com/ai-platform-unified/docs) docs
 
 [Training SDK](https://cloud.google.com/sdk/gcloud/reference/ai-platform/jobs/submit/training)
 
