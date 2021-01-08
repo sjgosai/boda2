@@ -84,3 +84,10 @@ In progress
 ## Google AI Platform (Unified)
 
 In November 2020, Google released the "Unified" version of GAIP. Haven't tried it yet. The docs look better organized.
+
+## References and notes for later:
+
+Google AI Platform [Classic](https://cloud.google.com/ai-platform) and [Unified](https://cloud.google.com/ai-platform-unified/docs) docs
+[Training SDK](https://cloud.google.com/sdk/gcloud/reference/ai-platform/jobs/submit/training)
+Custom container [Prediction](https://cloud.google.com/ai-platform/prediction/docs/getting-started-pytorch-container)
+[Hyperparameter Tuning](https://cloud.google.com/ai-platform/training/docs/hyperparameter-tuning-overview)
