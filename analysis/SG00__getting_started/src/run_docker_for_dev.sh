@@ -9,7 +9,8 @@ for_cpu=${6:-false}
 
 container=${docker_registry}/${container_name}:${container_version}
 
-cmd_on_start="jupyter notebook --ip 0.0.0.0 --port ${PORT_A} --no-browser --allow-root"
+new_entrypoint="jupyter-notebook"
+cmd_on_start="--ip 0.0.0.0 --port ${PORT_A} --no-browser --allow-root"
 
 if $for_cpu
 then
@@ -18,4 +19,6 @@ else
     gpu_flag='--gpus all'
 fi
 
-docker run $gpu_flag -it --shm-size=64g -p ${PORT_A}:${PORT_A} -p ${PORT_B}:${PORT_B} -v /home/${USER}:/home/${USER} -v ~/.gsutil:/root/.gsutil $container $cmd_on_start
+echo "docker run $gpu_flag -it --shm-size=64g -p ${PORT_A}:${PORT_A} -p ${PORT_B}:${PORT_B} -v /home/${USER}:/home/${USER} -v /root/.boto:/root/.boto -v ~/.gsutil:/root/.gsutil --entrypoint $new_entrypoint $container $cmd_on_start"
+
+docker run $gpu_flag -it --shm-size=64g -p ${PORT_A}:${PORT_A} -p ${PORT_B}:${PORT_B} -v /home/${USER}:/home/${USER} -v /root/.boto:/root/.boto -v ~/.gsutil:/root/.gsutil --entrypoint $new_entrypoint $container $cmd_on_start
