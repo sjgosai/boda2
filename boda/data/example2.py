@@ -31,25 +31,6 @@ Arguments:
     paddedSeqLen - Desired total sequence length after padding
 '''
 class MPRADataModule(pl.LightningDataModule):
-        
-    def __init__(self, file_seqID: str = './', file_seqFunc: str = './',
-                 MPRA_column='log2FoldChange',
-                 ValSize_pct=5, TestSize_pct=5,
-                 batchSize=32,
-                 paddedSeqLen=600, 
-                 numWorkers=8, **kwargs):       
-        super().__init__(**kwargs)
-        self.dataName  = 'MPRA_data'
-        self.file_seqID = file_seqID
-        self.file_seqFunc = file_seqFunc
-        self.MPRA_column = MPRA_column
-        self.ValSize_pct = ValSize_pct
-        self.TestSize_pct = TestSize_pct
-        self.batchSize = batchSize
-        self.paddedSeqLen = paddedSeqLen        
-        self.numWorkers = numWorkers
-
-    #------------------------------ STATIC METHODS ------------------------------
     
     @staticmethod
     def add_data_specific_args(parent_parser):
@@ -71,9 +52,72 @@ class MPRADataModule(pl.LightningDataModule):
                             help='Desired total sequence length after padding')  
         
         args = parser.parse_args()
-        print(f'DataModule paramaters: {vars(args)}')
+        print(f'Parser arguments: {vars(args)}')
         return parser
+        
+    def __init__(self,
+                 file_seqID: str = './',
+                 file_seqFunc: str = './',
+                 MPRA_column='log2FoldChange',
+                 ValSize_pct=5,
+                 TestSize_pct=5,
+                 batchSize=32,
+                 paddedSeqLen=600, 
+                 numWorkers=8, **kwargs):       
+        
+        super().__init__()
+        self.dataName  = 'MPRA_data'
+        self.file_seqID = file_seqID
+        self.file_seqFunc = file_seqFunc
+        self.MPRA_column = MPRA_column
+        self.ValSize_pct = ValSize_pct
+        self.TestSize_pct = TestSize_pct
+        self.batchSize = batchSize
+        self.paddedSeqLen = paddedSeqLen        
+        self.numWorkers = numWorkers    
     
+    #------------------------------ KEY METHODS ------------------------------                
+    def setup(self):             
+        #--------- parse data from original MPRA files ---------
+        self.raw_data = self.parse_MPRAfiles(self.file_seqID, self.file_seqFunc, self.MPRA_column)
+        self.num_examples = len(self.raw_data)
+        
+        #--------- pad dna sequences, convert to one-hots, create tensors ---------          
+        print('Padding sequences and converting to one-hot tensors...')
+        seqTensors = []
+        activities = []
+        for idx,(sequence, activity) in enumerate(self.raw_data):
+            paddedSeq = self.pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
+            seqTensor = self.dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
+            seqTensors.append(seqTensor)
+            activities.append(activity)
+            if (idx+1)%10000 == 0:
+                print(f'{idx+1}/{self.num_examples} sequences padded and one-hotted...')                                         
+        self.sequencesTensor = torch.stack(seqTensors)
+        self.activitiesTensor = torch.Tensor(activities)        
+        self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
+        
+        #--------- split dataset in train/val/test sets ---------     
+        self.val_size = self.num_examples * self.ValSize_pct // 100          #might need to pre-separate examples in future data
+        self.test_size = self.num_examples * self.TestSize_pct // 100
+        self.train_size = self.num_examples - self.val_size - self.test_size
+        self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
+                                                                               [self.train_size, self.val_size, self.test_size],
+                                                                               generator=torch.Generator().manual_seed(1))
+           
+    def train_dataloader(self):
+        return DataLoader(self.dataset_train, batch_size=self.batchSize,
+                          shuffle=True, num_workers=self.numWorkers)
+    
+    def val_dataloader(self):
+        return DataLoader(self.dataset_val, batch_size=self.batchSize,
+                          shuffle=False, num_workers=self.numWorkers)
+
+    def test_dataloader(self):
+        return DataLoader(self.dataset_test, batch_size=self.batchSize,
+                          shuffle=False, num_workers=self.numWorkers)
+    
+    #------------------------------ HELPER METHODS ------------------------------ 
     @staticmethod
     def parse_MPRAfiles(file_seqID, file_seqFunc, MPRA_column):
         fasta_dict = {}
@@ -116,51 +160,9 @@ class MPRADataModule(pl.LightningDataModule):
             seqTensor[vocab.index(letter), letterIdx] = 1
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor 
-    
-    
-    #------------------------------ KEY METHODS ------------------------------        
-             
-    def setup(self):             
-        #--------- parse data from original MPRA files ---------
-        self.raw_data = self.parse_MPRAfiles(self.file_seqID, self.file_seqFunc, self.MPRA_column)
-        self.num_examples = len(self.raw_data)
-        
-        #--------- pad dna sequences, convert to one-hots, create tensors ---------          
-        print('Padding sequences and converting to one-hot tensors...')
-        seqTensors = []
-        activities = []
-        for idx,(sequence, activity) in enumerate(self.raw_data):
-            paddedSeq = self.pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
-            seqTensor = self.dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
-            seqTensors.append(seqTensor)
-            activities.append(activity)
-            if (idx+1)%10000 == 0:
-                print(f'{idx+1}/{self.num_examples} sequences padded and one-hotted...')                                         
-        self.sequencesTensor = torch.stack(seqTensors)
-        self.activitiesTensor = torch.Tensor(activities)        
-        self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
-        
-        #--------- split dataset in train/val/test sets ---------     
-        self.val_size = self.num_examples * self.ValSize_pct // 100          #might need to pre-separate examples in future data
-        self.test_size = self.num_examples * self.TestSize_pct // 100
-        self.train_size = self.num_examples - self.val_size - self.test_size
-        self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
-                                                                               [self.train_size, self.val_size, self.test_size],
-                                                                               generator=torch.Generator().manual_seed(1))
-           
-    def train_dataloader(self):
-        return DataLoader(self.dataset_train, batch_size=self.batchSize,
-                          shuffle=True, num_workers=self.numWorkers)
-    
-    def val_dataloader(self):
-        return DataLoader(self.dataset_val, batch_size=self.batchSize,
-                          shuffle=False, num_workers=self.numWorkers)
 
-    def test_dataloader(self):
-        return DataLoader(self.dataset_test, batch_size=self.batchSize,
-                          shuffle=False, num_workers=self.numWorkers)
-
-    
+ 
+   
 #------------------------------- EXAMPLE --------------------------------------------------
 if __name__ == '__main__':   
     import time
