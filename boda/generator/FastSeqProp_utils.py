@@ -75,7 +75,7 @@ def neg_reward_loss(x):
 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
-    #np.random.seed(1)                   #anchor the initial DNA sequences
+    #np.random.seed(1)                   #anchor the initial DNA sequence(s)
     #torch.manual_seed(1)                #anchor the sampling
     np.set_printoptions(precision=4)    #for shorter display of arrays
 
