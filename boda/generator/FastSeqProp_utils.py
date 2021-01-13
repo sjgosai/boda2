@@ -27,12 +27,9 @@ def create_random_DiffDNAsequences(num_sequences, seq_len):
 '''
 '''
 def create_scaling_weights(num_sequences):
-    scaleWeights = torch.rand((numSequences, 4))
-    shiftWeights = torch.rand((numSequences, 4))
-    scaleWeights = scaleWeights.view(numSequences, 4, 1)
-    shiftWeights = shiftWeights.view(numSequences, 4, 1)
-    scaleWeights.requires_grad = True
-    shiftWeights.requires_grad = True
+    scaleWeights, shiftWeights = torch.rand((numSequences, 4)), torch.rand((numSequences, 4))
+    scaleWeights, shiftWeights = scaleWeights.view(numSequences, 4, 1), shiftWeights.view(numSequences, 4, 1)
+    scaleWeights.requires_grad, shiftWeights.requires_grad = True, True
     return scaleWeights, shiftWeights
 
 '''
