@@ -55,7 +55,7 @@ def sampling_layer(softmaxedSequences):
 
 '''
 Dummy predictor
-Reward the percentage of ones in first logit
+Reward the percentage of ones in first nucleotide
 '''
 def first_logit_rewarder(sequences):
     weights = torch.zeros(sequences.shape)
