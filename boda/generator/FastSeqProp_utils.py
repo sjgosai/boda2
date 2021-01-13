@@ -53,7 +53,6 @@ def sampling_layer(softmaxedSequences):
     output = sampledSequences - softmaxedSequences.detach() + softmaxedSequences   #ST estimator trick
     return output    
 
-
 '''
 Dummy predictor
 Reward the percentage of ones in first logit
