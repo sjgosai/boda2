@@ -151,7 +151,7 @@ if __name__ == '__main__':
     import time
     start_time = time.perf_counter()
     
-    dm = BODA2_DataModule(data_filePath='./BODA.MPRA.txt',
+    dm = BODA2_DataModule(dataRile_path='./BODA.MPRA.txt',
                          sequenceColumn='nt.sequence',
                          activityColumn='K562',
                          ValSize_pct=5,
