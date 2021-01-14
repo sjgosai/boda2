@@ -20,7 +20,18 @@ from boda.common import constants
 
 
 '''
-Pytorch Lighting DataModule
+- Pytorch Lighting DataModule -
+Takes a .txt file with a column cotaining DNA sequences
+and another column containing some activity.
+Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
+Arguments:
+    dataFile_path - Path to the .txt file with the data (space-separated)
+    sequenceColumn - Name of the column of the DNA sequences
+    MactivityColumn - Name of the column of the associated activity
+    ValSize_pct - Percentage of examples to form the validation set
+    TestSize_pct - Percentage of examples to form the test set
+    bathSize - Number of examples in each mini batch
+    paddedSeqLen - Desired total sequence length after padding
 '''
 class BODA2_DataModule(pl.LightningDataModule):
     
@@ -45,7 +56,7 @@ class BODA2_DataModule(pl.LightningDataModule):
         return parser
     
     def __init__(self,
-                 data_filePath,
+                 dataFile_path,
                  sequenceColumn,
                  activityColumn,
                  ValSize_pct=5,
@@ -56,7 +67,7 @@ class BODA2_DataModule(pl.LightningDataModule):
         
         super().__init__()
         self.dataName  = 'BODA2_data'
-        self.data_filePath = data_filePath
+        self.dataFile_path = dataFile_path
         self.sequenceColumn = sequenceColumn
         self.activityColumn = activityColumn
         self.ValSize_pct = ValSize_pct
@@ -67,7 +78,7 @@ class BODA2_DataModule(pl.LightningDataModule):
         
     def setup(self):             
         #--------- parse data from original MPRA files ---------
-        self.raw_data = self.parse_textFile(self.data_filePath, self.sequenceColumn, self.activityColumn)
+        self.raw_data = self.parse_textFile(self.dataFile_path, self.sequenceColumn, self.activityColumn)
         self.num_examples = len(self.raw_data)
         
         #--------- pad dna sequences, convert to one-hots, create tensors ---------          
