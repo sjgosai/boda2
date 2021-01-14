@@ -115,5 +115,5 @@ if __name__ == '__main__':
     plt.xlabel('Gradient Steps')
     vert_label=plt.ylabel('Reward')
     vert_label.set_rotation(90)
-    plt.title('Reward per epoch')
+    #plt.title('Reward per epoch')
     plt.show()
