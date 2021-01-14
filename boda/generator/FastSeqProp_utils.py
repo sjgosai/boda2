@@ -54,7 +54,7 @@ def sampling_layer(softmaxedSequences):
 Dummy predictor
 Reward the percentage of ones in first nucleotide
 '''
-def first_logit_rewarder(sequences):
+def first_dimension_rewarder(sequences):
     weights = torch.zeros(sequences.shape)
     weights[:,0,:] = 1
     rewards = (weights * sequences).sum(2).sum(1) / sequences.shape[2]
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         softmaxedSequences = relaxation_layer(DNAsequences, scaleWeights, shiftWeights)
         sampledSequences = sampling_layer(softmaxedSequences)
-        predictions = first_logit_rewarder(sampledSequences)
+        predictions = first_dimension_rewarder(sampledSequences)
         loss = neg_reward_loss(predictions)
         loss.backward()
         optimizer.step()
