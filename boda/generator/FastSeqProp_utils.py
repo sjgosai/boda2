@@ -93,7 +93,7 @@ if __name__ == '__main__':
     
     print('-----Initial sequence(s)-----')
     print(DNAsequences.detach().numpy())
-    loss_hist  = []
+    reward_hist  = []
     for epoch in range(1, epochs+1):
         optimizer.zero_grad()
         softmaxedSequences = relaxation_layer(DNAsequences, scaleWeights, shiftWeights)
@@ -103,7 +103,7 @@ if __name__ == '__main__':
         loss.backward()
         optimizer.step()
         scheduler.step()
-        loss_hist.append(loss.item())
+        reward_hist.append(-loss.item())
         if epoch%2==0:
             print(f'epoch: {epoch}, loss: {round(loss.item(),6)}, learning_rate: {scheduler.get_last_lr()}')
             print('-----Updated sequence(s)-----')
@@ -111,9 +111,9 @@ if __name__ == '__main__':
     
     print('-----Last sampled sequence(s)-----')
     print(sampledSequences.detach().numpy())
-    plt.plot(loss_hist)
+    plt.plot(reward_hist)
     plt.xlabel('Gradient Steps')
-    vert_label=plt.ylabel('Loss')
+    vert_label=plt.ylabel('Reward')
     vert_label.set_rotation(90)
-    plt.title('Loss per epoch')
+    plt.title('Reward per epoch')
     plt.show()
