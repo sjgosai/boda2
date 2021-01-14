@@ -19,8 +19,9 @@ from boda.common import constants
 
 
 '''
-Pytorch Lighting DataModule
-Takes MPRA files, preprocesses, tokenizes, and creates Train/Val/Test dataloaders.
+- Pytorch Lighting DataModule -
+Takes MPRA files (.fa and .out format).
+Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
 Arguments:
     file_seqID - Path to the file containing IDs of DNA sequences
     file_seqFunc - Path to the file containing a map of IDs to MPRA data
@@ -56,8 +57,8 @@ class MPRADataModule(pl.LightningDataModule):
         return parser
         
     def __init__(self,
-                 file_seqID: str = './',
-                 file_seqFunc: str = './',
+                 file_seqID,
+                 file_seqFunc,
                  MPRA_column='log2FoldChange',
                  ValSize_pct=5,
                  TestSize_pct=5,
@@ -94,7 +95,7 @@ class MPRADataModule(pl.LightningDataModule):
             if (idx+1)%10000 == 0:
                 print(f'{idx+1}/{self.num_examples} sequences padded and one-hotted...')                                         
         self.sequencesTensor = torch.stack(seqTensors)
-        self.activitiesTensor = torch.Tensor(activities)        
+        self.activitiesTensor = torch.Tensor(activities).view(-1,1)            
         self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
         
         #--------- split dataset in train/val/test sets ---------     
