@@ -97,6 +97,7 @@ class MPRAregressionModel(pl.LightningModule):
         self.weightDecay = weightDecay
         self.dropout = dropout       
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.loss = nn.MSELoss()
         
         #input shape
