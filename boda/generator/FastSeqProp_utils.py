@@ -43,7 +43,7 @@ def sampling_layer(softmaxedSequences):
     sampledSequences_T = F.one_hot(sampledIdxs, num_classes=4)        
     sampledSequences = torch.transpose(sampledSequences_T, 1, 2)
     output = sampledSequences - softmaxedSequences.detach() + softmaxedSequences   #ST estimator trick
-    return output    
+    return output
 
 '''
 Dummy predictor
