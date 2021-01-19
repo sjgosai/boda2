@@ -66,8 +66,7 @@ class Fast_Seq_Prop(nn.Module):
             for step in range(self.seq_len):
                 randomNucleotide = np.random.randint(4)
                 trainable_sequences[seqIdx, randomNucleotide, step] = 1
-        self.trainable_sequences = nn.Parameter(torch.tensor(trainable_sequences, dtype=torch.float))
-        
+        self.trainable_sequences = nn.Parameter(torch.tensor(trainable_sequences, dtype=torch.float))   
     
     def create_scaling_weights(self):
         self.scaleWeights = nn.Parameter(torch.rand((self.num_sequences, 4, 1)))
@@ -152,8 +151,8 @@ if __name__ == '__main__':
             print(softmaxed_sequences.detach().numpy()) 
     
     
-    print('-----Last sampled sequence(s)-----')
-    print(sampled_sequences.detach().numpy())
+    print('-----Sample Example-----')
+    print(FSP_model.sample().detach().numpy())
     plt.plot(reward_hist)
     plt.xlabel('Gradient Steps')
     vert_label=plt.ylabel('Reward')
