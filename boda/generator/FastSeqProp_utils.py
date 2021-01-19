@@ -13,35 +13,30 @@ import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 import matplotlib.pyplot as plt
 
-'''
-'''
+
 def create_random_DiffDNAsequences(num_sequences, seq_len):
     DNAsequences = np.zeros((num_sequences, 4, seq_len))
     for seqIdx in range(num_sequences):
         for step in range(seq_len):
             randomNucleotide = np.random.randint(4)
             DNAsequences[seqIdx, randomNucleotide, step] = 1
-    DNAsequences = torch.tensor(DNAsequences, requires_grad=True)
+    DNAsequences = torch.tensor(DNAsequences, dtype=torch.float, requires_grad=True)
     return DNAsequences
 
-'''
-'''
+
 def create_scaling_weights(num_sequences):
-    scaleWeights, shiftWeights = torch.rand((numSequences, 4)), torch.rand((numSequences, 4))
-    scaleWeights, shiftWeights = scaleWeights.view(numSequences, 4, 1), shiftWeights.view(numSequences, 4, 1)
-    scaleWeights.requires_grad, shiftWeights.requires_grad = True, True
+    scaleWeights = torch.rand((numSequences, 4, 1), requires_grad=True)
+    shiftWeights = torch.rand((numSequences, 4, 1), requires_grad=True)
     return scaleWeights, shiftWeights
 
-'''
-'''
+
 def relaxation_layer(DNAsequences, scaleWeights, shiftWeights):
     normalizedSequences = F.instance_norm(DNAsequences)
     scaledSequences = normalizedSequences * scaleWeights + shiftWeights
     softmaxedSequences = F.softmax(scaledSequences, dim=1)
     return softmaxedSequences
 
-'''
-'''
+
 def sampling_layer(softmaxedSequences):
     nucleotideDist = Categorical(torch.transpose(softmaxedSequences, 1, 2))
     sampledIdxs = nucleotideDist.sample()
