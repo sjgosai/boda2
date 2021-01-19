@@ -106,7 +106,7 @@ class Fast_Seq_Prop(nn.Module):
 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
-    from FastSeqProp_utils import first_token_rewarder, neg_reward_loss
+    from Fast_Seq_Prop_utils import first_token_rewarder, neg_reward_loss
     import sys
     sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
     import boda
