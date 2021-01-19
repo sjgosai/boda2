@@ -15,11 +15,6 @@ import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 from warnings import warn
 
-import sys
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-import boda
-from boda.common import constants     
-
 
 class Fast_Seq_Prop(nn.Module):
     def __init__(self,
@@ -45,13 +40,14 @@ class Fast_Seq_Prop(nn.Module):
         self.softmaxed_sequences = None
         
     def forward(self):
+        #scaled softmax relaxation
         normalized_sequences = F.instance_norm(self.trainable_sequences)
         scaled_sequences = normalized_sequences * self.scaleWeights + self.shiftWeights
         softmaxed_sequences = F.softmax(scaled_sequences, dim=1)
-        #--------------------------------------------------------
+        #save attributes without messing the backward graph
         self.softmaxed_sequences = softmaxed_sequences
         self.padded_softmaxed_sequences = self.pad(softmaxed_sequences)
-        #--------------------------------------------------------
+        #sample
         nucleotideProbs = Categorical(torch.transpose(softmaxed_sequences, 1, 2))
         sampledIdxs = nucleotideProbs.sample()
         sampled_sequences_T = F.one_hot(sampledIdxs, num_classes=4)        
@@ -107,9 +103,14 @@ class Fast_Seq_Prop(nn.Module):
             return sampled_sequences
 
 
+
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
     from FastSeqProp_utils import first_token_rewarder, neg_reward_loss
+    import sys
+    sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
+    import boda
+    from boda.common import constants  
     
     #np.random.seed(1)                   #anchor the initial DNA sequence(s)
     #torch.manual_seed(1)                #anchor the sampling
@@ -117,7 +118,7 @@ if __name__ == '__main__':
     
     numSequences = 1
     seqLen = 3
-    paddingLen = 2
+    paddingLen = 6
     LR = 1
     epochs = 10
     
@@ -151,7 +152,7 @@ if __name__ == '__main__':
             print(softmaxed_sequences.detach().numpy()) 
     
     
-    print('-----Sample Example-----')
+    print('-----Sampled example-----')
     print(FSP_model.sample().detach().numpy())
     plt.plot(reward_hist)
     plt.xlabel('Gradient Steps')
