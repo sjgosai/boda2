@@ -109,7 +109,6 @@ if __name__ == '__main__':
     from Fast_Seq_Prop_utils import first_token_rewarder, neg_reward_loss
     import sys
     sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-    import boda
     from boda.common import constants  
     
     #np.random.seed(1)                   #anchor the initial DNA sequence(s)
