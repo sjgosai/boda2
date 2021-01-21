@@ -83,7 +83,6 @@ class FastSeqProp(nn.Module):
         else:
             self.upPadTensor, self.downPadTensor = None, None
 
-        
     def pad(self, tensor):
         if self.padding_len > 0:
             paddedTensor = torch.cat([ self.upPadTensor, tensor, self.downPadTensor], dim=2)
