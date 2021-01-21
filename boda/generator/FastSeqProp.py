@@ -78,10 +78,12 @@ class FastSeqProp(nn.Module):
                                          downPadTensor[:,:self.padding_len//2 + self.padding_len%2]
             upPadTensor, downPadTensor = upPadTensor.repeat(self.num_sequences, 1, 1), \
                                          downPadTensor.repeat(self.num_sequences, 1, 1)
-            self.upPadTensor, self.downPadTensor = upPadTensor, downPadTensor
+            self.register_buffer('upPadTensor', upPadTensor)
+            self.register_buffer('downPadTensor', downPadTensor)
         else:
             self.upPadTensor, self.downPadTensor = None, None
-    
+
+        
     def pad(self, tensor):
         if self.padding_len > 0:
             paddedTensor = torch.cat([ self.upPadTensor, tensor, self.downPadTensor], dim=2)
@@ -96,9 +98,11 @@ class FastSeqProp(nn.Module):
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor
     
-    def optimize(self, predictor, loss_fn, steps=20, learning_rate=0.5, step_print=5):
+    def optimize(self, predictor, loss_fn, steps=20, learning_rate=0.5, step_print=5, lr_scheduler=True):
+        if lr_scheduler: etaMin = 0.000001
+        else: etaMin = learning_rate
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=steps)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=steps, eta_min=etaMin)
         
         print('-----Initial sequence(s)-----')
         print(self.pad(self.trainable_sequences).detach().numpy())
@@ -151,7 +155,7 @@ if __name__ == '__main__':
     
     #np.random.seed(1)                   # anchor the initial DNA sequence(s)
     #torch.manual_seed(1)                # anchor the sampling
-    #np.set_printoptions(precision=2)    # for shorter display of np arrays
+    np.set_printoptions(precision=2)    # for shorter display of np arrays
     
     model = FastSeqProp(num_sequences=1,
                         seq_len=5,
@@ -161,9 +165,10 @@ if __name__ == '__main__':
                         vocab_list=constants.STANDARD_NT)
     model.optimize(predictor=first_token_rewarder,
                    loss_fn=neg_reward_loss,
-                   steps=20,
+                   steps=12,
                    learning_rate=0.5,
-                   step_print=5)
+                   step_print=2,
+                   lr_scheduler=True)
     sample_example = model.generate()
     
     print('-----Sample example-----')
