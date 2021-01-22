@@ -132,8 +132,8 @@ class FastSeqProp(nn.Module):
     
     def generate(self, padded=True):
         if self.softmaxed_sequences == None:
-            warn('The model hasn\'t been trained')
-            return self.pad(self.trainable_sequences)
+            warn('The model hasn\'t been trained yet')
+            return self.pad(self.trainable_sequences.detach())
         else:
             nucleotideProbs = Categorical(torch.transpose(self.softmaxed_sequences, 1, 2))
             sampledIdxs = nucleotideProbs.sample()
@@ -163,11 +163,11 @@ if __name__ == '__main__':
                         downPad_DNA=constants.MPRA_DOWNSTREAM,
                         vocab_list=constants.STANDARD_NT)
     model.optimize(predictor=first_token_rewarder,
-                   loss_fn=neg_reward_loss,
-                   steps=12,
-                   learning_rate=0.5,
-                   step_print=2,
-                   lr_scheduler=True)
+                    loss_fn=neg_reward_loss,
+                    steps=12,
+                    learning_rate=0.5,
+                    step_print=2,
+                    lr_scheduler=True)
     sample_example = model.generate()
     
     print('-----Sample example-----')
