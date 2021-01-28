@@ -91,7 +91,7 @@ class BODA2_DataModule(pl.LightningDataModule):
             seqTensors.append(seqTensor)
             activities.append(activity)
             if (idx+1)%10000 == 0:
-                print(f'{idx+1}/{self.num_examples} sequences padded and one-hotted...')                                         
+                print(f'{idx+1}/{self.num_examples} sequences padded and tokenized...')                                         
         self.sequencesTensor = torch.stack(seqTensors)
         self.activitiesTensor = torch.Tensor(activities).view(-1,1)            
         self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
