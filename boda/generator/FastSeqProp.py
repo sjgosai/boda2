@@ -33,17 +33,19 @@ class FastSeqProp(nn.Module):
         self.vocab_list = vocab_list
         self.vocab_len = len(vocab_list)
         self.create_paddingTensors()
+        self.softmaxed_logits = None
+        self.noise_factor = 0
         
         #initialize the trainable logits
         self.create_differentiable_input_logits()      
-        self.softmaxed_logits = None
         
         #instance normalization layer
         self.instance_norm = nn.InstanceNorm1d(num_features=self.vocab_len, affine=True)
         
     def forward(self):
         #scaled softmax relaxation
-        normalized_logits = self.instance_norm(self.differentiable_logits)
+        normalized_logits = self.instance_norm(self.differentiable_logits) + \
+             self.noise_factor*torch.rand((self.num_sequences, self.vocab_len, self.seq_len))
         softmaxed_logits = F.softmax(normalized_logits, dim=1)
         #save attributes without messing the backward graph
         self.softmaxed_logits = softmaxed_logits
@@ -94,7 +96,9 @@ class FastSeqProp(nn.Module):
         seq_tensor = torch.Tensor(seq_tensor)
         return seq_tensor
     
-    def optimize(self, predictor, loss_fn, steps=20, learning_rate=0.5, step_print=5, lr_scheduler=True):
+    def optimize(self, predictor, loss_fn, steps=20, learning_rate=0.5, 
+                 step_print=5, lr_scheduler=True, noise_factor=0):
+        self.noise_factor = noise_factor
         if lr_scheduler:
             etaMin = 0.000001
         else:
@@ -114,8 +118,9 @@ class FastSeqProp(nn.Module):
             optimizer.step()
             scheduler.step()
             loss_hist.append(loss.item())
+            self.noise_factor = self.noise_factor / np.sqrt(step)
             if step % step_print == 0:
-                print(f'step: {step}, loss: {round(loss.item(),6)}, learning_rate: {scheduler.get_last_lr()}')        
+                print(f'step: {step}, loss: {round(loss.item(),6)}, learning_rate: {scheduler.get_last_lr()}, noise factor: {self.noise_factor}')               
         print('-----Final distribution-----')
         print(self.padded_softmaxed_logits.detach().numpy())
         self.loss_hist = loss_hist
@@ -124,7 +129,6 @@ class FastSeqProp(nn.Module):
         vert_label=plt.ylabel('Loss')
         vert_label.set_rotation(90)
         plt.show()
-        return None
     
     def generate(self, padded=True):
         if self.softmaxed_logits == None:
@@ -160,10 +164,11 @@ if __name__ == '__main__':
                         vocab_list=constants.STANDARD_NT)
     model.optimize(predictor=first_token_rewarder,
                     loss_fn=neg_reward_loss,
-                    steps=12,
+                    steps=20,
                     learning_rate=0.5,
                     step_print=2,
-                    lr_scheduler=True)
+                    lr_scheduler=True,
+                    noise_factor=0.005)
     sample_example = model.generate()
     
     print('-----Sample example-----')
