@@ -29,7 +29,7 @@ class FastSeqProp(nn.Module):
         self.noise_factor = 0
         
         #initialize the trainable logits
-        self.create_differentiable_input_logits()      
+        self.create_differentiable_input_logits(one_hot=True)      
         
         #instance normalization layer
         self.instance_norm = nn.InstanceNorm1d(num_features=self.vocab_len, affine=True)
@@ -51,13 +51,18 @@ class FastSeqProp(nn.Module):
         softmaxed_logits, sampled_nucleotides = self.pad(softmaxed_logits), self.pad(sampled_nucleotides)
         return softmaxed_logits, sampled_nucleotides
     
-    def create_differentiable_input_logits(self):
-        differentiable_logits = np.zeros((self.num_sequences, self.vocab_len, self.seq_len))
-        for seqIdx in range(self.num_sequences):
-            for step in range(self.seq_len):
-                randomNucleotide = np.random.randint(self.vocab_len)
-                differentiable_logits[seqIdx, randomNucleotide, step] = 1
-        self.differentiable_logits = nn.Parameter(torch.tensor(differentiable_logits, dtype=torch.float))   
+    def create_differentiable_input_logits(self, one_hot=True):
+        if one_hot:
+            differentiable_logits = np.zeros((self.num_sequences, self.vocab_len, self.seq_len))
+            for seqIdx in range(self.num_sequences):
+                for step in range(self.seq_len):
+                    randomNucleotide = np.random.randint(self.vocab_len)
+                    differentiable_logits[seqIdx, randomNucleotide, step] = 1
+        
+            self.differentiable_logits = nn.Parameter(torch.tensor(differentiable_logits, dtype=torch.float))  
+        else:
+            self.differentiable_logits = nn.Parameter(torch.rand((self.num_sequences, self.vocab_len, self.seq_len)))
+         
     
     def create_paddingTensors(self):
         assert self.padding_len >= 0 and type(self.padding_len) == int, 'Padding must be a nonnegative integer'
@@ -157,9 +162,9 @@ if __name__ == '__main__':
                         vocab_list=constants.STANDARD_NT)
     model.optimize(predictor=first_token_rewarder,
                     loss_fn=neg_reward_loss,
-                    steps=20,
+                    steps=100,
                     learning_rate=0.5,
-                    step_print=2,
+                    step_print=20,
                     lr_scheduler=True,
                     noise_factor=0.005)
     sample_example = model.generate()
