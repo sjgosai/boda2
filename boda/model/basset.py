@@ -72,6 +72,8 @@ class Basset(ptl.LightningModule):
         parser.add_argument('--use_batch_norm', type=utils.str2bool, default=True)
         parser.add_argument('--use_weight_norm',type=utils.str2bool, default=False)
         
+        parser.add_argument('--learning_rate', type=float, default=1e-4)
+        
         return parser
     
     def __init__(self, conv1_channels=300, conv1_kernel_size=19, 
@@ -104,6 +106,8 @@ class Basset(ptl.LightningModule):
         self.dropout_p         = dropout_p
         self.use_batch_norm    = use_batch_norm
         self.use_weight_norm   = use_weight_norm
+        
+        self.learning_rate     = learning_rate
         
         self.pad1  = nn.ConstantPad1d(self.conv1_pad, 0.)
         self.conv1 = Conv1dNorm(4, 
