@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov  2 11:51:51 2020
-
-@author: castrr
-"""
-
 import argparse
 import numpy as np
 import torch

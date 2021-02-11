@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jan 19 16:22:03 2021
-
-@author: castrr
-"""
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -120,7 +112,8 @@ class FastSeqProp(nn.Module):
             loss_hist.append(loss.item())
             self.noise_factor = self.noise_factor / np.sqrt(step)
             if step % step_print == 0:
-                print(f'step: {step}, loss: {round(loss.item(),6)}, learning_rate: {scheduler.get_last_lr()}, noise factor: {self.noise_factor}')               
+                print(f'step: {step}, loss: {round(loss.item(),6)}, learning_rate: {scheduler.get_last_lr()}, noise factor: {self.noise_factor}')                      
+        self.noise_factor = 0
         print('-----Final distribution-----')
         print(self.padded_softmaxed_logits.detach().numpy())
         self.loss_hist = loss_hist
