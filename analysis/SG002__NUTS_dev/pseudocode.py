@@ -14,28 +14,58 @@ class SMT_parameters(nn.Module):
   
   
 class ST_parameters(nn.Module):
-  def __init__(self, num_sequences=1, vocab_len=4, seq_len=200, temperature=1, upPad_tensor, downPad_tensor):
-    self.num_sequences = num_sequences
-    self.vocab_len = vocab_len
-    self.seq_len = seq_len
-    self.upPad_tensor = upPad_tensor
-    self.temperature = temperature
-    self.downPad_tensor = downPad_tensor
-    self.softmax = nn.Softmax(dim=1)
-    self.theta = nn.Parameter( torch.rand(self.num_sequences, self.vocab_len, self.seq_len) )
-    self.register_buffer('upPad_tensor', upPad_tensor)
-    self.register_buffer('downPad_tensor', downPad_tensor)
+    def __init__(self,
+                 num_sequences=1,
+                 seq_len=200, 
+                 padding_len=0,
+                 upPad_DNA=None,
+                 downPad_DNA=None,
+                 vocab_list=['A','G','T','C'],
+                 temperature=1,
+                 num_st_samples=1,
+                 **kwargs):
+        super(ST_parameters, self).__init__()
+        self.num_sequences = num_sequences
+        self.seq_len = seq_len  
+        self.padding_len = padding_len
+        self.upPad_DNA = upPad_DNA
+        self.downPad_DNA = downPad_DNA
+        self.vocab_list = vocab_list
+        self.temperature = temperature
+        self.num_st_samples = num_st_samples
+        
+        self.softmax = nn.Softmax(dim=1)
+        self.vocab_len = len(vocab_list)       
+        upPad_logits, downPad_logits = create_paddingTensors()     #a method or import func? or import the pad tensors?
+        self.register_buffer('upPad_logits', upPad_logits)
+        self.register_buffer('downPad_logits', downPad_logits)
+        
+        # initialize theta and r
+        self.initialize_theta(one_hot=False)
+        self.r = torch.randn_like(self.theta) 
+            
+    def initialize_theta(self, one_hot=False):
+        if one_hot:
+            theta = np.zeros((self.num_sequences, self.vocab_len, self.seq_len))
+            for seqIdx in range(self.num_sequences):
+                for step in range(self.seq_len):
+                    random_token = np.random.randint(self.vocab_len)
+                    theta[seqIdx, random_token, step] = 1      
+            self.theta = nn.Parameter(torch.tensor(theta, dtype=torch.float))  
+        else:
+            self.theta = nn.Parameter(torch.rand((self.num_sequences, self.vocab_len, self.seq_len)))
     
-  def forward(self):
-    # Generate a Straight-through estimator sample
-    softmax_theta = self.softmax(self.theta / self.temperature)
-    probs = Categorical(torch.transpose(softmax_theta, 1, 2))
-    idxs = probs.sample()
-    sample_theta_T = F.one_hot(idxs, num_classes=self.vocab_len)   
-    sample_theta = torch.transpose(sample_theta_T, 1, 2)
-    sample_theta = sample_theta - softmax_theta.detach() + softmax_theta
-    sample_theta = torch.cat([ self.upPad_logits, sample_theta, self.downPad_logits], dim=2)
-    return sample_theta
+    def forward(self):
+        # Generate a Straight-through estimator sample
+        softmax_theta = self.softmax(self.theta / self.temperature)
+        probs = Categorical(torch.transpose(softmax_theta, 1, 2))
+        idxs = probs.sample((self.num_st_samples, ))
+        sample_theta_T = F.one_hot(idxs, num_classes=self.vocab_len)   
+        sample_theta = torch.transpose(sample_theta_T, 2, 3)
+        sample_theta = sample_theta - softmax_theta.detach() + softmax_theta
+        sample_theta = torch.cat([ self.upPad_logits, sample_theta, self.downPad_logits], dim=3)
+        return sample_theta
+    
   
 
 class NUTS3(nn.Module):
