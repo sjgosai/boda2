@@ -53,7 +53,7 @@ Dummy loss
 For maximizing avg reward
 '''
 def neg_reward_loss(x):
-    return -torch.mean(x)
+    return -torch.sum(x)
 
 
 
