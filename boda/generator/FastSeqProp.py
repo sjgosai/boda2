@@ -62,13 +62,18 @@ class FastSeqProp(nn.Module):
             for seqIdx in range(self.num_sequences):
                 for step in range(self.seq_len):
                     randomNucleotide = np.random.randint(self.vocab_len)
-                    differentiable_logits[seqIdx, randomNucleotide, step] = 1
-        
+                    differentiable_logits[seqIdx, randomNucleotide, step] = 1       
             self.differentiable_logits = nn.Parameter(torch.tensor(differentiable_logits, dtype=torch.float))  
         else:
             self.differentiable_logits = nn.Parameter(torch.rand((self.num_sequences, self.vocab_len, self.seq_len)))
          
-    
+    def set_seed(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(self.seed)
+                
     def create_paddingTensors(self):
         assert self.padding_len >= 0 and type(self.padding_len) == int, 'Padding must be a nonnegative integer'
         if self.padding_len > 0:
@@ -146,12 +151,6 @@ class FastSeqProp(nn.Module):
                 sampled_nucleotides = self.pad(sampled_nucleotides)
             return sampled_nucleotides.detach()
 
-    def set_seed(self):
-        if self.seed is not None:
-            np.random.seed(self.seed)
-            torch.manual_seed(self.seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed(self.seed)
 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
