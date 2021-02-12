@@ -25,13 +25,15 @@ class FastSeqProp(nn.Module):
         self.downPad_DNA = downPad_DNA
         self.vocab_list = vocab_list
         self.seed = seed
-        self.vocab_len = len(vocab_list)
-        self.create_paddingTensors()
-        self.softmaxed_logits = None
+        
+        self.vocab_len = len(vocab_list)       
         self.noise_factor = 0
+        self.softmaxed_logits = None
+
+        self.create_paddingTensors()      
         self.set_seed()
         
-        #initialize the trainable logits
+        #initialize the trainable logits     
         self.create_differentiable_input_logits(one_hot=True)      
         
         #instance normalization layer
