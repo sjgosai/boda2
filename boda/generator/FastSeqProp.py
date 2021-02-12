@@ -15,6 +15,7 @@ class FastSeqProp(nn.Module):
                  upPad_DNA=None,
                  downPad_DNA=None,
                  vocab_list=['A','G','T','C'],
+                 seed=None,
                  **kwargs):
         super(FastSeqProp, self).__init__()
         self.num_sequences = num_sequences
@@ -23,10 +24,12 @@ class FastSeqProp(nn.Module):
         self.upPad_DNA = upPad_DNA
         self.downPad_DNA = downPad_DNA
         self.vocab_list = vocab_list
+        self.seed = seed
         self.vocab_len = len(vocab_list)
         self.create_paddingTensors()
         self.softmaxed_logits = None
         self.noise_factor = 0
+        self.set_seed()
         
         #initialize the trainable logits
         self.create_differentiable_input_logits(one_hot=True)      
@@ -37,7 +40,7 @@ class FastSeqProp(nn.Module):
     def forward(self):
         #scaled softmax relaxation
         normalized_logits = self.instance_norm(self.differentiable_logits) + \
-             self.noise_factor*torch.rand((self.num_sequences, self.vocab_len, self.seq_len))
+             self.noise_factor*torch.randn_like(self.differentiable_logits)
         softmaxed_logits = F.softmax(normalized_logits, dim=1)
         #save attributes without messing the backward graph
         self.softmaxed_logits = softmaxed_logits
@@ -141,17 +144,19 @@ class FastSeqProp(nn.Module):
                 sampled_nucleotides = self.pad(sampled_nucleotides)
             return sampled_nucleotides.detach()
 
-
+    def set_seed(self):
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(self.seed)
 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
     from FastSeqProp_utils import first_token_rewarder, neg_reward_loss
     import sys
     sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-    from boda.common import constants  
-    
-    #np.random.seed(1)                   # anchor the initial DNA sequence(s)
-    #torch.manual_seed(1)                # anchor the sampling
+    from boda.common import constants     
     np.set_printoptions(precision=2)    # for shorter display of np arrays
     
     model = FastSeqProp(num_sequences=1,
@@ -159,7 +164,8 @@ if __name__ == '__main__':
                         padding_len=2,
                         upPad_DNA=constants.MPRA_UPSTREAM,
                         downPad_DNA=constants.MPRA_DOWNSTREAM,
-                        vocab_list=constants.STANDARD_NT)
+                        vocab_list=constants.STANDARD_NT,
+                        seed=None)
     model.optimize(predictor=first_token_rewarder,
                     loss_fn=neg_reward_loss,
                     steps=100,
