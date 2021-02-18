@@ -270,7 +270,7 @@ if __name__ == '__main__':
                 upPad_DNA=constants.MPRA_UPSTREAM,
                 downPad_DNA=constants.MPRA_DOWNSTREAM,
                 vocab_list=constants.STANDARD_NT,
-                seed=0,
+                seed=None,
                 temperature=1)
        
     #model.run_HMC(num_steps=500, epsilon=0.1)
