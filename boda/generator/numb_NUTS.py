@@ -222,6 +222,7 @@ class NUTS(nn.Module):
             print('--------------------------------')
             print(f'epsilon = {epsilon}')
             r_0 = torch.randn_like(self.r)
+            #changed 0 to 1e-10 to avoid possible log(0) in build_tree
             u = np.random.uniform(1e-10, self.p_fn(theta=self.theta, r=r_0))
             theta_minus, theta_plus = self.theta, self.theta
             r_minus, r_plus = self.r, self.r
