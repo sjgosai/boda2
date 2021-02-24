@@ -16,6 +16,7 @@ class NUTS(nn.Module):
                  vocab_list=['A','G','T','C'],
                  seed=None,
                  temperature=1,
+                 kinetic_scale_factor=1,
                  **kwargs):
         super(NUTS, self).__init__()
         self.fitness_fn = fitness_fn
@@ -27,6 +28,7 @@ class NUTS(nn.Module):
         self.vocab_list = vocab_list
         self.seed = seed
         self.temperature = temperature
+        self.kinetic_scale_factor = kinetic_scale_factor
         self.Delta_max = 1000
         self.delta = 0.65
         self.fitness_hist = []
@@ -106,9 +108,9 @@ class NUTS(nn.Module):
     
     def p_fn(self, theta=None, r=None, L=None):
         if theta is not None:
-            return torch.exp(self.L_fn(theta) - r.pow(2).sum()/2 / (1)).item()
+            return torch.exp(self.L_fn(theta) - r.pow(2).sum()/2 * self.kinetic_scale_factor).item()
         elif L is not None:
-            return torch.exp(L - r.pow(2).sum()/2/(1)).item()
+            return torch.exp(L - r.pow(2).sum()/2 * self.kinetic_scale_factor).item()
     
     def leapfrog(self, theta, r, epsilon):
         # make theta a leaf
@@ -168,7 +170,7 @@ class NUTS(nn.Module):
         while (np.log(p_prime + 1e-12) - np.log(p + 1e-12)) * a > np.log(0.5) * a:
             epsilon = epsilon * (2. ** a)
             _, _, _, _, p_prime = self.leapfrog(self.theta, self.r, epsilon)
-        print(f'Initial reasonable epsilon = {epsilon}')
+        #print(f'Initial reasonable epsilon = {epsilon}')
         return epsilon
     
     def stop_indicator(self, theta_minus, r_minus, theta_plus, r_plus):
@@ -255,21 +257,22 @@ class NUTS(nn.Module):
                 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
-    from FastSeqProp_utils import first_token_rewarder
     import sys
     sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-    from boda.common import constants    
+    from boda.common import constants, utils 
+
     np.set_printoptions(precision=2, suppress=True)    # for shorter display of np arrays
     
-    model = NUTS(fitness_fn=first_token_rewarder,
+    model = NUTS(fitness_fn=utils.first_token_rewarder,
                 num_sequences=1,
-                seq_len=5,
+                seq_len=200,
                 padding_len=0,
                 upPad_DNA=constants.MPRA_UPSTREAM,
                 downPad_DNA=constants.MPRA_DOWNSTREAM,
                 vocab_list=constants.STANDARD_NT,
                 seed=None,
-                temperature=1)
+                temperature=1,
+                kinetic_scale_factor=0.01)
        
     #model.run_HMC(num_steps=500, epsilon=0.1)
-    model.run_NUTS6(M=4, M_adapt=2)
+    model.run_NUTS6(M=20, M_adapt=6)
