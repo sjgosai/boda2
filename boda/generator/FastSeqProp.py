@@ -154,28 +154,27 @@ class FastSeqProp(nn.Module):
 
 
 #--------------------------- EXAMPLE ----------------------------------------
-# if __name__ == '__main__':
-#     from FastSeqProp_utils import first_token_rewarder, neg_reward_loss
-#     import sys
-#     sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-#     from boda.common import constants     
-#     np.set_printoptions(precision=2)    # for shorter display of np arrays
+if __name__ == '__main__':
+    import sys
+    sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
+    from boda.common import constants, utils     
+    np.set_printoptions(precision=2)    # for shorter display of np arrays
     
-#     model = FastSeqProp(num_sequences=1,
-#                         seq_len=5,
-#                         padding_len=2,
-#                         upPad_DNA=constants.MPRA_UPSTREAM,
-#                         downPad_DNA=constants.MPRA_DOWNSTREAM,
-#                         vocab_list=constants.STANDARD_NT,
-#                         seed=None)
-#     model.optimize(predictor=first_token_rewarder,
-#                     loss_fn=neg_reward_loss,
-#                     steps=100,
-#                     learning_rate=0.5,
-#                     step_print=20,
-#                     lr_scheduler=True,
-#                     noise_factor=0.005)
-#     sample_example = model.generate()
+    model = FastSeqProp(num_sequences=1,
+                        seq_len=5,
+                        padding_len=2,
+                        upPad_DNA=constants.MPRA_UPSTREAM,
+                        downPad_DNA=constants.MPRA_DOWNSTREAM,
+                        vocab_list=constants.STANDARD_NT,
+                        seed=None)
+    model.optimize(predictor=utils.first_token_rewarder,
+                    loss_fn=utils.neg_reward_loss,
+                    steps=100,
+                    learning_rate=0.5,
+                    step_print=20,
+                    lr_scheduler=True,
+                    noise_factor=0.005)
+    sample_example = model.generate()
     
-#     print('-----Sample example-----')
-#     print(sample_example.numpy())
+    print('-----Sample example-----')
+    print(sample_example.numpy())
