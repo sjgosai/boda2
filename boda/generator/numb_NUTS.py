@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.autograd as ag
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 import matplotlib.pyplot as plt
@@ -91,12 +90,8 @@ class NUTS(nn.Module):
                 for step in range(self.seq_len):
                     random_token = np.random.randint(self.vocab_len)
                     theta[seqIdx, random_token, step] = 1      
-            #self.theta = nn.Parameter(torch.tensor(theta, dtype=torch.float))  
-            #self.theta = torch.tensor(theta, dtype=torch.float)
             self.register_buffer('theta', torch.tensor(theta, dtype=torch.float))
         else:
-            #self.theta = nn.Parameter(torch.rand(size))
-            #self.theta = self.softmax(torch.rand(size))
             self.register_buffer('theta', self.softmax(torch.rand(size)))
             
     def L_fn(self, theta):
@@ -108,7 +103,6 @@ class NUTS(nn.Module):
         sampled_nucleotides = sampled_nucleotides - softmaxed_theta.detach() + softmaxed_theta  #ST estimator trick
         sampled_nucleotides = self.pad(sampled_nucleotides)
         return -self.fitness_fn(sampled_nucleotides).sum()
-        #return -self.fitness_fn(self.pad(theta)).sum()
     
     def p_fn(self, theta=None, r=None, L=None):
         if theta is not None:
