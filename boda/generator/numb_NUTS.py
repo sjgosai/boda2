@@ -39,8 +39,9 @@ class NUTS(nn.Module):
         self.set_seed()
         
         # initialize theta and r
-        self.initialize_theta(one_hot=False)
-        self.r = torch.randn_like(self.theta)
+        self.initialize_theta(one_hot=True)
+        #self.r = torch.randn_like(self.theta)
+        self.register_buffer('r', torch.randn_like(self.theta))
 
     def set_seed(self):
         if self.seed is not None:
@@ -91,10 +92,12 @@ class NUTS(nn.Module):
                     random_token = np.random.randint(self.vocab_len)
                     theta[seqIdx, random_token, step] = 1      
             #self.theta = nn.Parameter(torch.tensor(theta, dtype=torch.float))  
-            self.theta = torch.tensor(theta, dtype=torch.float)
+            #self.theta = torch.tensor(theta, dtype=torch.float)
+            self.register_buffer('theta', torch.tensor(theta, dtype=torch.float))
         else:
             #self.theta = nn.Parameter(torch.rand(size))
-            self.theta = self.softmax(torch.rand(size))
+            #self.theta = self.softmax(torch.rand(size))
+            self.register_buffer('theta', self.softmax(torch.rand(size)))
             
     def L_fn(self, theta):
         softmaxed_theta = self.softmax(theta / self.temperature)
@@ -103,14 +106,15 @@ class NUTS(nn.Module):
         sampled_nucleotides_T = F.one_hot(sampled_idxs, num_classes=self.vocab_len)        
         sampled_nucleotides = torch.transpose(sampled_nucleotides_T, 1, 2)
         sampled_nucleotides = sampled_nucleotides - softmaxed_theta.detach() + softmaxed_theta  #ST estimator trick
-        #sampled_nucleotides = self.pad(sampled_nucleotides)
+        sampled_nucleotides = self.pad(sampled_nucleotides)
         return -self.fitness_fn(sampled_nucleotides).sum()
+        #return -self.fitness_fn(self.pad(theta)).sum()
     
     def p_fn(self, theta=None, r=None, L=None):
         if theta is not None:
-            return torch.exp(self.L_fn(theta) - r.pow(2).sum()/2).item()
+            return torch.exp(self.L_fn(theta) - r.pow(2).sum()/2 / (1)).item()
         elif L is not None:
-            return torch.exp(L - r.pow(2).sum()/2).item()
+            return torch.exp(L - r.pow(2).sum()/2/(1)).item()
     
     def leapfrog(self, theta, r, epsilon):
         # make theta a leaf
@@ -134,20 +138,20 @@ class NUTS(nn.Module):
         return theta_prime, r_prime, L_prime.item(), L_grad_prime, p_prime
 
     def run_HMC(self, num_steps, epsilon=1):
-        self.fitness_hist.append(self.fitness_fn(self.theta))
-        print(self.theta.detach().numpy())
+        self.fitness_hist.append(self.fitness_fn(self.pad(self.theta)))
+        #print(self.theta)
         alpha_list = []
         for step in range(num_steps):
             r_0 = torch.randn_like(self.r)
             p = self.p_fn(theta=self.theta, r=r_0)
             theta_prime, r_prime, L_prime, _, p_prime = self.leapfrog(self.theta, self.r, epsilon)
-            alpha = min(1, p_prime/p)
+            alpha = min(1, p_prime/(p + 1e-20))
             random_prob = float(np.random.rand(1))
             alpha_list.append(alpha)
             if alpha >= random_prob:
                 self.theta, self.r = theta_prime, r_prime
                 self.fitness_hist.append(-L_prime)            
-        print(self.softmax(self.theta).numpy())
+        #print(self.softmax(self.theta))
         plt.plot(self.fitness_hist)
         plt.ylim(-0.01,1.01)
         plt.title('Fitness')
@@ -161,13 +165,13 @@ class NUTS(nn.Module):
         _, r_prime, _, L_grad_prime, p_prime = self.leapfrog(self.theta, self.r, epsilon)
         # check the initial step size does not yield infinite values of p or the grad
         k = 1
-        while np.isinf(p_prime) or np.isinf(L_grad_prime).any():   
+        while np.isinf(p_prime) or torch.isinf(L_grad_prime).any():   
             k *= 0.5
             epsilon = k * epsilon
             _, _, _, L_grad_prime, p_prime = self.leapfrog(self.theta, self.r, epsilon)              
         # set a = 2*I[p_prime/p > 0.5] - 1
-        a = 1. if p_prime/p > 0.5 else -1.
-        while (p_prime/p) ** a > 0.5 ** a:
+        a = 1. if p_prime/(p + 1e-12) > 0.5 else -1.
+        while (np.log(p_prime + 1e-12) - np.log(p + 1e-12)) * a > np.log(0.5) * a:
             epsilon = epsilon * (2. ** a)
             _, _, _, _, p_prime = self.leapfrog(self.theta, self.r, epsilon)
         print(f'Initial reasonable epsilon = {epsilon}')
@@ -183,9 +187,9 @@ class NUTS(nn.Module):
         if j == 0:   
             theta_prime, r_prime, L_prime, L_grad_prime, p_prime = self.leapfrog(theta, r, v * epsilon)
             n_prime = 1 if u <= p_prime else 0
-            s_prime = 1 if np.log(u) < (np.log(p_prime) + self.Delta_max) else 0
+            s_prime = 1 if np.log(u) < (np.log(p_prime + 1e-12) + self.Delta_max) else 0
             p_0 = self.p_fn(theta=theta_0, r=r_0)
-            alpha = min(1, p_prime/p_0)
+            alpha = min(1, p_prime/(p_0 + 1e-12))
             self.fitness_hist.append(-L_prime)
             return theta_prime, r_prime, theta_prime, r_prime, theta_prime, n_prime, s_prime, alpha, 1.
         else:
@@ -207,28 +211,29 @@ class NUTS(nn.Module):
                 n_prime += n_2prime
             return theta_minus, r_minus, theta_plus, r_plus, theta_prime, n_prime, s_prime, alpha_prime, n_alpha_prime
         
-    def run_NUTS6(self, M, M_adapt, max_height=12):    
+    def run_NUTS6(self, M, M_adapt, max_height=10):    
         epsilon = self.find_reasonable_epsilon()
-        print('Initial distributions:')
-        print(self.theta.numpy())
+        #print('Initial distributions:')
+        #print(self.theta)
         mu = np.log(10 * epsilon)
         epsilon_bar = 1
         H_bar = 0.
         gamma = 0.05
         t_0 = 10
         kappa = 0.75
-        self.fitness_hist.append(self.fitness_fn(self.theta))
+        self.fitness_hist.append(self.fitness_fn(self.pad(self.theta)))
         for m in range(M):
             print('--------------------------------')
+            print(f'Step {m+1} / {M}')
             print(f'epsilon = {epsilon}')
             r_0 = torch.randn_like(self.r)
             #changed 0 to 1e-10 to avoid possible log(0) in build_tree
-            u = np.random.uniform(1e-10, self.p_fn(theta=self.theta, r=r_0))
+            u = np.random.uniform(1e-12, self.p_fn(theta=self.theta, r=r_0))
             theta_minus, theta_plus = self.theta, self.theta
             r_minus, r_plus = self.r, self.r
             j, n, s = 0, 1, 1
             while s == 1 and j <= max_height:
-                print(f'Height of the tree = {j}')
+                #print(f'Height of the tree = {j}')
                 v = np.random.choice([-1, 1])
                 if v == -1:
                     theta_minus, r_minus, _, _, theta_prime, n_prime, s_prime, alpha, n_alpha = \
@@ -243,15 +248,14 @@ class NUTS(nn.Module):
                 n += n_prime
                 s = s_prime * self.stop_indicator(theta_minus, r_minus, theta_plus, r_plus)
                 j += 1
-            if m <= M_adapt:
+            if m < M_adapt:
                 H_bar = (1 - 1/(m + t_0)) * H_bar + 1/(m + t_0) * (self.delta - alpha / n_alpha)
                 epsilon = np.exp(mu - H_bar * np.sqrt(m+1) / gamma)
                 #re-wrote: log(epsilon_bar) = m ** (-kappa) * log(epsilon) + ( 1 - m ** (-kappa)) * log(epsilon_bar)
                 epsilon_bar = epsilon_bar * (epsilon * epsilon_bar) ** (1 / (m+1) ** kappa)
-            print('Final distributions:')
-            print(self.softmax(self.theta).numpy())
-            plt.plot(self.fitness_hist)
-            plt.ylim(-0.01,1.01)
+            #print('Final distributions:')
+            #print(theta_prime)
+            plt.plot(self.fitness_hist, linestyle="",marker=".")
             plt.title(f'Fitness history after {m+1} iterations')
             plt.show()
                 
