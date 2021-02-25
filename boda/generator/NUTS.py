@@ -40,7 +40,8 @@ class NUTS_parameters(nn.Module):
         self.register_buffer('r', torch.randn_like(self.theta))
         
         # create and register the padding tensors
-        upPad_logits, downPad_logits = utils.create_paddingTensors(self.num_sequences, self.padding_len, self.num_st_samples)
+        upPad_logits, downPad_logits = utils.create_paddingTensors(self.num_sequences, self.padding_len,
+                                                                   self.num_st_samples, self.ST_sampling)
         self.register_buffer('upPad_logits', upPad_logits)
         self.register_buffer('downPad_logits', downPad_logits)
                 
