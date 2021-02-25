@@ -163,11 +163,11 @@ class NUTS6(nn.Module):
         gamma = 0.05
         t_0 = 10
         kappa = 0.75
-        initial_fitness = self.fitness_fn(self.phase_params.pad(self.phase_params.theta, multi_sampling_off=True))
+        initial_fitness = self.fitness_fn(self.phase_params.pad(self.phase_params.theta, multi_sampling_off=True)).mean()
         self.fitness_hist.append(initial_fitness.item())
         for m in range(M):
             print('--------------------------------')
-            print(f'Step {m+1} / {M}')
+            print(f'Trial {m+1} / {M}')
             print(f'epsilon = {epsilon}')
             r_0 = torch.randn_like(self.phase_params.r)
             #changed 0 to 1e-10 to avoid possible log(0) in build_tree
@@ -199,11 +199,11 @@ class NUTS6(nn.Module):
             #print('Final distributions:')
             #print(theta_prime)
             plt.plot(self.fitness_hist, linestyle="",marker=".")
-            plt.title(f'Fitness history after {m+1} iterations')
+            plt.title(f'Average fitness history after {m+1} trials')
             plt.show()
             
     def L_fn(self, theta):
-        return -self.fitness_fn(self.phase_params(theta)).sum()
+        return -self.fitness_fn(self.phase_params(theta)).mean()
     
     def p_fn(self, theta=None, r=None, L=None):
         if theta is not None:
@@ -258,50 +258,6 @@ class NUTS6(nn.Module):
         return 1 * s.item()
         
     def build_tree(self, theta, r, u, v, j, epsilon, theta_0, r_0):
-        """
-        
-
-        Parameters
-        ----------
-        theta : TYPE
-            DESCRIPTION.
-        r : TYPE
-            DESCRIPTION.
-        u : TYPE
-            DESCRIPTION.
-        v : TYPE
-            DESCRIPTION.
-        j : TYPE
-            DESCRIPTION.
-        epsilon : TYPE
-            DESCRIPTION.
-        theta_0 : TYPE
-            DESCRIPTION.
-        r_0 : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        TYPE
-            DESCRIPTION.
-        TYPE
-            DESCRIPTION.
-        TYPE
-            DESCRIPTION.
-        TYPE
-            DESCRIPTION.
-        theta_prime : TYPE
-            DESCRIPTION.
-        n_prime : TYPE
-            DESCRIPTION.
-        s_prime : TYPE
-            DESCRIPTION.
-        TYPE
-            DESCRIPTION.
-        TYPE
-            DESCRIPTION.
-
-        """
         if j == 0:   
             theta_prime, r_prime, L_prime, L_grad_prime, p_prime = self.leapfrog(theta, r, v * epsilon)
             n_prime = 1 if u <= p_prime else 0
@@ -334,7 +290,7 @@ class NUTS6(nn.Module):
 if __name__ == '__main__':
     
     phase_params = NUTS_parameters(theta_0=None,
-                                num_sequences=1,
+                                num_sequences=3,
                                 num_st_samples=10,
                                 seq_len=200, 
                                 padding_len=400,
@@ -346,5 +302,5 @@ if __name__ == '__main__':
                     fitness_fn=utils.first_token_rewarder,
                     kinetic_scale_factor=0.1)
     
-    sampler.run(M=20, M_adapt=10)
+    sampler.run(M=15, M_adapt=10)
         
