@@ -114,7 +114,7 @@ class NUTS_parameters(nn.Module):
         
 class NUTS6(nn.Module):
     def __init__(self,
-                 parameters,
+                 phase_params,
                  fitness_fn,
                  kinetic_scale_factor=1,
                  **kwargs):
@@ -123,7 +123,7 @@ class NUTS6(nn.Module):
 
         Parameters
         ----------
-        parameters : torch Module
+        phase_params : torch Module
             DESCRIPTION.
         fitness_fn : torch Module
             DESCRIPTION.
@@ -138,7 +138,7 @@ class NUTS6(nn.Module):
 
         """
         super(NUTS6, self).__init__()
-        self.parameters = parameters
+        self.phase_params = phase_params
         self.fitness_fn = fitness_fn
         self.kinetic_scale_factor = kinetic_scale_factor
         self.Delta_max = 1000
@@ -151,37 +151,37 @@ class NUTS6(nn.Module):
     def run(self, M, M_adapt, max_height=10):    
         epsilon = self.find_reasonable_epsilon()
         #print('Initial distributions:')
-        #print(self.parameters.theta)
+        #print(self.phase_params.theta)
         mu = np.log(10 * epsilon)
         epsilon_bar = 1
         H_bar = 0.
         gamma = 0.05
         t_0 = 10
         kappa = 0.75
-        self.fitness_hist.append(self.fitness_fn(self.pad(self.parameters.theta)))
+        #self.fitness_hist.append(self.fitness_fn(self.phase_params.pad(self.phase_params.theta)))
         for m in range(M):
             print('--------------------------------')
             print(f'Step {m+1} / {M}')
             print(f'epsilon = {epsilon}')
-            r_0 = torch.randn_like(self.parameters.r)
+            r_0 = torch.randn_like(self.phase_params.r)
             #changed 0 to 1e-10 to avoid possible log(0) in build_tree
-            u = np.random.uniform(1e-12, self.p_fn(theta=self.parameters.theta, r=r_0))
-            theta_minus, theta_plus = self.parameters.theta, self.parameters.theta
-            r_minus, r_plus = self.parameters.r, self.parameters.r
+            u = np.random.uniform(1e-12, self.p_fn(theta=self.phase_params.theta, r=r_0))
+            theta_minus, theta_plus = self.phase_params.theta, self.phase_params.theta
+            r_minus, r_plus = self.phase_params.r, self.phase_params.r
             j, n, s = 0, 1, 1
             while s == 1 and j <= max_height:
                 #print(f'Height of the tree = {j}')
                 v = np.random.choice([-1, 1])
                 if v == -1:
                     theta_minus, r_minus, _, _, theta_prime, n_prime, s_prime, alpha, n_alpha = \
-                        self.build_tree(theta_minus, r_minus, u, v, j, epsilon, self.parameters.theta, r_0)
+                        self.build_tree(theta_minus, r_minus, u, v, j, epsilon, self.phase_params.theta, r_0)
                 else:
                     _, _, theta_plus, r_plus, theta_prime, n_prime, s_prime, alpha, n_alpha = \
-                        self.build_tree(theta_plus, r_plus, u, v, j, epsilon, self.parameters.theta, r_0)
+                        self.build_tree(theta_plus, r_plus, u, v, j, epsilon, self.phase_params.theta, r_0)
                 if s_prime == 1:
                     random_prob = float(np.random.rand(1))
                     if min(1, n_prime / n) >= random_prob:
-                        self.parameters.theta = theta_prime
+                        self.phase_params.theta = theta_prime
                 n += n_prime
                 s = s_prime * self.stop_indicator(theta_minus, r_minus, theta_plus, r_plus)
                 j += 1
@@ -197,7 +197,7 @@ class NUTS6(nn.Module):
             plt.show()
             
     def L_fn(self, theta):
-        return -self.fitness_fn(self.parameters(theta)).sum()
+        return -self.fitness_fn(self.phase_params(theta)).sum()
     
     def p_fn(self, theta=None, r=None, L=None):
         if theta is not None:
@@ -228,22 +228,28 @@ class NUTS6(nn.Module):
     
     # adapted from https://github.com/mfouesneau/NUTS
     def find_reasonable_epsilon(self):
-        p = self.p_fn(theta=self.parameters.theta, r=self.parameters.r)
+        p = self.p_fn(theta=self.phase_params.theta, r=self.phase_params.r)
         epsilon = 1
-        _, r_prime, _, L_grad_prime, p_prime = self.leapfrog(self.parameters.theta, self.parameters.r, epsilon)
+        _, r_prime, _, L_grad_prime, p_prime = self.leapfrog(self.phase_params.theta, self.phase_params.r, epsilon)
         # check the initial step size does not yield infinite values of p or the grad
         k = 1
         while np.isinf(p_prime) or torch.isinf(L_grad_prime).any():   
             k *= 0.5
             epsilon = k * epsilon
-            _, _, _, L_grad_prime, p_prime = self.leapfrog(self.parameters.theta, self.parameters.r, epsilon)              
+            _, _, _, L_grad_prime, p_prime = self.leapfrog(self.phase_params.theta, self.phase_params.r, epsilon)              
         # set a = 2*I[p_prime/p > 0.5] - 1
         a = 1. if p_prime/(p + 1e-12) > 0.5 else -1.
         while (np.log(p_prime + 1e-12) - np.log(p + 1e-12)) * a > np.log(0.5) * a:
             epsilon = epsilon * (2. ** a)
-            _, _, _, _, p_prime = self.leapfrog(self.parameters.theta, self.parameters.r, epsilon)
+            _, _, _, _, p_prime = self.leapfrog(self.phase_params.theta, self.phase_params.r, epsilon)
         #print(f'Initial reasonable epsilon = {epsilon}')
         return epsilon
+    
+    def stop_indicator(self, theta_minus, r_minus, theta_plus, r_plus):
+        theta_diff = theta_plus - theta_minus
+        s = (torch.mul(theta_diff, r_plus).sum() >= 0) and (torch.mul(theta_diff, r_minus).sum() >= 0)
+        if s == False: print('Stopped by U-turn')
+        return 1 * s.item()
         
     def build_tree(self, theta, r, u, v, j, epsilon, theta_0, r_0):
         """
@@ -316,4 +322,23 @@ class NUTS6(nn.Module):
                 s_prime = s_2prime * self.stop_indicator(theta_minus, r_minus, theta_plus, r_plus)
                 n_prime += n_2prime
             return theta_minus, r_minus, theta_plus, r_plus, theta_prime, n_prime, s_prime, alpha_prime, n_alpha_prime
+        
+
+#--------------------------- EXAMPLE ----------------------------------------
+if __name__ == '__main__':
+    
+    phase_params = NUTS_parameters(theta_0=None,
+                                num_sequences=1,
+                                num_st_samples=1,
+                                seq_len=200, 
+                                padding_len=400,
+                                vocab_len=4,
+                                temperature=1,
+                                ST_sampling=True)
+    
+    sampler = NUTS6(phase_params=phase_params,
+                    fitness_fn=utils.first_token_rewarder,
+                    kinetic_scale_factor=1)
+    
+    
         
