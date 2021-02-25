@@ -335,7 +335,7 @@ if __name__ == '__main__':
     
     phase_params = NUTS_parameters(theta_0=None,
                                 num_sequences=1,
-                                num_st_samples=1,
+                                num_st_samples=10,
                                 seq_len=200, 
                                 padding_len=400,
                                 vocab_len=4,
@@ -344,7 +344,7 @@ if __name__ == '__main__':
     
     sampler = NUTS6(phase_params=phase_params,
                     fitness_fn=utils.first_token_rewarder,
-                    kinetic_scale_factor=1)
+                    kinetic_scale_factor=0.1)
     
-    
+    sampler.run(M=20, M_adapt=10)
         
