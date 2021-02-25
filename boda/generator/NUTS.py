@@ -175,8 +175,8 @@ class NUTS6(nn.Module):
         for m in pbar:
             pbar.set_postfix({'epsilon': epsilon})
             r_0 = torch.randn_like(self.phase_params.r)
-            #changed 0 to 1e-10 to avoid possible log(0) in build_tree
-            u = np.random.uniform(1e-12, self.p_fn(theta=self.phase_params.theta, r=r_0))
+            #changed 0 to 1e-15 to avoid possible log(0) in build_tree
+            u = np.random.uniform(1e-15, self.p_fn(theta=self.phase_params.theta, r=r_0))
             theta_minus, theta_plus = self.phase_params.theta, self.phase_params.theta
             r_minus, r_plus = self.phase_params.r, self.phase_params.r
             j, n, s = 0, 1, 1
