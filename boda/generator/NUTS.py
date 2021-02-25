@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 import matplotlib.pyplot as plt
+import time
+from tqdm import tqdm, tqdm_gui
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
@@ -153,7 +155,9 @@ class NUTS6(nn.Module):
         self.softmax = nn.Softmax(dim=1)
         self.grad = torch.autograd.grad
     
-    def run(self, M, M_adapt, max_height=10):    
+    def run(self, M, M_adapt, max_height=10):  
+        self.M = M
+        self.M_adapt = M_adapt
         epsilon = self.find_reasonable_epsilon()
         #print('Initial distributions:')
         #print(self.phase_params.theta)
@@ -165,10 +169,10 @@ class NUTS6(nn.Module):
         kappa = 0.75
         initial_fitness = self.fitness_fn(self.phase_params.pad(self.phase_params.theta, multi_sampling_off=True)).mean()
         self.fitness_hist.append(initial_fitness.item())
-        for m in range(M):
-            print('--------------------------------')
-            print(f'Trial {m+1} / {M}')
-            print(f'epsilon = {epsilon}')
+        visited_theta = []
+        visited_theta.append(self.phase_params.theta.numpy())
+        for m in tqdm(range(self.M)):
+            print(f' epsilon = {epsilon}')
             r_0 = torch.randn_like(self.phase_params.r)
             #changed 0 to 1e-10 to avoid possible log(0) in build_tree
             u = np.random.uniform(1e-12, self.p_fn(theta=self.phase_params.theta, r=r_0))
@@ -176,7 +180,6 @@ class NUTS6(nn.Module):
             r_minus, r_plus = self.phase_params.r, self.phase_params.r
             j, n, s = 0, 1, 1
             while s == 1 and j <= max_height:
-                #print(f'Height of the tree = {j}')
                 v = np.random.choice([-1, 1])
                 if v == -1:
                     theta_minus, r_minus, _, _, theta_prime, n_prime, s_prime, alpha, n_alpha = \
@@ -188,19 +191,17 @@ class NUTS6(nn.Module):
                     random_prob = float(np.random.rand(1))
                     if min(1, n_prime / n) >= random_prob:
                         self.phase_params.theta = theta_prime
+                        visited_theta.append(theta_prime)
                 n += n_prime
                 s = s_prime * self.stop_indicator(theta_minus, r_minus, theta_plus, r_plus)
                 j += 1
-            if m < M_adapt:
+            if m < self.M_adapt:
                 H_bar = (1 - 1/(m + t_0)) * H_bar + 1/(m + t_0) * (self.delta - alpha / n_alpha)
                 epsilon = np.exp(mu - H_bar * np.sqrt(m+1) / gamma)
                 #re-wrote: log(epsilon_bar) = m ** (-kappa) * log(epsilon) + ( 1 - m ** (-kappa)) * log(epsilon_bar)
                 epsilon_bar = epsilon_bar * (epsilon * epsilon_bar) ** (1 / (m+1) ** kappa)
-            #print('Final distributions:')
-            #print(theta_prime)
-            plt.plot(self.fitness_hist, linestyle="",marker=".")
-            plt.title(f'Average fitness history after {m+1} trials')
-            plt.show()
+        self.visited_theta = visited_theta
+
             
     def L_fn(self, theta):
         return -self.fitness_fn(self.phase_params(theta)).mean()
@@ -285,6 +286,17 @@ class NUTS6(nn.Module):
                 n_prime += n_2prime
             return theta_minus, r_minus, theta_plus, r_plus, theta_prime, n_prime, s_prime, alpha_prime, n_alpha_prime
         
+    def plots(self):
+        if self.phase_params.num_sequences > 1:
+            fitness_plot_title = f'Fitness-average history after {self.M} trials'
+        else:
+            fitness_plot_title = f'Fitness history after {self.M} trials'
+        plt.plot(self.fitness_hist, linestyle="",marker=".")
+        plt.title(fitness_plot_title)
+        plt.show()      
+           
+            
+        
 
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
@@ -292,15 +304,10 @@ if __name__ == '__main__':
     phase_params = NUTS_parameters(theta_0=None,
                                 num_sequences=3,
                                 num_st_samples=10,
-                                seq_len=200, 
-                                padding_len=400,
-                                vocab_len=4,
                                 temperature=1,
-                                ST_sampling=True)
-    
+                                ST_sampling=True)  
     sampler = NUTS6(phase_params=phase_params,
                     fitness_fn=utils.first_token_rewarder,
-                    kinetic_scale_factor=0.1)
-    
-    sampler.run(M=15, M_adapt=10)
-        
+                    kinetic_scale_factor=0.025)    
+    sampler.run(M=30, M_adapt=8, max_height=8)  
+    sampler.plots()
