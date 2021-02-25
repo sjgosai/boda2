@@ -171,8 +171,9 @@ class NUTS6(nn.Module):
         self.fitness_hist.append(initial_fitness.item())
         visited_theta = []
         visited_theta.append(self.phase_params.theta.numpy())
-        for m in tqdm(range(self.M)):
-            print(f' epsilon = {epsilon}')
+        pbar = tqdm(range(self.M))
+        for m in pbar:
+            pbar.set_postfix({'epsilon': epsilon})
             r_0 = torch.randn_like(self.phase_params.r)
             #changed 0 to 1e-10 to avoid possible log(0) in build_tree
             u = np.random.uniform(1e-12, self.p_fn(theta=self.phase_params.theta, r=r_0))
@@ -302,12 +303,12 @@ class NUTS6(nn.Module):
 if __name__ == '__main__':
     
     phase_params = NUTS_parameters(theta_0=None,
-                                num_sequences=3,
+                                num_sequences=1,
                                 num_st_samples=10,
                                 temperature=1,
                                 ST_sampling=True)  
     sampler = NUTS6(phase_params=phase_params,
                     fitness_fn=utils.first_token_rewarder,
                     kinetic_scale_factor=0.025)    
-    sampler.run(M=30, M_adapt=8, max_height=8)  
+    sampler.run(M=20, M_adapt=10, max_height=10)  
     sampler.plots()
