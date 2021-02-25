@@ -61,7 +61,7 @@ def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
     return seq_tensor
     
 
-def create_paddingTensors(num_sequences, padding_len):
+def create_paddingTensors(num_sequences, padding_len, num_st_samples=1, for_multi_sampling=True):
     """
     
     Parameters
@@ -70,6 +70,12 @@ def create_paddingTensors(num_sequences, padding_len):
         Number of sequences that will be padded.
     padding_len : int
         Total length of padding (maximally evenly distributed in up and down stream).
+    num_st_samples: int
+        Number of straight-through samples per sequence that will be padded.
+        The default is 1.
+    for_multi_sampling: bool
+        Whether or not the tensor will pad multi-sampled sequences.
+        The defaul is True.
 
     Returns
     -------
@@ -87,8 +93,12 @@ def create_paddingTensors(num_sequences, padding_len):
                                      dna2tensor(constants.MPRA_DOWNSTREAM)
         upPad_logits, downPad_logits = upPad_logits[:,-padding_len//2 + padding_len%2:], \
                                      downPad_logits[:,:padding_len//2 + padding_len%2]
-        upPad_logits, downPad_logits = upPad_logits.repeat(num_sequences, 1, 1), \
-                                     downPad_logits.repeat(num_sequences, 1, 1)     
+        if for_multi_sampling:
+            upPad_logits, downPad_logits = upPad_logits.repeat(num_st_samples, num_sequences, 1, 1), \
+                                        downPad_logits.repeat(num_st_samples, num_sequences, 1, 1)                                     
+        else:
+            upPad_logits, downPad_logits = upPad_logits.repeat(num_sequences, 1, 1), \
+                                         downPad_logits.repeat(num_sequences, 1, 1)  
     return upPad_logits, downPad_logits
         
 
