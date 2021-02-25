@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
 from boda.common import utils 
 
+
 class NUTS_parameters(nn.Module):
     def __init__(self,
                  theta_0=None,
@@ -20,6 +21,35 @@ class NUTS_parameters(nn.Module):
                  temperature=1,
                  ST_sampling=True,
                  **kwargs):
+        """
+        
+
+        Parameters
+        ----------
+        theta_0 : torch tensor, optional
+            DESCRIPTION. The default is None.
+        num_sequences : int, optional
+            DESCRIPTION. The default is 1.
+        num_st_samples : int, optional
+            DESCRIPTION. The default is 1.
+        seq_len : int, optional
+            DESCRIPTION. The default is 200.
+        padding_len : int, optional
+            DESCRIPTION. The default is 400.
+        vocab_len : int, optional
+            DESCRIPTION. The default is 4.
+        temperature : float, optional
+            DESCRIPTION. The default is 1.
+        ST_sampling : bool, optional
+            DESCRIPTION. The default is True.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super(NUTS_parameters, self).__init__()
         self.theta_0 = theta_0
         self.num_sequences = num_sequences
@@ -88,6 +118,25 @@ class NUTS6(nn.Module):
                  fitness_fn,
                  kinetic_scale_factor=1,
                  **kwargs):
+        """
+        
+
+        Parameters
+        ----------
+        parameters : torch Module
+            DESCRIPTION.
+        fitness_fn : torch Module
+            DESCRIPTION.
+        kinetic_scale_factor : float, optional
+            DESCRIPTION. The default is 1.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super(NUTS6, self).__init__()
         self.parameters = parameters
         self.fitness_fn = fitness_fn
@@ -197,6 +246,50 @@ class NUTS6(nn.Module):
         return epsilon
         
     def build_tree(self, theta, r, u, v, j, epsilon, theta_0, r_0):
+        """
+        
+
+        Parameters
+        ----------
+        theta : TYPE
+            DESCRIPTION.
+        r : TYPE
+            DESCRIPTION.
+        u : TYPE
+            DESCRIPTION.
+        v : TYPE
+            DESCRIPTION.
+        j : TYPE
+            DESCRIPTION.
+        epsilon : TYPE
+            DESCRIPTION.
+        theta_0 : TYPE
+            DESCRIPTION.
+        r_0 : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+        TYPE
+            DESCRIPTION.
+        TYPE
+            DESCRIPTION.
+        TYPE
+            DESCRIPTION.
+        theta_prime : TYPE
+            DESCRIPTION.
+        n_prime : TYPE
+            DESCRIPTION.
+        s_prime : TYPE
+            DESCRIPTION.
+        TYPE
+            DESCRIPTION.
+        TYPE
+            DESCRIPTION.
+
+        """
         if j == 0:   
             theta_prime, r_prime, L_prime, L_grad_prime, p_prime = self.leapfrog(theta, r, v * epsilon)
             n_prime = 1 if u <= p_prime else 0
