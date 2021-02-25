@@ -256,7 +256,7 @@ class NUTS6(nn.Module):
     def stop_indicator(self, theta_minus, r_minus, theta_plus, r_plus):
         theta_diff = theta_plus - theta_minus
         s = (torch.mul(theta_diff, r_plus).sum() >= 0) and (torch.mul(theta_diff, r_minus).sum() >= 0)
-        if s == False: print('Stopped by U-turn')
+        if s == False: print('Trial stopped by U-turn')
         return 1 * s.item()
         
     def build_tree(self, theta, r, u, v, j, epsilon, theta_0, r_0):
@@ -303,7 +303,7 @@ class NUTS6(nn.Module):
 if __name__ == '__main__':
     
     phase_params = NUTS_parameters(theta_0=None,
-                                num_sequences=1,
+                                num_sequences=3,
                                 num_st_samples=10,
                                 temperature=1,
                                 ST_sampling=True)  
