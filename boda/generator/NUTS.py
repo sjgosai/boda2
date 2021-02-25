@@ -105,9 +105,14 @@ class NUTS_parameters(nn.Module):
             else:
                 self.register_buffer('theta', self.softmax(torch.rand(size)))
            
-    def pad(self, tensor):
+    def pad(self, tensor, multi_sampling_off=False):
         if self.padding_len > 0:
-            return torch.cat([ self.upPad_logits, tensor, self.downPad_logits], dim=-1)
+            if multi_sampling_off:
+                size = tensor.shape
+                upPad_logits, downPad_logits = self.upPad_logits[0].view(size), self.downPad_logits[0].view(size)
+                return torch.cat([ upPad_logits, tensor, downPad_logits], dim=-1)
+            else:
+                return torch.cat([ self.upPad_logits, tensor, self.downPad_logits], dim=-1)
         else: 
             return tensor
         
@@ -158,7 +163,8 @@ class NUTS6(nn.Module):
         gamma = 0.05
         t_0 = 10
         kappa = 0.75
-        #self.fitness_hist.append(self.fitness_fn(self.phase_params.pad(self.phase_params.theta)))
+        initial_fitness = self.fitness_fn(self.phase_params.pad(self.phase_params.theta, multi_sampling_off=True))
+        self.fitness_hist.append(initial_fitness.item())
         for m in range(M):
             print('--------------------------------')
             print(f'Step {m+1} / {M}')
