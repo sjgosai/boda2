@@ -13,61 +13,70 @@ class NUTS_parameters(nn.Module):
     def __init__(self,
                  theta_0=None,
                  num_sequences=1,
+                 num_st_samples=1,
                  seq_len=200, 
                  padding_len=400,
                  vocab_len=4,
                  temperature=1,
-                 sampling=True,
+                 ST_sampling=True,
                  **kwargs):
         super(NUTS_parameters, self).__init__()
-        self.theta = theta_0
+        self.theta_0 = theta_0
         self.num_sequences = num_sequences
+        self.num_st_samples = num_st_samples
         self.seq_len = seq_len  
         self.padding_len = padding_len
         self.vocab_len = vocab_len
         self.temperature = temperature
+        self.ST_sampling = ST_sampling
+        
+        self.softmax = nn.Softmax(dim=1)
+        self.grad = torch.autograd.grad
         
         # if initial theta was not given, initialize randomly
-        if self.theta is None:
-            self.initialize_theta(one_hot=True)
+        self.initialize_theta(one_hot=True)
         
         # initialize the momentum r
         self.register_buffer('r', torch.randn_like(self.theta))
         
         # create and register the padding tensors
-        upPad_logits, downPad_logits = utils.create_paddingTensors(self.num_sequences, self.padding_len)
+        upPad_logits, downPad_logits = utils.create_paddingTensors(self.num_sequences, self.padding_len, self.num_st_samples)
         self.register_buffer('upPad_logits', upPad_logits)
         self.register_buffer('downPad_logits', downPad_logits)
                 
     def forward(self, theta):
         softmaxed_theta = self.softmax(theta / self.temperature)
-        if not self.sampling:
-            return self.pad(softmaxed_theta)
-        else:
+        if self.ST_sampling:
            softmaxed_theta = self.softmax(theta / self.temperature)
-           nucleotide_probs = Categorical(torch.transpose(softmaxed_theta, 1, 2))
-           sampled_idxs = nucleotide_probs.sample()
-           sampled_nucleotides_T = F.one_hot(sampled_idxs, num_classes=self.vocab_len)        
-           sampled_nucleotides = torch.transpose(sampled_nucleotides_T, 1, 2)
-           sampled_nucleotides = sampled_nucleotides - softmaxed_theta.detach() + softmaxed_theta  #ST estimator trick
-           return self.pad(sampled_nucleotides)
+           probs = Categorical(torch.transpose(softmaxed_theta, 1, 2))
+           idxs = probs.sample((self.num_st_samples, ))
+           sampled_theta_T = F.one_hot(idxs, num_classes=self.vocab_len)   
+           sampled_theta = torch.transpose(sampled_theta_T, 2, 3)
+           sampled_theta = sampled_theta - softmaxed_theta.detach() + softmaxed_theta
+           sampled_theta = self.pad(sampled_theta)
+           sampled_theta = sampled_theta.view(self.num_st_samples * self.num_sequences, self.vocab_len, -1)
+           return sampled_theta
+        else:
+            return self.pad(softmaxed_theta)
          
     def initialize_theta(self, one_hot=True):
-        size = (self.num_sequences, self.vocab_len, self.seq_len)
-        if one_hot:
-            theta = np.zeros(size)
-            for seqIdx in range(self.num_sequences):
-                for step in range(self.seq_len):
-                    random_token = np.random.randint(self.vocab_len)
-                    theta[seqIdx, random_token, step] = 1      
-            self.register_buffer('theta', torch.tensor(theta, dtype=torch.float))
+        if self.theta_0 is not None:
+            self.register_buffer('theta', self.theta_0)
         else:
-            self.register_buffer('theta', self.softmax(torch.rand(size)))
+            size = (self.num_sequences, self.vocab_len, self.seq_len)
+            if one_hot:
+                theta = np.zeros(size)
+                for seqIdx in range(self.num_sequences):
+                    for step in range(self.seq_len):
+                        random_token = np.random.randint(self.vocab_len)
+                        theta[seqIdx, random_token, step] = 1      
+                self.register_buffer('theta', torch.tensor(theta, dtype=torch.float))
+            else:
+                self.register_buffer('theta', self.softmax(torch.rand(size)))
            
     def pad(self, tensor):
         if self.padding_len > 0:
-            padded_tensor = torch.cat([ self.upPad_logits, tensor, self.downPad_logits], dim=2)
-            return padded_tensor
+            return torch.cat([ self.upPad_logits, tensor, self.downPad_logits], dim=-1)
         else: 
             return tensor
         
