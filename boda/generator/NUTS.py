@@ -33,7 +33,7 @@ class NUTS_parameters(nn.Module):
         self.softmax = nn.Softmax(dim=1)
         self.grad = torch.autograd.grad
         
-        # if initial theta was not given, initialize randomly
+        # register initial theta. if it was not given, initialize randomly
         self.initialize_theta(one_hot=True)
         
         # initialize the momentum r
