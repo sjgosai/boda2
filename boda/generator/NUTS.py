@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
 import matplotlib.pyplot as plt
 import time
-from tqdm import tqdm, tqdm_gui
+from tqdm import tqdm
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
@@ -171,7 +171,7 @@ class NUTS6(nn.Module):
         self.fitness_hist.append(initial_fitness.item())
         visited_theta = []
         visited_theta.append(self.phase_params.theta.numpy())
-        pbar = tqdm(range(self.M))
+        pbar = tqdm(range(self.M), desc='NUTS Trials')
         for m in pbar:
             pbar.set_postfix({'epsilon': epsilon})
             r_0 = torch.randn_like(self.phase_params.r)
@@ -303,12 +303,12 @@ class NUTS6(nn.Module):
 if __name__ == '__main__':
     
     phase_params = NUTS_parameters(theta_0=None,
-                                num_sequences=3,
+                                num_sequences=1,
                                 num_st_samples=10,
                                 temperature=1,
                                 ST_sampling=True)  
     sampler = NUTS6(phase_params=phase_params,
                     fitness_fn=utils.first_token_rewarder,
-                    kinetic_scale_factor=0.025)    
+                    kinetic_scale_factor=0.028)    
     sampler.run(M=20, M_adapt=10, max_height=10)  
     sampler.plots()
