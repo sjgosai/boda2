@@ -64,7 +64,7 @@ class Basset(ptl.LightningModule):
         parser.add_argument('--conv2_channels', type=int, default=200)
         parser.add_argument('--conv2_kernel_size', type=int, default=11)
         
-        parser.add_argument('--conv3_channels', type=int, default=300)
+        parser.add_argument('--conv3_channels', type=int, default=200)
         parser.add_argument('--conv3_kernel_size', type=int, default=7)
         
         parser.add_argument('--linear1_channels', type=int, default=1000)
@@ -186,3 +186,11 @@ class Basset(ptl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+
+
+if __name__ == '__main__':   
+    parser = argparse.ArgumentParser(description="BassetModel", add_help=False)
+    parser = Basset.add_model_specific_args(parser) 
+    #model = Basset(parser)
+    #summary(model, (4, 600) )
+    
