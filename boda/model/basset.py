@@ -186,11 +186,4 @@ class Basset(ptl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-
-
-if __name__ == '__main__':   
-    parser = argparse.ArgumentParser(description="BassetModel", add_help=False)
-    parser = Basset.add_model_specific_args(parser) 
-    #model = Basset(parser)
-    #summary(model, (4, 600) )
     
