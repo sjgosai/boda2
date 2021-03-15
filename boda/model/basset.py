@@ -6,7 +6,10 @@ import torch.nn.functional as F
 
 import pytorch_lightning as ptl
 
-from ..common import utils
+#from ..common import utils
+import sys
+sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
+from boda.common import utils 
 
 def get_padding(kernel_size):
     left = (kernel_size - 1) // 2
@@ -81,7 +84,8 @@ class Basset(ptl.LightningModule):
                  conv3_channels=200, conv3_kernel_size=7, 
                  linear1_channels=1000, linear2_channels=1000, 
                  n_outputs=280, activation='ReLU', 
-                 dropout_p=0.3, use_batch_norm=True, use_weight_norm=False):
+                 dropout_p=0.3, use_batch_norm=True, use_weight_norm=False,
+                 learning_rate=1e-4):                                                
         super().__init__()
         
         self.conv1_channels    = conv1_channels
@@ -146,7 +150,7 @@ class Basset(ptl.LightningModule):
                                   weight_norm=self.use_weight_norm)
         self.output  = nn.Linear(self.linear2_channels, self.n_outputs)
         
-        self.nonlin  = getattr(nn, self.activation)
+        self.nonlin  = getattr(nn, self.activation)()                               
         
         self.dropout = nn.Dropout(p=self.dropout_p)
         
@@ -155,11 +159,10 @@ class Basset(ptl.LightningModule):
     def forward(self, x):
         hook = self.nonlin( self.conv1( self.pad1( x ) ) )
         hook = self.maxpool_3( hook )
-        hook = self.nonlin( self.conv2( self.pad2( x ) ) )
+        hook = self.nonlin( self.conv2( self.pad2( hook ) ) )
         hook = self.maxpool_4( hook )
-        hook = self.nonlin( self.conv3( self.pad3( x ) ) )
-        hook = self.maxpool_4( self.pad4( hook ) )
-        
+        hook = self.nonlin( self.conv3( self.pad3( hook ) ) )
+        hook = self.maxpool_4( self.pad4( hook ) )        
         hook = torch.flatten( hook, start_dim=1 )
         
         hook = self.dropout( self.nonlin( self.linear1( hook ) ) )
