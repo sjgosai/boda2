@@ -107,8 +107,7 @@ class BODA2_DataModule(pl.LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.dataset_test, batch_size=self.batchSize,
                           shuffle=False, num_workers=self.numWorkers)
-    
-    
+       
     #------------------------------ HELPER METHODS ------------------------------ 
     @staticmethod
     def parse_textFile(file_path, sequence_column, activity_column):

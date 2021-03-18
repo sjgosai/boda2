@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Dec 30 18:21:59 2020
-
-@author: castrr
-"""
-
 import argparse
 import torch
 import torch.nn as nn
@@ -13,10 +5,8 @@ import torch.nn.functional as F
 from torchsummary import summary
 import pytorch_lightning as pl
 
-
 '''
 Custom MPRA activity predictor
-
 '''
 class MPRAregressionModel(pl.LightningModule):
 

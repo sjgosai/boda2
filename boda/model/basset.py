@@ -164,11 +164,10 @@ class Basset(ptl.LightningModule):
         hook = self.nonlin( self.conv3( self.pad3( hook ) ) )
         hook = self.maxpool_4( self.pad4( hook ) )        
         hook = torch.flatten( hook, start_dim=1 )
-        
         hook = self.dropout( self.nonlin( self.linear1( hook ) ) )
         hook = self.dropout( self.nonlin( self.linear2( hook ) ) )
-        
-        return self.output( hook )
+        output = self.output( hook )
+        return output, hook
         
     def training_step(self, batch, batch_idx):
         x, y   = batch
