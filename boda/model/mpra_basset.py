@@ -3,7 +3,12 @@ import torch
 import torch.nn as nn
 from torchsummary import summary
 import pytorch_lightning as pl
-from basset import Basset
+#from basset import Basset
+
+import sys
+sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
+import boda
+from boda.model.basset import Basset
 
 class MPRA_Basset(pl.LightningModule):
 
@@ -72,8 +77,7 @@ class MPRA_Basset(pl.LightningModule):
         self.log('test_loss', loss)       
         
     def configure_optimizers(self):
-        optimizer = getattr(torch.optim, self.optimizer)(self.parameters(),
-                                                         lr=self.learning_rate,
+        optimizer = getattr(torch.optim, self.optimizer)(self.parameters(), lr=self.learning_rate,
                                                          weight_decay=self.weight_decay)       
         if self.scheduler:
             lr_scheduler = {
