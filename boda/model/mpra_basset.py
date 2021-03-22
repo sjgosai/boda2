@@ -7,22 +7,33 @@ import pytorch_lightning as pl
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-import boda
 from boda.model.basset import Basset
 
 class MPRA_Basset(pl.LightningModule):
-
+    
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         
-        args = parser.parse_args()
-        print(f'Parser argumentss: {vars(args)}')
+        parser.add_argument('--pretrained', type=bool, default=True, 
+                            help='True if pretrained basset weights are going to be given')  
+        parser.add_argument('--target_width', type=int, default=3, 
+                            help='Width (or length) of the target data') 
+        parser.add_argument('--learning_rate', type=float, default=1e-4, 
+                            help='Value of the learning rate')
+        parser.add_argument('--optimizer', type=str, default='Adam', 
+                            help='Name of the optimizer')
+        parser.add_argument('--scheduler', type=bool, default=True, 
+                            help='If true it implements cosine annealing LR')
+        parser.add_argument('--weight_decay', type=float, default=1e-6, 
+                            help='Weight decay rate')
+        parser.add_argument('--epochs', type=int, default=1, 
+                            help='Number of epochs passed to the trainer (used by the scheduler)') 
         return parser
     
     def __init__(self,
-                 pretrained=True,
                  basset_weights_path=None,
+                 pretrained=True,
                  target_width=3,
                  learning_rate=1e-4,
                  optimizer='Adam',
@@ -30,7 +41,35 @@ class MPRA_Basset(pl.LightningModule):
                  weight_decay=1e-6,
                  epochs=1,
                  **kwargs):
+        """
         
+
+        Parameters
+        ----------
+        pretrained : TYPE, optional
+            DESCRIPTION. The default is True.
+        basset_weights_path : TYPE, optional
+            DESCRIPTION. The default is None.
+        target_width : TYPE, optional
+            DESCRIPTION. The default is 3.
+        learning_rate : TYPE, optional
+            DESCRIPTION. The default is 1e-4.
+        optimizer : TYPE, optional
+            DESCRIPTION. The default is 'Adam'.
+        scheduler : TYPE, optional
+            DESCRIPTION. The default is False.
+        weight_decay : TYPE, optional
+            DESCRIPTION. The default is 1e-6.
+        epochs : TYPE, optional
+            DESCRIPTION. The default is 1.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.pretrained = pretrained
         self.basset_weights_path = basset_weights_path
@@ -51,6 +90,7 @@ class MPRA_Basset(pl.LightningModule):
         
         self.basset_last_hidden_width = self.basset_net.linear2_channels
         self.mpra_output = nn.Linear(self.basset_last_hidden_width, self.target_width)
+        self.example_input_array = torch.rand(1, 4, 600)
         
     def forward(self, x):
         _, basset_last_hidden = self.basset_net(x)
