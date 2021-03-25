@@ -19,7 +19,7 @@ Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
 Arguments:
     dataFile_path - Path to the .txt file with the data (space-separated)
     sequenceColumn - Name of the column of the DNA sequences
-    MactivityColumn - Name of the column of the associated activity
+    MactivityColumns - List of names of the columns of the associated activity
     ValSize_pct - Percentage of examples to form the validation set
     TestSize_pct - Percentage of examples to form the test set
     bathSize - Number of examples in each mini batch
@@ -50,18 +50,19 @@ class BODA2_DataModule(pl.LightningDataModule):
     def __init__(self,
                  dataFile_path,
                  sequenceColumn,
-                 activityColumn,
+                 activityColumns,
                  ValSize_pct=5,
                  TestSize_pct=5,
                  batchSize=32,
                  paddedSeqLen=600, 
-                 numWorkers=8, **kwargs):       
+                 numWorkers=8,
+                 **kwargs):       
         
         super().__init__()
         self.dataName  = 'BODA2_data'
         self.dataFile_path = dataFile_path
         self.sequenceColumn = sequenceColumn
-        self.activityColumn = activityColumn
+        self.activityColumns = activityColumns
         self.ValSize_pct = ValSize_pct
         self.TestSize_pct = TestSize_pct
         self.batchSize = batchSize
@@ -70,14 +71,16 @@ class BODA2_DataModule(pl.LightningDataModule):
         
     def setup(self):             
         #--------- parse data from original MPRA files ---------
-        self.raw_data = self.parse_textFile(self.dataFile_path, self.sequenceColumn, self.activityColumn)
+        self.raw_data = self.parse_textFile(self.dataFile_path, self.sequenceColumn, self.activityColumns)
         self.num_examples = len(self.raw_data)
         
         #--------- pad dna sequences, convert to one-hots, create tensors ---------          
         print('Padding sequences and converting to one-hot tensors...')
         seqTensors = []
         activities = []
-        for idx,(sequence, activity) in enumerate(self.raw_data):
+        for idx, data in enumerate(self.raw_data):
+            sequence = data[0]
+            activity = data[1:]
             paddedSeq = self.pad_sequence(sequence, self.paddedSeqLen, constants.MPRA_UPSTREAM, constants.MPRA_DOWNSTREAM)
             seqTensor = self.dna2tensor(paddedSeq, vocab=constants.STANDARD_NT)
             seqTensors.append(seqTensor)
@@ -85,7 +88,7 @@ class BODA2_DataModule(pl.LightningDataModule):
             if (idx+1)%10000 == 0:
                 print(f'{idx+1}/{self.num_examples} sequences padded and tokenized...')                                         
         self.sequencesTensor = torch.stack(seqTensors)
-        self.activitiesTensor = torch.Tensor(activities).view(-1,1)            
+        self.activitiesTensor = torch.Tensor(activities).view(-1, len(self.activityColumns))            
         self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
         
         #--------- split dataset in train/val/test sets ---------     
@@ -110,9 +113,9 @@ class BODA2_DataModule(pl.LightningDataModule):
        
     #------------------------------ HELPER METHODS ------------------------------ 
     @staticmethod
-    def parse_textFile(file_path, sequence_column, activity_column):
+    def parse_textFile(file_path, sequence_column, activity_columns):
         df = pd.read_csv(file_path, sep=" ")
-        sub_df = df[[sequence_column, activity_column]].dropna()
+        sub_df = df[[sequence_column, *activity_columns]].dropna()
         data_list = sub_df.values.tolist()
         return data_list
     
@@ -142,9 +145,9 @@ if __name__ == '__main__':
     import time
     start_time = time.perf_counter()
     
-    dm = BODA2_DataModule(dataRile_path='./BODA.MPRA.txt',
+    dm = BODA2_DataModule(dataFile_path='./BODA.MPRA.txt',
                          sequenceColumn='nt.sequence',
-                         activityColumn='K562',
+                         activityColumns=['K562', 'HepG2', 'SKNSH'],
                          ValSize_pct=5,
                          TestSize_pct=5,
                          batchSize=32,
