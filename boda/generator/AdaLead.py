@@ -2,11 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
-# import torch.nn.functional as F
-# from torch.distributions.categorical import Categorical
-# import matplotlib.pyplot as plt
-# import time
-# from tqdm import tqdm
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
