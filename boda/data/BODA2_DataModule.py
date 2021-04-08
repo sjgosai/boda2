@@ -7,24 +7,9 @@ from torch.utils.data import random_split, DataLoader, TensorDataset
 import sys
 
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-import boda
 from boda.common import constants     
 
 
-'''
-- Pytorch Lighting DataModule -
-Takes a .txt file with a column cotaining DNA sequences
-and another column containing some activity.
-Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
-Arguments:
-    dataFile_path - Path to the .txt file with the data (space-separated)
-    sequenceColumn - Name of the column of the DNA sequences
-    MactivityColumns - List of names of the columns of the associated activity
-    ValSize_pct - Percentage of examples to form the validation set
-    TestSize_pct - Percentage of examples to form the test set
-    bathSize - Number of examples in each mini batch
-    paddedSeqLen - Desired total sequence length after padding
-'''
 class BODA2_DataModule(pl.LightningDataModule):
     
     @staticmethod
@@ -32,32 +17,58 @@ class BODA2_DataModule(pl.LightningDataModule):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         
         parser.add_argument('--ValSize_pct', type=float, default=5, 
-                            help='Percentage of examples to form the validation set')  
-        
+                            help='Percentage of examples to form the validation set')    
         parser.add_argument('--TestSize_pct', type=float, default=5, 
-                            help='Percentage of examples to form the test set')  
-        
+                            help='Percentage of examples to form the test set')          
         parser.add_argument('--bathSize', type=int, default=32, 
-                            help='Number of examples in each mini batch')  
-        
+                            help='Number of examples in each mini batch')         
         parser.add_argument('--paddedSeqLen', type=int, default=600, 
                             help='Desired total sequence length after padding') 
-        
-        args = parser.parse_args()
-        print(f'Parser arguments: {vars(args)}')
+        parser.add_argument('--numWorkers', type=int, default=8, 
+                            help='number of gpus or cpu cores to be used') 
         return parser
     
     def __init__(self,
                  dataFile_path,
-                 sequenceColumn,
-                 activityColumns,
+                 sequenceColumn='nt.sequence',
+                 activityColumns=['K562', 'HepG2', 'SKNSH'],
                  ValSize_pct=5,
                  TestSize_pct=5,
                  batchSize=32,
                  paddedSeqLen=600, 
                  numWorkers=8,
                  **kwargs):       
-        
+        """
+        Takes a .txt file with a column cotaining DNA sequences
+        and another column containing some activity.
+        Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
+
+        Parameters
+        ----------
+        dataFile_path : TYPE
+            Path to the .txt file with the data (space-separated).
+        sequenceColumn : TYPE, optional
+             Name of the column of the DNA sequences. The default is 'nt.sequence'.
+        activityColumns : TYPE, optional
+            List of names of the columns of the associated activity. The default is ['K562', 'HepG2', 'SKNSH'].
+        ValSize_pct : TYPE, optional
+            Percentage of examples to form the validation set. The default is 5.
+        TestSize_pct : TYPE, optional
+            Percentage of examples to form the test set. The default is 5.
+        batchSize : TYPE, optional
+            Number of examples in each mini batch. The default is 32.
+        paddedSeqLen : TYPE, optional
+            Desired total sequence length after padding. The default is 600.
+        numWorkers : TYPE, optional
+            number of gpus(?) or cpu cores to be used. The default is 8.
+        **kwargs : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__()
         self.dataName  = 'BODA2_data'
         self.dataFile_path = dataFile_path
@@ -136,25 +147,3 @@ class BODA2_DataModule(pl.LightningDataModule):
             seqTensor[vocab.index(letter), letterIdx] = 1
         seqTensor = torch.Tensor(seqTensor)
         return seqTensor 
-    
-   
-    
-   
-#------------------------------- EXAMPLE --------------------------------------------------
-if __name__ == '__main__':   
-    import time
-    start_time = time.perf_counter()
-    
-    dm = BODA2_DataModule(dataFile_path='./BODA.MPRA.txt',
-                         sequenceColumn='nt.sequence',
-                         activityColumns=['K562', 'HepG2', 'SKNSH'],
-                         ValSize_pct=5,
-                         TestSize_pct=5,
-                         batchSize=32,
-                         paddedSeqLen=600, 
-                         numWorkers=8)
-    
-    dm.setup()    
-    end_time = time.perf_counter()
-    run_time = end_time - start_time
-    print(f"Finished in {run_time:.4f} secs")
