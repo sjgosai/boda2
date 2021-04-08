@@ -118,7 +118,7 @@ def first_token_rewarder(sequences):
     """
     weights = torch.zeros_like(sequences)
     weights[:,0,:] = 1
-    rewards = (weights * sequences).sum(2).sum(1) / sequences.shape[2]
+    rewards = (weights * sequences).sum(2).sum(1).div(sequences.shape[2])
     rewards = rewards.view(-1, 1)
     return rewards
 
