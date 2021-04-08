@@ -8,7 +8,6 @@ import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
 from boda.model.mpra_basset import MPRA_Basset
 from boda.data.BODA2_DataModule import BODA2_DataModule
-%load_ext tensorboard
 
 
 def main(args):
@@ -32,7 +31,6 @@ def main(args):
     
     trainer.fit(model, datamodule)
     trainer.test()
-    %tensorboard --logdir model_logs/MPRAbasset_logs
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='MPRA_Basset', add_help=False)
