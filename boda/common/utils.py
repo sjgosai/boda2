@@ -1,12 +1,13 @@
 import argparse
 import torch
+import random
 import numpy as np
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
 from boda.common import constants 
 
-def set_seed(seed):
+def set_all_seeds(seed):
     """Fixes all random seeds
     
     Parameters
@@ -21,6 +22,7 @@ def set_seed(seed):
     """
     np.random.seed(seed)
     torch.manual_seed(seed)
+    random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed(seed)
 
@@ -102,7 +104,7 @@ def create_paddingTensors(num_sequences, padding_len, num_st_samples=1, for_mult
     return upPad_logits, downPad_logits
         
 
-def first_token_rewarder(sequences):
+def first_token_rewarder(sequences, pct=1.):
     """Predictor for dummy examples
 
     Parameters
@@ -120,7 +122,7 @@ def first_token_rewarder(sequences):
     weights[:,0,:] = 1
     rewards = (weights * sequences).sum(2).sum(1).div(sequences.shape[2])
     rewards = rewards.view(-1, 1)
-    return rewards
+    return 1 - abs(rewards - pct)
 
 
 def neg_reward_loss(x):
