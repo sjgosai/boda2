@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import random
+from tqdm import tqdm
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
@@ -119,24 +120,10 @@ class AdaLead(nn.Module):
             ret.append("".join(strB))
         return ret
     
-    def propose_sequences(self, from_last_checkpoint=False):
-        self.dflt_device = self.device_reference_tensor.device    
-        if from_last_checkpoint:
-            try:
-                self.measured_sequences = self.new_seqs
-                print('Starting from last checkpoint')
-            except:
-                print('Not possible to start from last checkpoint')
-        else:
-            if self.measured_sequences is None:
-                self.measured_sequences = self.start_from_random_sequences(self.sequences_batch_size)
-                print('Starting from random sequences')
-            else:
-                print('Starting from the given initial sequences')
-                
+    def propose_sequences(self, initial_sequences): #from_last_checkpoint=False):              
         """Propose top `sequences_batch_size` sequences for evaluation."""
-        measured_sequence_set = set(self.measured_sequences)
-        measured_fitnesses = self.get_fitness(self.measured_sequences)
+        measured_sequence_set = set(initial_sequences)
+        measured_fitnesses = self.get_fitness(initial_sequences)
         #print(measured_fitnesses)
         
         # Get all sequences within `self.threshold` percentile of the top_fitness
@@ -144,15 +131,15 @@ class AdaLead(nn.Module):
         top_inds = np.argwhere((measured_fitnesses >= top_fitness * (
                                     1 - np.sign(top_fitness) * self.threshold)))
         top_inds = top_inds.reshape(-1).tolist()
+        self.initial_top_fitness = top_fitness
         #print(top_inds)
-        print(f'Initial top fitness: {top_fitness}')
+        #print(f'Initial top fitness: {self.top_fitness}')
         
-        parents = [self.measured_sequences[i] for i in top_inds]
+        parents = [initial_sequences[i] for i in top_inds]
         parents = np.resize(np.array(parents), self.sequences_batch_size,)
         #print(parents)
         
         sequences = {}
-        
         previous_model_cost = self.model_cost
         while self.model_cost - previous_model_cost < self.model_queries_per_batch:
             # generate recombinant mutants
@@ -205,8 +192,21 @@ class AdaLead(nn.Module):
         new_seqs = np.array(list(sequences.keys()))
         preds = np.array(list(sequences.values()))
         sorted_order = np.argsort(preds)[: -self.sequences_batch_size : -1]
-        self.new_seqs, self.preds = new_seqs[sorted_order], preds[sorted_order]
-    
+        return new_seqs[sorted_order], preds[sorted_order]
+        
+    def run(self, num_iterations=10):
+        self.dflt_device = self.device_reference_tensor.device    
+        if self.measured_sequences is None:
+            self.new_seqs = self.start_from_random_sequences(self.sequences_batch_size)
+            #print('Starting from random sequences')
+        else:
+            self.new_seqs = self.measured_sequences
+            #print('Starting from given initial sequences')
+        pbar = tqdm(range(num_iterations), desc='Iterations')
+        for iteration in pbar:
+            self.new_seqs, self.preds = self.propose_sequences(self.new_seqs)
+            self.final_top_fitness = max(self.preds)
+            pbar.set_postfix({'Initial top fitness': self.initial_top_fitness, 'Final top fitness': self.final_top_fitness})
     
     
 #--------------------------- EXAMPLE ----------------------------------------
@@ -224,17 +224,8 @@ if __name__ == '__main__':
                     seq_len = 100,
                     padding_len = 0,
                     fitness_fn = partial(utils.first_token_rewarder, pct=0.99))
-    #print(generator.measured_sequences)
-    #print(generator.recombine_population(generator.measured_sequences))
-    #print(generator.get_fitness(generator.measured_sequences))
-    generator.propose_sequences()
-    print(f'Final top fitness {max(generator.preds)}')
-    #print(generator.new_seqs)
-    num_improvements = 10
-    for i in range(num_improvements):
-        print(f'----- Improvement {i+2} -----')
-        generator.propose_sequences(from_last_checkpoint=True)
-        print(f'Final top fitness {max(generator.preds)}')
+    generator.run(num_iterations=11)
+    print('')
     print(f'Top 5 sequences: {generator.new_seqs[:5]}')
     print(f'Top 5 fitnesses: {generator.preds[:5]}')
     
