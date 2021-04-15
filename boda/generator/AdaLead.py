@@ -50,7 +50,7 @@ class AdaLead(nn.Module):
 
         #This tensor is used to get the device of the model in .propose_sequences()
         #since the padding tensors are None is padding_len=0.
-        #The device is used in .get_fitness()
+        #The device is used in .run()
         self.register_buffer('device_reference_tensor', torch.zeros(1))    
         self.dflt_device = self.device_reference_tensor.device
         
@@ -212,7 +212,7 @@ class AdaLead(nn.Module):
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
     from functools import partial
-    utils.set_all_seeds(0)
+    #utils.set_all_seeds(0)
     
     generator = AdaLead(model_queries_per_batch = 5000,
                     eval_batch_size = 20,
@@ -225,8 +225,8 @@ if __name__ == '__main__':
                     padding_len = 0,
                     fitness_fn = partial(utils.first_token_rewarder, pct=0.99))
     generator.run(num_iterations=11)
-    print('')
-    print(f'Top 5 sequences: {generator.new_seqs[:5]}')
-    print(f'Top 5 fitnesses: {generator.preds[:5]}')
+    # print('')
+    # print(f'Top 5 sequences: {generator.new_seqs[:5]}')
+    # print(f'Top 5 fitnesses: {generator.preds[:5]}')
     
     
