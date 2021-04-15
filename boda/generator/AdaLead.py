@@ -46,16 +46,19 @@ class AdaLead(nn.Module):
                                                                    for_multi_sampling=False)
         self.register_buffer('upPad_logits', upPad_logits)
         self.register_buffer('downPad_logits', downPad_logits)
-        
-        if measured_sequences is None:
-            self.measured_sequences = self.start_from_random_sequences(50)
+
+        #This tensor is used to get the device of the model in .propose_sequences()
+        #since the padding tensors are None is padding_len=0.
+        #The device is used in .get_fitness()
+        self.register_buffer('device_reference_tensor', torch.zeros(1))    
+        self.dflt_device = self.device_reference_tensor.device
         
     def get_fitness(self, sequence_list):
         self.model_cost += len(sequence_list)
-        batch = self.string_list_to_tensor(sequence_list)
+        batch = self.string_list_to_tensor(sequence_list).to(self.dflt_device)
         batch = self.pad(batch)
         fitnesses = self.fitness_fn(batch)
-        return 1 - np.abs( 0.9 - fitnesses.squeeze().numpy())
+        return fitnesses.squeeze().cpu().numpy()
     
     def string_list_to_tensor(self, sequence_list):
         batch_len = len(sequence_list)
@@ -64,6 +67,7 @@ class AdaLead(nn.Module):
         for idx, seq_str in enumerate(sequence_list):
             tensor = utils.dna2tensor(seq_str)
             batch_tensor[idx, :, :] = tensor
+        self.register_buffer('batch_tensor', batch_tensor)
         return batch_tensor
              
     def pad(self, tensor):
@@ -115,11 +119,25 @@ class AdaLead(nn.Module):
             ret.append("".join(strB))
         return ret
     
-    def propose_sequences(self):
+    def propose_sequences(self, from_last_checkpoint=False):
+        self.dflt_device = self.device_reference_tensor.device    
+        if from_last_checkpoint:
+            try:
+                self.measured_sequences = self.new_seqs
+                print('Starting from last checkpoint')
+            except:
+                print('Not possible to start from last checkpoint')
+        else:
+            if self.measured_sequences is None:
+                self.measured_sequences = self.start_from_random_sequences(self.sequences_batch_size)
+                print('Starting from random sequences')
+            else:
+                print('Starting from the given initial sequences')
+                
         """Propose top `sequences_batch_size` sequences for evaluation."""
         measured_sequence_set = set(self.measured_sequences)
         measured_fitnesses = self.get_fitness(self.measured_sequences)
-        print(measured_fitnesses)
+        #print(measured_fitnesses)
         
         # Get all sequences within `self.threshold` percentile of the top_fitness
         top_fitness = measured_fitnesses.max()
@@ -181,8 +199,7 @@ class AdaLead(nn.Module):
         if len(sequences) == 0:
             raise ValueError(
                 "No sequences generated. If `model_queries_per_batch` is small, try "
-                "making `eval_batch_size` smaller"
-            )
+                "making `eval_batch_size` smaller")
 
         # We propose the top `self.sequences_batch_size` new sequences we have generated
         new_seqs = np.array(list(sequences.keys()))
@@ -194,23 +211,31 @@ class AdaLead(nn.Module):
     
 #--------------------------- EXAMPLE ----------------------------------------
 if __name__ == '__main__':
+    from functools import partial
+    utils.set_all_seeds(0)
     
-    model = AdaLead(model_queries_per_batch = 10000,
-                    eval_batch_size = 100,
-                    sequences_batch_size = 15,
-                    rho = 5,
+    generator = AdaLead(model_queries_per_batch = 5000,
+                    eval_batch_size = 20,
+                    sequences_batch_size = 100,
+                    rho = 50,
                     threshold = 0.1,
                     recomb_rate = 0.1,
                     mu = 1,
-                    seq_len = 10,
+                    seq_len = 100,
                     padding_len = 0,
-                    fitness_fn = utils.first_token_rewarder)
-    print(model.measured_sequences)
-    #print(model.recombine_population(model.measured_sequences))
-    #print(model.get_fitness(model.measured_sequences))
-    model.propose_sequences()
-    print(model.new_seqs)
-    print(model.preds)
-    
+                    fitness_fn = partial(utils.first_token_rewarder, pct=0.99))
+    #print(generator.measured_sequences)
+    #print(generator.recombine_population(generator.measured_sequences))
+    #print(generator.get_fitness(generator.measured_sequences))
+    generator.propose_sequences()
+    print(f'Final top fitness {max(generator.preds)}')
+    #print(generator.new_seqs)
+    num_improvements = 10
+    for i in range(num_improvements):
+        print(f'----- Improvement {i+2} -----')
+        generator.propose_sequences(from_last_checkpoint=True)
+        print(f'Final top fitness {max(generator.preds)}')
+    print(f'Top 5 sequences: {generator.new_seqs[:5]}')
+    print(f'Top 5 fitnesses: {generator.preds[:5]}')
     
     
