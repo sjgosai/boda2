@@ -3,11 +3,9 @@ import torch
 import torch.nn as nn
 from torchsummary import summary
 import pytorch_lightning as pl
-#from basset import Basset
 
 import sys
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-from boda.model.basset import Basset
+from .basset import Basset
 
 class MPRA_Basset(pl.LightningModule):
     

@@ -18,4 +18,7 @@ WORKDIR /usr/src/boda2/
 RUN pip install --upgrade pip==20.2.3
 RUN pip install --no-cache-dir --use-feature=2020-resolver -r requirements.txt
 
+# Installing BODA as a package
+RUN pip install -e .
+
 WORKDIR /

@@ -6,10 +6,8 @@ import torch.nn.functional as F
 
 import pytorch_lightning as ptl
 
-#from ..common import utils
 import sys
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-from boda.common import utils 
+from ..common import utils 
 
 def get_padding(kernel_size):
     left = (kernel_size - 1) // 2

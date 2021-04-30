@@ -4,8 +4,7 @@ import random
 import numpy as np
 
 import sys
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
-from boda.common import constants 
+from . import constants 
 
 def set_all_seeds(seed):
     """Fixes all random seeds
