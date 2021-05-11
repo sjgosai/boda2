@@ -9,7 +9,7 @@ echo "Registering container to:"
 fullname="${docker_registry}/${container_name}:${container_version}"
 echo "${fullname}"
 
-docker build -t ${container_name} -f ${dockerfile} .
+docker build -t ${container_name} -f ${dockerfile} . --no-cache
 docker tag ${container_name} ${fullname}
 
 docker push ${fullname}

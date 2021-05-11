@@ -11,8 +11,8 @@ RUN apt-get update
 RUN apt-get install unzip
 
 # Dumping contents of repo into container
-ADD . /usr/src/boda2/
-WORKDIR /usr/src/boda2/
+ADD . /home/ubuntu/boda2/
+WORKDIR /home/ubuntu/boda2/
 
 # Installing requirements, including shipped submodules
 RUN pip install --upgrade pip==20.2.3

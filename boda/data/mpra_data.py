@@ -14,19 +14,32 @@ class BODA2_DataModule(pl.LightningDataModule):
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Data Module args')
         
-        parser.add_argument('--ValSize_pct', type=float, default=5, 
-                            help='Percentage of examples to form the validation set')    
-        parser.add_argument('--TestSize_pct', type=float, default=5, 
-                            help='Percentage of examples to form the test set')          
-        parser.add_argument('--bathSize', type=int, default=32, 
-                            help='Number of examples in each mini batch')         
-        parser.add_argument('--paddedSeqLen', type=int, default=600, 
-                            help='Desired total sequence length after padding') 
-        parser.add_argument('--numWorkers', type=int, default=8, 
-                            help='number of gpus or cpu cores to be used') 
+        group.add_argument('--dataFile_path', type=str, required=True)
+        group.add_argument('--sequenceColumn', type=str, default='nt.sequence')
+        group.add_argument('--activityColumns', type=str, nargs='+', default=['K562', 'HepG2', 'SKNSH'])
+        group.add_argument('--ValSize_pct', type=float, default=5, 
+                           help='Percentage of examples to form the validation set')    
+        group.add_argument('--TestSize_pct', type=float, default=5, 
+                           help='Percentage of examples to form the test set')          
+        group.add_argument('--batchSize', type=int, default=32, 
+                           help='Number of examples in each mini batch')         
+        group.add_argument('--paddedSeqLen', type=int, default=600, 
+                           help='Desired total sequence length after padding') 
+        group.add_argument('--numWorkers', type=int, default=8, 
+                           help='number of gpus or cpu cores to be used') 
         return parser
     
+    @staticmethod
+    def add_conditional_args(parser, known_args):
+        return parser
+    
+    @staticmethod
+    def process_args(grouped_args):
+        data_args    = grouped_args['Data Module args']
+        return data_args
+
     def __init__(self,
                  dataFile_path,
                  sequenceColumn='nt.sequence',
@@ -69,7 +82,6 @@ class BODA2_DataModule(pl.LightningDataModule):
 
         """
         super().__init__()
-        self.dataName  = 'BODA2_data'
         self.dataFile_path = dataFile_path
         self.sequenceColumn = sequenceColumn
         self.activityColumns = activityColumns
@@ -77,9 +89,9 @@ class BODA2_DataModule(pl.LightningDataModule):
         self.TestSize_pct = TestSize_pct
         self.batchSize = batchSize
         self.paddedSeqLen = paddedSeqLen        
-        self.numWorkers = numWorkers   
-        
-    def setup(self):             
+        self.numWorkers = numWorkers
+                
+    def setup(self, stage='train'):             
         #--------- parse data from original MPRA files ---------
         self.raw_data = self.parse_textFile(self.dataFile_path, self.sequenceColumn, self.activityColumns)
         self.num_examples = len(self.raw_data)
@@ -102,9 +114,9 @@ class BODA2_DataModule(pl.LightningDataModule):
         self.dataset_full = TensorDataset(self.sequencesTensor, self.activitiesTensor)  
         
         #--------- split dataset in train/val/test sets ---------     
-        self.val_size = self.num_examples * self.ValSize_pct // 100          #might need to pre-separate examples in future data
-        self.test_size = self.num_examples * self.TestSize_pct // 100
-        self.train_size = self.num_examples - self.val_size - self.test_size
+        self.val_size = int(self.num_examples * self.ValSize_pct // 100)      #might need to pre-separate examples in future data
+        self.test_size = int(self.num_examples * self.TestSize_pct // 100)
+        self.train_size = int(self.num_examples - self.val_size - self.test_size)
         self.dataset_train, self.dataset_val, self.dataset_test = random_split(self.dataset_full, 
                                                                                [self.train_size, self.val_size, self.test_size],
                                                                                generator=torch.Generator().manual_seed(1))

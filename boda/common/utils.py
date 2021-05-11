@@ -1,9 +1,11 @@
 import argparse
-import torch
-import random
-import numpy as np
-
 import sys
+import random
+import math
+
+import numpy as np
+import torch
+
 from . import constants 
 
 def set_all_seeds(seed):
@@ -129,3 +131,50 @@ def neg_reward_loss(x):
     For maximizing avg reward
     """
     return -torch.sum(x)
+
+def organize_args(parser, args):
+    arg_groups={}
+    for group in parser._action_groups:
+        group_dict={a.dest:getattr(args,a.dest,None) for a in group._group_actions}
+        arg_groups[group.title]=argparse.Namespace(**group_dict)
+    return arg_groups
+
+'''
+def reset_parameters(self) -> None:
+    init.kaiming_uniform_(self.weight, a=math.sqrt(5))
+    if self.bias is not None:
+        fan_in, _ = init._calculate_fan_in_and_fan_out(self.weight)
+        bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+        init.uniform_(self.bias, -bound, bound)
+        
+def reset_weight(w):
+    torch.nn.init.kaiming_uniform_(w, a=math.sqrt(5))
+    
+def reset_bias(b, w=None):
+    if w is None:
+        bound = 1 / math.sqrt(b.numel())
+    else:
+        fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(w)
+        bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+    torch.nn.init.uniform_(b, -bound, bound)
+
+def reshape_and_load_weights(model, state_dict):
+    model_dict = model.state_dict()
+    return NotImplementedError
+
+def replace_and_load_weights(model, state_dict):
+    return NotImplementedError
+
+loaded_weights = torch.load('../../artifacts/my-model.epoch_5-step_19885.pkl')
+model.load_state_dict(loaded_weights, strict=False)
+
+pretrained_dict = ...
+model_dict = model.state_dict()
+
+# 1. filter out unnecessary keys
+pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+# 2. overwrite entries in the existing state dict
+model_dict.update(pretrained_dict) 
+# 3. load the new state dict
+model.load_state_dict(pretrained_dict)
+'''

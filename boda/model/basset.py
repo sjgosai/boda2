@@ -55,36 +55,46 @@ class Basset(ptl.LightningModule):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Model Module args')
         
-        parser.add_argument('--conv1_channels', type=int, default=300)
-        parser.add_argument('--conv1_kernel_size', type=int, default=19)
+        group.add_argument('--conv1_channels', type=int, default=300)
+        group.add_argument('--conv1_kernel_size', type=int, default=19)
         
-        parser.add_argument('--conv2_channels', type=int, default=200)
-        parser.add_argument('--conv2_kernel_size', type=int, default=11)
+        group.add_argument('--conv2_channels', type=int, default=200)
+        group.add_argument('--conv2_kernel_size', type=int, default=11)
         
-        parser.add_argument('--conv3_channels', type=int, default=200)
-        parser.add_argument('--conv3_kernel_size', type=int, default=7)
+        group.add_argument('--conv3_channels', type=int, default=200)
+        group.add_argument('--conv3_kernel_size', type=int, default=7)
         
-        parser.add_argument('--linear1_channels', type=int, default=1000)
-        parser.add_argument('--linear2_channels', type=int, default=1000)
-        parser.add_argument('--n_outputs', type=int, default=280)
+        group.add_argument('--linear1_channels', type=int, default=1000)
+        group.add_argument('--linear2_channels', type=int, default=1000)
+        group.add_argument('--n_outputs', type=int, default=280)
         
-        parser.add_argument('--dropout_p', type=float, default=0.3)
-        parser.add_argument('--use_batch_norm', type=utils.str2bool, default=True)
-        parser.add_argument('--use_weight_norm',type=utils.str2bool, default=False)
+        group.add_argument('--dropout_p', type=float, default=0.3)
+        group.add_argument('--use_batch_norm', type=utils.str2bool, default=True)
+        group.add_argument('--use_weight_norm',type=utils.str2bool, default=False)
         
-        parser.add_argument('--learning_rate', type=float, default=1e-4)
+        group.add_argument('--loss_criterion',type=str, default='CrossEntropyLoss')
         
         return parser
     
+    @staticmethod
+    def add_conditional_args(parser, known_args):
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        model_args   = grouped_args['Model Module args']
+        return model_args
+
     def __init__(self, conv1_channels=300, conv1_kernel_size=19, 
                  conv2_channels=200, conv2_kernel_size=11, 
                  conv3_channels=200, conv3_kernel_size=7, 
                  linear1_channels=1000, linear2_channels=1000, 
                  n_outputs=280, activation='ReLU', 
                  dropout_p=0.3, use_batch_norm=True, use_weight_norm=False,
-                 learning_rate=1e-4):                                                
-        super().__init__()
+                 loss_criterion='CrossEntropyLoss'):                                                
+        super().__init__()        
         
         self.conv1_channels    = conv1_channels
         self.conv1_kernel_size = conv1_kernel_size
@@ -109,7 +119,7 @@ class Basset(ptl.LightningModule):
         self.use_batch_norm    = use_batch_norm
         self.use_weight_norm   = use_weight_norm
         
-        self.learning_rate     = learning_rate
+        self.loss_criterion    = loss_criterion
         
         self.pad1  = nn.ConstantPad1d(self.conv1_pad, 0.)
         self.conv1 = Conv1dNorm(4, 
@@ -152,9 +162,9 @@ class Basset(ptl.LightningModule):
         
         self.dropout = nn.Dropout(p=self.dropout_p)
         
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = getattr(nn,self.loss_criterion)()
         
-    def forward(self, x):
+    def encode(self, x):
         hook = self.nonlin( self.conv1( self.pad1( x ) ) )
         hook = self.maxpool_3( hook )
         hook = self.nonlin( self.conv2( self.pad2( hook ) ) )
@@ -162,11 +172,23 @@ class Basset(ptl.LightningModule):
         hook = self.nonlin( self.conv3( self.pad3( hook ) ) )
         hook = self.maxpool_4( self.pad4( hook ) )        
         hook = torch.flatten( hook, start_dim=1 )
-        hook = self.dropout( self.nonlin( self.linear1( hook ) ) )
+        return hook
+    
+    def decode(self, x):
+        hook = self.dropout( self.nonlin( self.linear1( x ) ) )
         hook = self.dropout( self.nonlin( self.linear2( hook ) ) )
-        output = self.output( hook )
-        return output, hook
+        return hook
+    
+    def classify(self, x):
+        output = self.output( x )
+        return output
         
+    def forward(self, x):
+        encoded = self.encode(x)
+        decoded = self.decode(encoded)
+        output  = self.classify(decoded)
+        return output
+'''        
     def training_step(self, batch, batch_idx):
         x, y   = batch
         logits = self(x)
@@ -183,4 +205,4 @@ class Basset(ptl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-    
+'''    
