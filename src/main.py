@@ -53,12 +53,14 @@ def _save_model(data_module, model_module, graph_module,
     
     filename=f'model_artifacts__{save_dict["timestamp"]}__{save_dict["random_tag"]}.tar.gz'
     with tempfile.TemporaryDirectory() as tmpdirname:
+        tmpdirname = '/tmp/output'
         with tarfile.open(os.path.join(tmpdirname,filename), 'w:gz') as tar:
             tar.add(local_dir,arcname='artifacts')
 
         if 'gs://' in args['Main args'].artifact_path:
+            clound_target = os.path.join(args['Main args'].artifact_path,filename)
             subprocess.check_call(
-                ['gsutil', 'cp', os.path.join(tmpdirname,filename), args['Main args'].artifact_path]
+                ['gsutil', 'cp', os.path.join(tmpdirname,filename), clound_target]
             )
         else:
             os.makedirs(args['Main args'].artifact_path, exist_ok=True)
