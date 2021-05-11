@@ -2,6 +2,11 @@
 /data/
 /artifacts/
 
+# Directories at any level
+__pycache__/
+lightning_logs/
+.ipynb_checkpoints/
+
 # Compiled python modules.
 *.pyc
 
