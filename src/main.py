@@ -6,6 +6,7 @@ import argparse
 import tarfile
 import tempfile
 import random
+import subprocess
 
 import torch
 from pytorch_lightning import Trainer
