@@ -52,6 +52,9 @@ class CNNBasicTraining(LightningModule):
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
         
+    def categorical_mse(self, x, y):
+        return (x - y).pow(2).mean(dim=0)
+        
     def configure_optimizers(self):
         params = [ x for x in self.parameters() if x.requires_grad ]
         print(f'Found {sum(p.numel() for p in params)} parameters')
@@ -72,19 +75,31 @@ class CNNBasicTraining(LightningModule):
     
     def training_step(self, batch, batch_idx):
         x, y   = batch
-        logits = self(x)
-        loss   = self.criterion(logits, y)
+        y_hat  = self(x)
+        loss   = self.criterion(y_hat, y)
         self.log('train_loss', loss)
         return loss
         
     def validation_step(self, batch, batch_idx):
         x, y   = batch
-        logits = self(x)
-        loss   = self.criterion(logits, y)
+        y_hat = self(x)
+        loss   = self.criterion(y_hat, y)
         self.log('valid_loss', loss)
-        return {'loss': loss.shape, 'preds': logits.shape, 'labels': y.shape}
+        metric = self.categorical_mse(y_hat, y)
+        return {'loss': loss, 'metric': metric, 'preds': y_hat, 'labels': y}
 
-#    def validation_epoch_end(self, val_step_outputs):
+    def validation_epoch_end(self, val_step_outputs):
+        arit_mean = torch.stack([ batch['loss'] for batch in val_step_outputs ], dim=0) \
+                      .mean()
+        harm_mean = torch.stack([ batch['metric'] for batch in val_step_outputs ], dim=0) \
+                      .mean(dim=0).pow(-1).mean().pow(-1)
+        res_str = '| Validation | arithmatic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
+                    .format(arit_mean, harm_mean)
+        print('')
+        print('-'*len(res_str))
+        print(res_str)
+        print('-'*len(res_str))
+        print('')
         #print(val_step_outputs)
         #for out in val_step_outputs:
         #    print(out)
