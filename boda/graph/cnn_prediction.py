@@ -151,9 +151,6 @@ class CNNTransferLearning(CNNBasicTraining):
         self.parent_weights = parent_weights
         self.frozen_epochs  = frozen_epochs
         
-    def setup(self, stage='training'):
-        self.transferred_keys= self.attach_parent_weights()
-        
     def attach_parent_weights(self):
         parent_state_dict = torch.load(self.parent_weights)
         if 'model_state_dict' in parent_state_dict.keys():
@@ -163,6 +160,9 @@ class CNNTransferLearning(CNNBasicTraining):
         self.load_state_dict( mod_state_dict['filtered_state_dict'], strict=False )
         return mod_state_dict['passed_keys']
     
+    def setup(self, stage='training'):
+        self.transferred_keys = self.attach_parent_weights()
+        
     def on_train_epoch_start(self):
         print(f'starting epoch {self.current_epoch}')
         for name, p in self.named_parameters():
