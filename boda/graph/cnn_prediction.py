@@ -10,7 +10,8 @@ import torch.nn.functional as F
 from pytorch_lightning.core.lightning import LightningModule
 
 from ..common import utils
-from .utils import add_optimizer_specific_args, add_scheduler_specific_args, reorg_optimizer_args, filter_state_dict
+from .utils import (add_optimizer_specific_args, add_scheduler_specific_args, reorg_optimizer_args, filter_state_dict,
+                    Pearson_correlation, Shannon_entropy)
 
 class CNNBasicTraining(LightningModule):
     
@@ -52,6 +53,7 @@ class CNNBasicTraining(LightningModule):
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
         
+        
     def categorical_mse(self, x, y):
         return (x - y).pow(2).mean(dim=0)
         
@@ -88,13 +90,20 @@ class CNNBasicTraining(LightningModule):
         metric = self.categorical_mse(y_hat, y)
         return {'loss': loss, 'metric': metric, 'preds': y_hat, 'labels': y}
 
-    def validation_epoch_end(self, val_step_outputs):
+    def validation_epoch_end(self, val_step_outputs):       
         arit_mean = torch.stack([ batch['loss'] for batch in val_step_outputs ], dim=0) \
                       .mean()
         harm_mean = torch.stack([ batch['metric'] for batch in val_step_outputs ], dim=0) \
                       .mean(dim=0).pow(-1).mean().pow(-1)
+        epoch_preds = torch.cat([batch['preds'] for batch in val_step_outputs], dim=0)
+        epoch_labels  = torch.cat([batch['labels'] for batch in val_step_outputs], dim=0)
+        pearsons, mean_pearson = self.pearson(epoch_preds, epoch_labels)
+        shannon_pred, shannon_label = self.shannon(epoch_preds), self.shannon(epoch_labels)
+        specificity_pearson, specificity_mean_pearson = self.pearson(shannon_pred, shannon_label)
         res_str = '| Validation | arithmatic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
                     .format(arit_mean, harm_mean)
+        res_str += ' Pearson: {:.5f} | Pearson_Shannon: {:.5f} |' \
+                    .format(mean_pearson.item(), specificity_mean_pearson.item())
         print('')
         print('-'*len(res_str))
         print(res_str)
