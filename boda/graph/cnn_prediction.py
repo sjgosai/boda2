@@ -104,6 +104,8 @@ class CNNBasicTraining(LightningModule):
                     .format(arit_mean, harm_mean)
         res_str += ' Pearson: {:.5f} | Pearson_Shannon: {:.5f} |' \
                     .format(mean_pearson.item(), specificity_mean_pearson.item())
+        self.log('Pearson', mean_pearson)
+        self.log('Pearson_Shannon', specificity_mean_pearson)
         print('')
         print('-'*len(res_str))
         print(res_str)
