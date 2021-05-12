@@ -99,7 +99,7 @@ class CNNBasicTraining(LightningModule):
         pearsons, mean_pearson = Pearson_correlation(epoch_preds, epoch_labels)
         shannon_pred, shannon_label = Shannon_entropy(epoch_preds), Shannon_entropy(epoch_labels)
         specificity_pearson, specificity_mean_pearson = Pearson_correlation(shannon_pred, shannon_label)
-        res_str = '| Validation | arithmatic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
+        res_str = '| Validation | arithmetic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
                     .format(arit_mean, harm_mean)
         res_str += ' Pearson: {:.5f} | Pearson_Shannon: {:.5f} |' \
                     .format(mean_pearson.item(), specificity_mean_pearson.item())
