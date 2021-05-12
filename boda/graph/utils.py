@@ -2,6 +2,8 @@ import sys
 import argparse
 import inspect
 
+from torch import nn
+
 from ..common import utils as cutils
 
 def add_optimizer_specific_args(parser, optimizer_name):
