@@ -1,3 +1,4 @@
+import sys
 import argparse
 import inspect
 
@@ -145,4 +146,33 @@ def reorg_optimizer_args(optim_arg_dict):
         optim_arg_dict.pop('step_size2')
     return optim_arg_dict
 
+def filter_state_dict(model, stashed_dict):
+    results_dict = { 
+        'filtered_state_dict': {},
+        'passed_keys' : [],
+        'removed_keys': [],
+        'missing_keys': []
+                   }
+    old_dict = model.state_dict()
 
+    for m_key, m_value in old_dict.items():
+        try:
+            
+            if old_dict[m_key].shape == stashed_dict[m_key].shape:
+                results_dict['filtered_state_dict'][m_key] = stashed_dict[m_key]
+                results_dict['passed_keys'].append(m_key)
+                print(f'Key {m_key} successfully matched', file=sys.stderr)
+                
+            else:
+                check_str = 'Size mismatch for key: {}, expected size {}, got {}' \
+                              .format(m_key, old_dict[m_key].shape, stashed_dict[m_key].shape)
+                results_dict['removed_keys'].append(m_key)
+                print(check_str, file=sys.stderr)
+                
+        except KeyError:
+            results_dict['missing_keys'].append(m_key)
+            print(f'Key {m_key} missing from dict', file=sys.stderr)
+            
+    return results_dict
+            
+            

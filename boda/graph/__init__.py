@@ -1,5 +1,5 @@
-from .cnn_prediction import CNNBasicTraining
+from .cnn_prediction import CNNBasicTraining, CNNTransferLearning
 
 __all__ = [
-    'CNNBasicTraining'
+    'CNNBasicTraining', 'CNNTransferLearning'
 ]
