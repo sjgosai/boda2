@@ -52,8 +52,6 @@ class CNNBasicTraining(LightningModule):
         self.scheduler_interval= scheduler_interval
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
-        self.pearson = Pearson_correlation()
-        self.shannon = Shannon_entropy()
         
     def categorical_mse(self, x, y):
         return (x - y).pow(2).mean(dim=0)
@@ -98,9 +96,9 @@ class CNNBasicTraining(LightningModule):
                       .mean(dim=0).pow(-1).mean().pow(-1)
         epoch_preds = torch.cat([batch['preds'] for batch in val_step_outputs], dim=0)
         epoch_labels  = torch.cat([batch['labels'] for batch in val_step_outputs], dim=0)
-        pearsons, mean_pearson = self.pearson(epoch_preds, epoch_labels)
-        shannon_pred, shannon_label = self.shannon(epoch_preds), self.shannon(epoch_labels)
-        specificity_pearson, specificity_mean_pearson = self.pearson(shannon_pred, shannon_label)
+        pearsons, mean_pearson = Pearson_correlation(epoch_preds, epoch_labels)
+        shannon_pred, shannon_label = Shannon_entropy(epoch_preds), Shannon_entropy(epoch_labels)
+        specificity_pearson, specificity_mean_pearson = Pearson_correlation(shannon_pred, shannon_label)
         res_str = '| Validation | arithmatic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
                     .format(arit_mean, harm_mean)
         res_str += ' Pearson: {:.5f} | Pearson_Shannon: {:.5f} |' \
