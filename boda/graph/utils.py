@@ -176,3 +176,21 @@ def filter_state_dict(model, stashed_dict):
     return results_dict
             
             
+class Pearson_correlation(nn.Module):
+    def __init__(self):
+        super(Pearson_correlation, self).__init__()
+        
+    def forward(self, x, y):
+        vx = x - torch.mean(x, dim=0)
+        vy = y - torch.mean(y, dim=0)
+        pearsons = torch.sum(vx * vy, dim=0) / (torch.sqrt(torch.sum(vx ** 2, dim=0)) * torch.sqrt(torch.sum(vy ** 2, dim=0)))
+        return pearsons, torch.mean(pearsons)
+    
+
+class Shannon_entropy(nn.Module):
+    def __init__(self):
+        super(Shannon_entropy, self).__init__()
+        
+    def forward(self, x):
+        p_c = nn.Softmax(dim=1)(x)
+        return torch.sum(- p_c * torch.log(p_c), axis=1)
