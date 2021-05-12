@@ -1,6 +1,7 @@
 import sys
 import argparse
 import inspect
+import torch
 
 from torch import nn
 
@@ -176,15 +177,13 @@ def filter_state_dict(model, stashed_dict):
             print(f'Key {m_key} missing from dict', file=sys.stderr)
             
     return results_dict
-            
-            
+                     
 def Pearson_correlation(x, y):
     vx = x - torch.mean(x, dim=0)
     vy = y - torch.mean(y, dim=0)
     pearsons = torch.sum(vx * vy, dim=0) / (torch.sqrt(torch.sum(vx ** 2, dim=0)) * torch.sqrt(torch.sum(vy ** 2, dim=0)))
     return pearsons, torch.mean(pearsons)
     
-
 def Shannon_entropy(x):
-    p_c = nn.Softmax(dim=1)(x)
+    p_c = nn.Softmax(dim=1)(x)    
     return torch.sum(- p_c * torch.log(p_c), axis=1)
