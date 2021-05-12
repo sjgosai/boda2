@@ -52,7 +52,8 @@ class CNNBasicTraining(LightningModule):
         self.scheduler_interval= scheduler_interval
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
-        
+        self.pearson = Pearson_correlation()
+        self.shannon = Shannon_entropy()
         
     def categorical_mse(self, x, y):
         return (x - y).pow(2).mean(dim=0)
