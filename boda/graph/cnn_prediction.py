@@ -2,6 +2,8 @@ import argparse
 import math
 import os
 import time
+import tempfile
+import subprocess
 
 import torch
 import torch.nn as nn
@@ -9,11 +11,17 @@ import torch.nn.functional as F
 
 from pytorch_lightning.core.lightning import LightningModule
 
+import hypertune
+
 from ..common import utils
 from .utils import (add_optimizer_specific_args, add_scheduler_specific_args, reorg_optimizer_args, filter_state_dict,
                     Pearson_correlation, Shannon_entropy)
 
 class CNNBasicTraining(LightningModule):
+    
+    ###############################
+    # BODA required staticmethods #
+    ###############################
     
     @staticmethod
     def add_graph_specific_args(parent_parser):
@@ -42,6 +50,10 @@ class CNNBasicTraining(LightningModule):
             graph_args.scheduler_args = None
         return graph_args
 
+    #######################
+    # Dead __init__ block #
+    #######################
+    
     def __init__(self, optimizer='Adam', scheduler=None, 
                  scheduler_monitor=None, scheduler_interval='epoch', 
                  optimizer_args=None, scheduler_args=None):
@@ -53,10 +65,43 @@ class CNNBasicTraining(LightningModule):
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
         
+    ###################
+    # Non-PTL methods #
+    ###################
+        
     def categorical_mse(self, x, y):
         return (x - y).pow(2).mean(dim=0)
         
+    def aug_log(self, internal_metrics=None, external_metrics=None):
+        
+        if internal_metrics is not None:
+            for my_key, my_value in internal_metrics.items():
+                self.log(my_key, my_value)
+                self.hpt.report_hyperparameter_tuning_metric(
+                    hyperparameter_metric_tag=my_key,
+                    metric_value=my_value,
+                    global_step=self.global_step)
+                
+        if external_metrics is not None:
+            res_str = '|'
+            for my_key, my_value in external_metrics.items():
+                self.log(my_key, my_value)
+                res_str += ' {}: {:.5f} |'.format(my_key, my_value)
+                self.hpt.report_hyperparameter_tuning_metric(
+                    hyperparameter_metric_tag=my_key,
+                    metric_value=my_value,
+                    global_step=self.global_step)
+            border = '-'*len(res_str)
+            print("\n".join(['',border, res_str, border,'']))
+        
+        return None
+
+    #############
+    # PTL hooks #
+    #############
+        
     def configure_optimizers(self):
+        self.hpt = hypertune.HyperTune()
         params = [ x for x in self.parameters() if x.requires_grad ]
         print(f'Found {sum(p.numel() for p in params)} parameters')
         optim_class = getattr(torch.optim,self.optimizer)
@@ -99,20 +144,14 @@ class CNNBasicTraining(LightningModule):
         pearsons, mean_pearson = Pearson_correlation(epoch_preds, epoch_labels)
         shannon_pred, shannon_label = Shannon_entropy(epoch_preds), Shannon_entropy(epoch_labels)
         specificity_pearson, specificity_mean_pearson = Pearson_correlation(shannon_pred, shannon_label)
-        res_str = '| Validation | arithmetic mean loss: {:.5f} | harmonic mean loss: {:.5f} |' \
-                    .format(arit_mean, harm_mean)
-        res_str += ' Pearson: {:.5f} | Pearson_Shannon: {:.5f} |' \
-                    .format(mean_pearson.item(), specificity_mean_pearson.item())
-        self.log('Pearson', mean_pearson)
-        self.log('Pearson_Shannon', specificity_mean_pearson)
-        print('')
-        print('-'*len(res_str))
-        print(res_str)
-        print('-'*len(res_str))
-        print('')
-        #print(val_step_outputs)
-        #for out in val_step_outputs:
-        #    print(out)
+        self.aug_log(external_metrics={
+            'arithmetic_mean_loss': arit_mean,
+            'harmonic_mean_loss': harm_mean,
+            'prediction_mean_pearson': mean_pearson.item(),
+            'entropy_mean_pearson': specificity_mean_pearson.item()
+        })
+
+        return None
     
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -121,6 +160,10 @@ class CNNBasicTraining(LightningModule):
         self.log('test_loss', loss)       
         
 class CNNTransferLearning(CNNBasicTraining):
+    
+    ###############################
+    # BODA required staticmethods #
+    ###############################
     
     @staticmethod
     def add_graph_specific_args(parent_parser):
@@ -151,6 +194,10 @@ class CNNTransferLearning(CNNBasicTraining):
             graph_args.scheduler_args = None
         return graph_args
 
+    #######################
+    # Dead __init__ block #
+    #######################
+    
     def __init__(self, parent_weights, unfreeze_epoch=9999, 
                  optimizer='Adam', scheduler=None, 
                  scheduler_monitor=None, scheduler_interval='epoch', 
@@ -161,8 +208,12 @@ class CNNTransferLearning(CNNBasicTraining):
         self.parent_weights = parent_weights
         self.frozen_epochs  = frozen_epochs
         
-    def attach_parent_weights(self):
-        parent_state_dict = torch.load(self.parent_weights)
+    ###################
+    # Non-PTL methods #
+    ###################
+        
+    def attach_parent_weights(self, my_weights):
+        parent_state_dict = torch.load(my_weights)
         if 'model_state_dict' in parent_state_dict.keys():
             parent_state_dict = parent_state_dict['model_state_dict']
             
@@ -170,8 +221,18 @@ class CNNTransferLearning(CNNBasicTraining):
         self.load_state_dict( mod_state_dict['filtered_state_dict'], strict=False )
         return mod_state_dict['passed_keys']
     
+    #############
+    # PTL hooks #
+    #############
+        
     def setup(self, stage='training'):
-        self.transferred_keys = self.attach_parent_weights()
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            if 'gs://' in self.parent_weights:
+                subprocess.call(['gsutil','cp',self.parent_weights,tmpdirname])
+                the_weights = os.path.join( tmpdirname, os.path.basename(self.parent_weights) )
+            else:
+                the_weights = self.parent_weights
+            self.transferred_keys = self.attach_parent_weights(the_weights)
         
     def on_train_epoch_start(self):
         print(f'starting epoch {self.current_epoch}')

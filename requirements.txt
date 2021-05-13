@@ -12,5 +12,9 @@ xlrd==2.0.1
 bioservices==1.7.10
 wordcloud==1.8.1
 torchsummary==1.5.1
+gcsfs==2021.04.0
 
+google-cloud-aiplatform
 cloudml-hypertune
+
+google-cloud-storage
