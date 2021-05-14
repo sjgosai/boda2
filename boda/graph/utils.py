@@ -152,9 +152,10 @@ def reorg_optimizer_args(optim_arg_dict):
 def filter_state_dict(model, stashed_dict):
     results_dict = { 
         'filtered_state_dict': {},
-        'passed_keys' : [],
-        'removed_keys': [],
-        'missing_keys': []
+        'passed_keys'  : [],
+        'removed_keys' : [],
+        'missing_keys' : [],
+        'unloaded_keys': []
                    }
     old_dict = model.state_dict()
 
@@ -174,7 +175,14 @@ def filter_state_dict(model, stashed_dict):
                 
         except KeyError:
             results_dict['missing_keys'].append(m_key)
-            print(f'Key {m_key} missing from dict', file=sys.stderr)
+            print(f'Missing key in dict: {m_key}', file=sys.stderr)
+            
+    for m_key, m_value in stashed_dict.items():
+        if m_key not in old_dict.keys():
+            check_str = 'Skipped loading key: {} of size {}' \
+                           .format(m_key, m_value.shape)
+            results_dict['unloaded_keys'].append(m_key)
+            print(check_str, file=sys.stderr)
             
     return results_dict
                      

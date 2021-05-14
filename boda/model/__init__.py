@@ -1,6 +1,6 @@
-from .basset import Basset
+from .basset import Basset, BassetVL
 from .mpra_basset import MPRA_Basset
 
 __all__ = [
-    'Basset', 'MPRA_Basset'
+    'Basset', 'BassetVL', 'MPRA_Basset'
 ]
