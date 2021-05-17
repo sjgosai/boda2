@@ -66,10 +66,25 @@ def _save_model(data_module, model_module, graph_module,
             os.makedirs(args['Main args'].artifact_path, exist_ok=True)
             shutil.copy(os.path.join(tmpdirname,filename), args['Main args'].artifact_path)
     
+def unpack_artifact(artifact_path,download_path='./'):
+    if 'gs' in artifact_path:
+        subprocess.call(['gsutil','cp',artifact_path,download_path])
+        if os.path.isdir(download_path):
+            tar_model = os.path.join(download_path, os.path.basename(artifact_path))
+        elif os.path.isfile(download_path):
+            tar_model = download_path
+    else:
+        assert os.path.isfile(artifact_path), "Could not find file at expected path."
+        tar_model = artifact_path
+        
+    assert tarfile.is_tarfile(tar_model), f"Expected a tarfile at {tar_model}. Not found."
+    
+    shutil.unpack_archive(tar_model)
+
 def model_fn(model_dir):
     checkpoint = torch.load(os.path.join(model_dir,'torch_checkpoint.pt'))
-    model_module = getattr(boda, checkpoint['model_module'])
-    model        = model_module(**checkpoint['model_hparams'])
+    model_module = getattr(boda.model, checkpoint['model_module'])
+    model        = model_module(**vars(checkpoint['model_hparams']))
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f'Loaded model from {checkpoint["timestamp"]}')
     return model
