@@ -46,7 +46,7 @@ class BODA2_DataModule(pl.LightningDataModule):
     def __init__(self,
                  datafile_path,
                  sequence_column='nt.sequence',
-                 activity_columns=['K562', 'HepG2', 'SKNSH'],
+                 activity_columns=['K562', 'HepG2.neon', 'SKNSH'],
                  valid_pct=5,
                  test_pct=5,
                  batch_size=32,

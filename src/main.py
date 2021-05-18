@@ -86,7 +86,8 @@ def model_fn(model_dir):
     model_module = getattr(boda.model, checkpoint['model_module'])
     model        = model_module(**vars(checkpoint['model_hparams']))
     model.load_state_dict(checkpoint['model_state_dict'])
-    print(f'Loaded model from {checkpoint["timestamp"]}')
+    print(f'Loaded model from {checkpoint["timestamp"]} in eval mode')
+    model.eval()
     return model
 
 if __name__ == '__main__':
