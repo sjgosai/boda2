@@ -73,7 +73,7 @@ class MPRA_DataModule(pl.LightningDataModule):
                  num_workers=8,
                  normalize=False,
                  **kwargs):       
-        '''
+        """
         Takes a .txt file with a column cotaining DNA sequences,
         column(s) containing log2FC, and a chromosome column.
         Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
@@ -123,7 +123,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         -------
         None.
 
-        '''
+        """
         
         super().__init__()
         self.datafile_path = datafile_path
