@@ -147,10 +147,10 @@ def parse_file(file_path, columns):
     return sub_df
 
 def row_pad_sequence(row,
-                 in_column_name='nt_sequence',
-                 padded_seq_len=600,
-                 upStreamSeq=constants.MPRA_UPSTREAM,
-                 downStreamSeq=constants.MPRA_DOWNSTREAM):
+                     in_column_name='nt_sequence',
+                     padded_seq_len=600,
+                     upStreamSeq=constants.MPRA_UPSTREAM,
+                     downStreamSeq=constants.MPRA_DOWNSTREAM):
     sequence = row[in_column_name]
     origSeqLen = len(sequence)
     paddingLen = padded_seq_len - origSeqLen
