@@ -141,9 +141,9 @@ def organize_args(parser, args):
         arg_groups[group.title]=argparse.Namespace(**group_dict)
     return arg_groups
 
-def parse_file(file_path, sequence_column, activity_columns, chromosome_column):
+def parse_file(file_path, columns):
     df = pd.read_csv(file_path, sep=" ", low_memory=False)
-    sub_df = df[[chromosome_column, sequence_column, *activity_columns]].dropna()
+    sub_df = df[columns].dropna()
     return sub_df
 
 def row_pad_sequence(row,
