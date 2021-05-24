@@ -25,6 +25,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
         group.add_argument('--activity_columns', type=str, nargs='+', default=['K562', 'HepG2.neon', 'SKNSH'])
+        group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''])
         group.add_argument('--val_chrs', type=str, nargs='+', default=['17','19','21','X'])
         group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'])
         group.add_argument('--chr_column', type=str, default='chr')
@@ -59,6 +60,7 @@ class MPRA_DataModule(pl.LightningDataModule):
                  project_column='data_project',
                  sequence_column='nt_sequence',
                  activity_columns=['K562_mean', 'HepG2_mean', 'SKNSH_mean'],
+                 exclude_chr_train = [''],
                  val_chrs=['17','19','21','X'],
                  test_chrs=['7','13'],
                  chr_column='chr',
@@ -90,6 +92,8 @@ class MPRA_DataModule(pl.LightningDataModule):
             Name of the column of the DNA sequences. The default is 'nt_sequence'.
         activity_columns : list, optional
             List of names of the columns with log2FC. The default is ['K562_mean', 'HepG2_mean', 'SKNSH_mean'].
+        exclude_chr_train : list, optional
+            List of chromosomes to be excluded from train. The default is [''].
         val_chrs : list, optional
             DESCRIPTION. The default is ['17','19','21','X'].
         test_chrs : list, optional
@@ -131,12 +135,13 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.project_column = project_column
         self.sequence_column = sequence_column
         self.activity_columns = activity_columns
+        self.exclude_chr_train = set(exclude_chr_train)
         self.val_chrs = set(val_chrs)
         self.test_chrs = set(test_chrs)
         self.chr_column = chr_column
         self.std_multiple_cut = std_multiple_cut
         self.up_cutoff_move = up_cutoff_move
-        self.synth_chr = set(synth_chr)
+        self.synth_chr = synth_chr
         self.synth_val_pct = synth_val_pct
         self.synth_test_pct = synth_test_pct
         self.synth_seed = synth_seed
@@ -149,6 +154,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.tensor_column_name = 'onehot_seq'
         self.activity_means = None
         self.activity_stds = None
+        self.synth_chr_as_set = {synth_chr}
         
         self.padding_fn = partial(utils.row_pad_sequence,
                                   in_column_name=self.sequence_column,
@@ -198,7 +204,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         print(f'Number of examples discarded from top: {num_up_cuts}')
         print(f'Number of examples discarded from bottom: {num_down_cuts}')
         print('')
-        print(f'Number of examples to be used: {self.num_examples}')
+        print(f'Number of examples available: {self.num_examples}')
         print('')
         print('-'*50)
         print('')
@@ -213,7 +219,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         #--------- split dataset in train/val/test sets ---------
         print('Creating train/val/test datasets...')
         all_chrs = set(temp_df[self.chr_column])
-        self.train_chrs = all_chrs - self.val_chrs - self.test_chrs - self.synth_chr
+        self.train_chrs = all_chrs - self.val_chrs - self.test_chrs - self.synth_chr_as_set - self.exclude_chr_train
         
         sequences_train  = list(temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.tensor_column_name])
         sequences_val    = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
@@ -233,9 +239,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.dataset_val   = TensorDataset(sequences_val, activities_val)
         self.dataset_test  = TensorDataset(sequences_test, activities_test)
              
-        if next(iter(self.synth_chr), None) in all_chrs:
-            synth_sequences  = list(temp_df[temp_df[self.chr_column].isin(self.synth_chr)][self.tensor_column_name])
-            synth_activities = temp_df[temp_df[self.chr_column].isin(self.synth_chr)][self.activity_columns].to_numpy()
+        if self.synth_chr in all_chrs:
+            synth_sequences  = list(temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.tensor_column_name])
+            synth_activities = temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.activity_columns].to_numpy()
             synth_sequences  = torch.stack(synth_sequences)
             synth_activities = torch.Tensor(synth_activities)
             synth_dataset = TensorDataset(synth_sequences, synth_activities)
@@ -249,8 +255,9 @@ class MPRA_DataModule(pl.LightningDataModule):
                                                [synth_train_size, synth_val_size, synth_test_size],
                                                generator=torch.Generator().manual_seed(self.synth_seed))       
             self.synth_dataset_train, self.synth_dataset_val, self.synth_dataset_test = synth_dataset_split
-        
-            self.dataset_train = ConcatDataset([self.dataset_train, self.synth_dataset_train])
+            
+            if self.synth_chr not in self.exclude_chr_train:
+                self.dataset_train = ConcatDataset([self.dataset_train, self.synth_dataset_train])
             self.dataset_val   = ConcatDataset([self.dataset_val, self.synth_dataset_val])
             self.dataset_test  = ConcatDataset([self.dataset_test, self.synth_dataset_test])
         
@@ -261,12 +268,15 @@ class MPRA_DataModule(pl.LightningDataModule):
         train_pct = round(100 * self.train_size / self.num_examples, 2)
         val_pct   = round(100 * self.val_size / self.num_examples, 2)
         test_pct  = round(100 * self.test_size / self.num_examples, 2)
+        excluded_size = self.num_examples - self.train_size - self.val_size - self.test_size
+        excluded_pct = round(100 * excluded_size / self.num_examples, 2)
         print('-'*50)
         print('')
         print(f'Number of examples in train: {self.train_size} ({train_pct}%)')
         print(f'Number of examples in val:   {self.val_size} ({val_pct}%)')
         print(f'Number of examples in test:  {self.test_size} ({test_pct}%)')
         print('')
+        print(f'Excluded from train: {excluded_size} ({excluded_pct})%')
         print('-'*50)       
                 
     def train_dataloader(self):
