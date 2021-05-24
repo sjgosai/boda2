@@ -195,3 +195,21 @@ def Pearson_correlation(x, y):
 def Shannon_entropy(x):
     p_c = nn.Softmax(dim=1)(x)    
     return torch.sum(- p_c * torch.log(p_c), axis=1)
+
+# Not useful for gpu
+def _get_ranks(x):
+    tmp = x.argsort(dim=0)
+    ranks = torch.zeros_like(tmp)
+    if len(x.shape) > 1:
+        dims = x.shape[1]
+        for dim in range(dims):
+            ranks[tmp[:,dim], dim] = torch.arange(x.shape[0])
+    else:
+        ranks[tmp] = torch.arange(x.shape[0])
+    return ranks
+
+# Not useful for gpu
+def Spearman_correlation(x, y):
+    x_rank = _get_ranks(x).double()
+    y_rank = _get_ranks(y).double()
+    return Pearson_correlation(x_rank, y_rank)

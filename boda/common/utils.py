@@ -4,7 +4,9 @@ import random
 import math
 
 import numpy as np
+import pandas as pd
 import torch
+import torch.nn.functional as F
 
 from . import constants 
 
@@ -138,6 +140,31 @@ def organize_args(parser, args):
         group_dict={a.dest:getattr(args,a.dest,None) for a in group._group_actions}
         arg_groups[group.title]=argparse.Namespace(**group_dict)
     return arg_groups
+
+def parse_file(file_path, columns):
+    df = pd.read_csv(file_path, sep=" ", low_memory=False)
+    sub_df = df[columns].dropna()
+    return sub_df
+
+def row_pad_sequence(row,
+                     in_column_name='nt_sequence',
+                     padded_seq_len=600,
+                     upStreamSeq=constants.MPRA_UPSTREAM,
+                     downStreamSeq=constants.MPRA_DOWNSTREAM):
+    sequence = row[in_column_name]
+    origSeqLen = len(sequence)
+    paddingLen = padded_seq_len - origSeqLen
+    assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq)), 'Not enough padding available'
+    upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
+    downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
+    paddedSequence = upPad + sequence + downPad            
+    return paddedSequence
+
+def row_dna2tensor(row, in_column_name='padded_seq' , vocab=constants.STANDARD_NT):
+    sequence_str = row[in_column_name]
+    seq_idxs = torch.tensor([vocab.index(letter) for letter in sequence_str])
+    sequence_tensor = F.one_hot(seq_idxs, num_classes=4).transpose(1,0)
+    return sequence_tensor.type(torch.float32)
 
 '''
 def reset_parameters(self) -> None:
