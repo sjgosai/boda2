@@ -234,7 +234,7 @@ class BassetVL(ptl.LightningModule):
                  n_linear_layers=2, linear_channels=1000, 
                  n_outputs=280, activation='ReLU', 
                  dropout_p=0.3, use_batch_norm=True, use_weight_norm=False,
-                 loss_criterion='CrossEntropyLoss'):                                                
+                 loss_criterion='MSELoss'):                                                
         super().__init__()        
         
         self.conv1_channels    = conv1_channels
