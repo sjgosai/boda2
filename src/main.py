@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import yaml
 import shutil
@@ -12,6 +13,7 @@ import torch
 from pytorch_lightning import Trainer
 
 import boda
+from boda.common import utils
 
 def main(args):
     data_module = getattr(boda.data, args['Main args'].data_module)
@@ -98,6 +100,7 @@ if __name__ == '__main__':
     group.add_argument('--graph_module',type=str, required=True, help='BODA graph module to define computations.')
     group.add_argument('--artifact_path', type=str, default='/opt/ml/checkpoints/', help='Path where model artifacts are deposited.')
     group.add_argument('--pretrained_weights', type=str, help='Pretrained weights.')
+    group.add_argument('--tolerate_unknown_args', type=utils.str2bool, default=False, help='Skips unknown command line args without exceptions. Useful for HPO, but high risk of silent errors.')
     known_args, leftover_args = parser.parse_known_args()
     
     Data  = getattr(boda.data,  known_args.data_module)
@@ -116,7 +119,13 @@ if __name__ == '__main__':
     
     parser = Trainer.add_argparse_args(parser)
     parser.add_argument('--help', '-h', action='help')
-    args = parser.parse_args()
+    
+    if known_args.tolerate_unknown_args:
+        args, leftover_args = parser.parse_known_args()
+        print("Skipping unexpected args. Check leftovers for typos:", file=sys.stderr)
+        print(leftover_args, file=sys.stderr)
+    else:
+        args = parser.parse_args()
     
     args = boda.common.utils.organize_args(parser, args)
     

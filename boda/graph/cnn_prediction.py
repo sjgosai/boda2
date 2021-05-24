@@ -1,6 +1,7 @@
 import argparse
 import math
 import os
+import sys
 import time
 import tempfile
 import subprocess
@@ -244,4 +245,85 @@ class CNNTransferLearning(CNNBasicTraining):
                     p.requires_grad = True
             else:
                 p.requires_grad = True            
+
+class CNNTransferLearningActivityBias(CNNTransferLearning):
     
+    ###############################
+    # BODA required staticmethods #
+    ###############################
+    
+    @staticmethod
+    def add_graph_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Graph Module args')
+        group.add_argument('--parent_weights', type=str, required=True)
+        group.add_argument('--frozen_epochs', type=int, default=9999)
+        group.add_argument('--rebalance_quantile', type=float)
+        group.add_argument('--optimizer', type=str, default='Adam')
+        group.add_argument('--scheduler', type=str)
+        group.add_argument('--scheduler_monitor', type=str)
+        group.add_argument('--scheduler_interval', type=str, default='epoch')        
+        
+        return parser
+    
+    #######################
+    # Dead __init__ block #
+    #######################
+    
+    def __init__(self, parent_weights, unfreeze_epoch=9999, 
+                 rebalance_quantile=0.5, 
+                 optimizer='Adam', scheduler=None, 
+                 scheduler_monitor=None, scheduler_interval='epoch', 
+                 optimizer_args=None, scheduler_args=None):
+        super().__init__(parent_weights, frozen_epochs, 
+                         optimizer, scheduler, scheduler_monitor, 
+                         scheduler_interval, optimizer_args, scheduler_args)
+
+        self.rebalance_quantile = rebalance_quantile
+        
+    #############
+    # PTL hooks #
+    #############
+        
+    def setup(self, stage='training'):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            if 'gs://' in self.parent_weights:
+                subprocess.call(['gsutil','cp',self.parent_weights,tmpdirname])
+                the_weights = os.path.join( tmpdirname, os.path.basename(self.parent_weights) )
+            else:
+                the_weights = self.parent_weights
+            self.transferred_keys = self.attach_parent_weights(the_weights)
+            
+        train_labs = torch.cat([ batch[1].cpu() for batch in self.train_dataloader() ], dim=0)
+        
+        assert (self.rebalance_quantile > 0.) and (self.rebalance_quantile < 1.)
+        
+        self.rebalance_cutoff = torch.quantile(train_labs.max(dim=1)[0], self.rebalance_quantile).item()
+        print(f"Activity at {self.rebalance_quantile} quantile: {self.rebalance_cutoff}",file=sys.stderr)
+        self.upper_factor     = self.rebalance_quantile / (1. - self.rebalance_quantile)
+        self.lower_factor     = self.upper_factor ** -1
+        
+        self.upper_factor = self.upper_factor
+        self.lower_factor = self.lower_factor
+        
+    def training_step(self, batch, batch_idx):
+        x, y   = batch
+        y_hat  = self(x)
+        
+        get_upper = y.max(dim=1)[0].ge( self.rebalance_cutoff )
+        get_lower = ~get_upper
+        
+        if get_upper.sum():
+            loss = self.criterion(y_hat[get_upper], y[get_upper]) \
+                     .div(get_upper.numel()).mul(get_upper.sum())\
+                     .mul( self.upper_factor )
+            if get_lower.sum():
+                loss += self.criterion(y_hat[get_lower], y[get_lower]) \
+                          .div(get_lower.numel()).mul(get_lower.sum())\
+                          .mul( self.lower_factor )
+        else:
+            loss = self.criterion(y_hat, y) \
+                     .mul( self.lower_factor )
+        
+        self.log('train_loss', loss)
+        return loss
