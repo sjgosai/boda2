@@ -24,7 +24,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--data_project', type=str, nargs='+', default=['BODA', 'UKBB'])
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
-        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562', 'HepG2.neon', 'SKNSH'])
+        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'])
         group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''])
         group.add_argument('--val_chrs', type=str, nargs='+', default=['17','19','21','X'])
         group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'])
