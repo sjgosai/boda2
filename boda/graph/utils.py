@@ -203,9 +203,9 @@ def _get_ranks(x):
     if len(x.shape) > 1:
         dims = x.shape[1]
         for dim in range(dims):
-            ranks[tmp[:,dim], dim] = torch.arange(x.shape[0])
+            ranks[tmp[:,dim], dim] = torch.arange(x.shape[0], layout=x.layout, device=x.device)
     else:
-        ranks[tmp] = torch.arange(x.shape[0])
+        ranks[tmp] = torch.arange(x.shape[0], layout=x.layout, device=x.device)
     return ranks
 
 # Not useful for gpu
