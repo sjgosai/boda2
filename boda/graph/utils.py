@@ -196,7 +196,6 @@ def Shannon_entropy(x):
     p_c = nn.Softmax(dim=1)(x)    
     return torch.sum(- p_c * torch.log(p_c), axis=1)
 
-# Not useful for gpu
 def _get_ranks(x):
     tmp = x.argsort(dim=0)
     ranks = torch.zeros_like(tmp)
@@ -208,7 +207,6 @@ def _get_ranks(x):
         ranks[tmp] = torch.arange(x.shape[0], layout=x.layout, device=x.device)
     return ranks
 
-# Not useful for gpu
 def Spearman_correlation(x, y):
     x_rank = _get_ranks(x).double()
     y_rank = _get_ranks(y).double()
