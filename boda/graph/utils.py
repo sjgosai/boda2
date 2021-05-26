@@ -208,6 +208,6 @@ def _get_ranks(x):
     return ranks
 
 def Spearman_correlation(x, y):
-    x_rank = _get_ranks(x).double()
-    y_rank = _get_ranks(y).double()
+    x_rank = _get_ranks(x).float()
+    y_rank = _get_ranks(y).float()
     return Pearson_correlation(x_rank, y_rank)
