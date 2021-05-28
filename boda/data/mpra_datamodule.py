@@ -24,7 +24,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--data_project', type=str, nargs='+', default=['BODA', 'UKBB'])
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
-        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'])
+        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562', 'HepG2.neon', 'SKNSH'])
         group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''])
         group.add_argument('--val_chrs', type=str, nargs='+', default=['17','19','21','X'])
         group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'])
@@ -60,12 +60,12 @@ class MPRA_DataModule(pl.LightningDataModule):
                  project_column='data_project',
                  sequence_column='nt_sequence',
                  activity_columns=['K562_mean', 'HepG2_mean', 'SKNSH_mean'],
-                 exclude_chr_train = [''],
+                 exclude_chr_train=[''],
                  val_chrs=['17','19','21','X'],
                  test_chrs=['7','13'],
                  chr_column='chr',
                  std_multiple_cut=6.0,
-                 up_cutoff_move=3.0,
+                 up_cutoff_move=4.0,
                  synth_chr='synth',
                  synth_val_pct=10.0,
                  synth_test_pct=10.0,
@@ -135,9 +135,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.project_column = project_column
         self.sequence_column = sequence_column
         self.activity_columns = activity_columns
-        self.exclude_chr_train = set(exclude_chr_train)
-        self.val_chrs = set(val_chrs)
-        self.test_chrs = set(test_chrs)
+        self.exclude_chr_train = set(exclude_chr_train) - {''}
+        self.val_chrs = set(val_chrs) - {''}
+        self.test_chrs = set(test_chrs) - {''}
         self.chr_column = chr_column
         self.std_multiple_cut = std_multiple_cut
         self.up_cutoff_move = up_cutoff_move
@@ -163,6 +163,12 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.tokenize_fn = partial(utils.row_dna2tensor,
                                    in_column_name=self.pad_column_name
                                    )
+        self.chr_dataset_train = None
+        self.chr_dataset_val = None
+        self.chr_dataset_test = None
+        self.synth_dataset_train = None
+        self.synth_dataset_val = None
+        self.synth_dataset_test = None
                 
     def setup(self, stage='train'):
         #--------- parse data from MPRA file ---------
@@ -221,23 +227,26 @@ class MPRA_DataModule(pl.LightningDataModule):
         all_chrs = set(temp_df[self.chr_column])
         self.train_chrs = all_chrs - self.val_chrs - self.test_chrs - self.synth_chr_as_set - self.exclude_chr_train
         
-        sequences_train  = list(temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.tensor_column_name])
-        sequences_val    = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
-        sequences_test   = list(temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.tensor_column_name])          
-        activities_train = temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.activity_columns].to_numpy()
-        activities_val   = temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.activity_columns].to_numpy() 
-        activities_test  = temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.activity_columns].to_numpy()
-            
-        sequences_train  = torch.stack(sequences_train)
-        sequences_val    = torch.stack(sequences_val)
-        sequences_test   = torch.stack(sequences_test)        
-        activities_train = torch.Tensor(activities_train)     
-        activities_val   = torch.Tensor(activities_val)     
-        activities_test  = torch.Tensor(activities_test)
-
-        self.dataset_train = TensorDataset(sequences_train, activities_train)
-        self.dataset_val   = TensorDataset(sequences_val, activities_val)
-        self.dataset_test  = TensorDataset(sequences_test, activities_test)
+        if len(self.train_chrs) > 0:
+            sequences_train  = list(temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.tensor_column_name])
+            activities_train = temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.activity_columns].to_numpy()
+            sequences_train  = torch.stack(sequences_train)
+            activities_train = torch.Tensor(activities_train)    
+            self.chr_dataset_train = TensorDataset(sequences_train, activities_train)
+        
+        if len(self.val_chrs) > 0:
+            sequences_val  = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
+            activities_val = temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.activity_columns].to_numpy()
+            sequences_val  = torch.stack(sequences_val)
+            activities_val = torch.Tensor(activities_val)  
+            self.chr_dataset_val = TensorDataset(sequences_val, activities_val)
+        
+        if len(self.test_chrs) > 0:
+            sequences_test    = list(temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.tensor_column_name])                      
+            activities_test   = temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.activity_columns].to_numpy()    
+            sequences_test    = torch.stack(sequences_test)        
+            activities_test   = torch.Tensor(activities_test)
+            self.chr_dataset_test = TensorDataset(sequences_test, activities_test)
              
         if self.synth_chr in all_chrs:
             synth_sequences  = list(temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.tensor_column_name])
@@ -256,15 +265,34 @@ class MPRA_DataModule(pl.LightningDataModule):
                                                generator=torch.Generator().manual_seed(self.synth_seed))       
             self.synth_dataset_train, self.synth_dataset_val, self.synth_dataset_test = synth_dataset_split
             
-            if self.synth_chr not in self.exclude_chr_train:
-                self.dataset_train = ConcatDataset([self.dataset_train, self.synth_dataset_train])
-            self.dataset_val   = ConcatDataset([self.dataset_val, self.synth_dataset_val])
-            self.dataset_test  = ConcatDataset([self.dataset_test, self.synth_dataset_test])
+            if self.chr_dataset_train is None:
+                if self.synth_chr not in self.exclude_chr_train:
+                    self.dataset_train = self.synth_dataset_train
+            else:
+                self.dataset_train = ConcatDataset([self.chr_dataset_train, self.synth_dataset_train])
+            if self.chr_dataset_val is None:
+                self.dataset_val = self.synth_dataset_val
+            else:
+                self.dataset_val = ConcatDataset([self.chr_dataset_val, self.synth_dataset_val])
+            if self.chr_dataset_test is None:
+                self.dataset_test = self.synth_dataset_test
+            else:
+                self.dataset_test = ConcatDataset([self.chr_dataset_test, self.synth_dataset_test])
+        else:
+            self.dataset_train = self.chr_dataset_train
+            self.dataset_val = self.chr_dataset_val
+            self.dataset_test = self.chr_dataset_test
         
         #--------- print train/val/test info ---------
-        self.train_size   = len(self.dataset_train)
-        self.val_size     = len(self.dataset_val)
-        self.test_size    = len(self.dataset_test)
+        if self.dataset_train is not None: self.train_size = len(self.dataset_train)
+        else: self.train_size = 0
+            
+        if self.dataset_val is not None: self.val_size = len(self.dataset_val)
+        else: self.val_size = 0
+            
+        if self.dataset_test is not None: self.test_size = len(self.dataset_test)
+        else: self.test_size = 0
+            
         train_pct = round(100 * self.train_size / self.num_examples, 2)
         val_pct   = round(100 * self.val_size / self.num_examples, 2)
         test_pct  = round(100 * self.test_size / self.num_examples, 2)
@@ -301,4 +329,16 @@ class MPRA_DataModule(pl.LightningDataModule):
 
     def synth_test_dataloader(self):
         return DataLoader(self.synth_dataset_test, batch_size=self.batch_size,
+                          shuffle=False, num_workers=self.num_workers)
+    
+    def chr_train_dataloader(self):
+        return DataLoader(self.chr_dataset_train, batch_size=self.batch_size,
+                          shuffle=True, num_workers=self.num_workers)
+    
+    def chr_val_dataloader(self):
+        return DataLoader(self.chr_dataset_val, batch_size=self.batch_size,
+                          shuffle=False, num_workers=self.num_workers)
+
+    def chr_test_dataloader(self):
+        return DataLoader(self.chr_dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
