@@ -15,8 +15,8 @@ from pytorch_lightning.core.lightning import LightningModule
 import hypertune
 
 from ..common import utils
-from .utils import (add_optimizer_specific_args, add_scheduler_specific_args, reorg_optimizer_args, filter_state_dict,
-                    Pearson_correlation, Shannon_entropy)
+from .utils import (add_optimizer_specific_args, add_scheduler_specific_args, reorg_optimizer_args, reorg_scheduler_args,
+                    filter_state_dict, pearson_correlation, spearman_correlation, shannon_entropy)
 
 class CNNBasicTraining(LightningModule):
     
@@ -47,6 +47,7 @@ class CNNBasicTraining(LightningModule):
         graph_args.optimizer_args = reorg_optimizer_args(graph_args.optimizer_args)
         try:
             graph_args.scheduler_args = vars(grouped_args['LR Scheduler args'])
+            graph_args.scheduler_args = reorg_scheduler_args(graph_args.scheduler_args)
         except KeyError:
             graph_args.scheduler_args = None
         return graph_args
@@ -142,14 +143,15 @@ class CNNBasicTraining(LightningModule):
                       .mean(dim=0).pow(-1).mean().pow(-1)
         epoch_preds = torch.cat([batch['preds'] for batch in val_step_outputs], dim=0)
         epoch_labels  = torch.cat([batch['labels'] for batch in val_step_outputs], dim=0)
-        pearsons, mean_pearson = Pearson_correlation(epoch_preds, epoch_labels)
-        shannon_pred, shannon_label = Shannon_entropy(epoch_preds), Shannon_entropy(epoch_labels)
-        specificity_pearson, specificity_mean_pearson = Pearson_correlation(shannon_pred, shannon_label)
+        spearman, mean_spearman = spearman_correlation(epoch_preds, epoch_labels)
+        shannon_pred, shannon_label = shannon_entropy(epoch_preds), shannon_entropy(epoch_labels)
+        specificity_spearman, specificity_mean_spearman = spearman_correlation(shannon_pred, shannon_label)
         self.aug_log(external_metrics={
+            'current_epoch': self.current_epoch, 
             'arithmetic_mean_loss': arit_mean,
             'harmonic_mean_loss': harm_mean,
-            'prediction_mean_pearson': mean_pearson.item(),
-            'entropy_mean_pearson': specificity_mean_pearson.item()
+            'prediction_mean_spearman': mean_spearman.item(),
+            'entropy_spearman': specificity_mean_spearman.item()
         })
 
         return None
@@ -178,23 +180,6 @@ class CNNTransferLearning(CNNBasicTraining):
         group.add_argument('--scheduler_interval', type=str, default='epoch')
         return parser
     
-    @staticmethod
-    def add_conditional_args(parser, known_args):
-        parser = add_optimizer_specific_args(parser, known_args.optimizer)
-        parser = add_scheduler_specific_args(parser, known_args.scheduler)
-        return parser
-
-    @staticmethod
-    def process_args(grouped_args):
-        graph_args   = grouped_args['Graph Module args']
-        graph_args.optimizer_args = vars(grouped_args['Optimizer args'])
-        graph_args.optimizer_args = reorg_optimizer_args(graph_args.optimizer_args)
-        try:
-            graph_args.scheduler_args = vars(grouped_args['LR Scheduler args'])
-        except KeyError:
-            graph_args.scheduler_args = None
-        return graph_args
-
     #######################
     # Dead __init__ block #
     #######################
