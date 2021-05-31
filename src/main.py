@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import time
 import yaml
 import shutil
@@ -11,11 +12,14 @@ import subprocess
 
 import torch
 from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import boda
 from boda.common import utils
 
 def main(args):
+    
     data_module = getattr(boda.data, args['Main args'].data_module)
     model_module= getattr(boda.model, args['Main args'].model_module)
     graph_module= getattr(boda.graph, args['Main args'].graph_module)
@@ -28,15 +32,43 @@ def main(args):
         (model_module,graph_module),
         vars(graph_module.process_args(args))
     )
-
+    
+    use_callbacks = None
+    if args['Main args'].checkpoint_monitor is not None:
+        use_callbacks = {
+            'model_checkpoint': ModelCheckpoint(
+                save_top_k=1,
+                monitor=args['Main args'].checkpoint_monitor
+            ),
+            'early_stopping': EarlyStopping(
+                monitor=args['Main args'].checkpoint_monitor, 
+                patience=args['Main args'].stopping_patience,
+                mode=args['Main args'].stopping_mode
+            )
+        }
+        
     os.makedirs('/tmp/output/artifacts', exist_ok=True)
-    trainer = Trainer.from_argparse_args(args['pl.Trainer'])
+    trainer = Trainer.from_argparse_args(args['pl.Trainer'], 
+                                         callbacks=list(use_callbacks.values()))
     
     trainer.fit(model, data)
+    
+    model = _set_best(model, use_callbacks)
     
     _save_model(data_module, model_module, graph_module, 
                 model, trainer, args)
     
+def _set_best(my_model, callbacks):
+    try:
+        best_path = callbacks['model_checkpoint'].best_model_path
+        get_epoch = re.search('epoch=(\d*)', best_path).group(1)
+        ckpt = torch.load( best_path )
+        my_model.load_state_dict( ckpt['state_dict'] )
+        print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
+    except TypeError:
+        print('Setting most recent model', file=sys.stderr)
+    return my_model
+
 def _save_model(data_module, model_module, graph_module, 
                 model, trainer, args):
     local_dir = args['pl.Trainer'].default_root_dir
@@ -67,7 +99,7 @@ def _save_model(data_module, model_module, graph_module,
         else:
             os.makedirs(args['Main args'].artifact_path, exist_ok=True)
             shutil.copy(os.path.join(tmpdirname,filename), args['Main args'].artifact_path)
-    
+
 def unpack_artifact(artifact_path,download_path='./'):
     if 'gs' in artifact_path:
         subprocess.call(['gsutil','cp',artifact_path,download_path])
@@ -100,6 +132,9 @@ if __name__ == '__main__':
     group.add_argument('--graph_module',type=str, required=True, help='BODA graph module to define computations.')
     group.add_argument('--artifact_path', type=str, default='/opt/ml/checkpoints/', help='Path where model artifacts are deposited.')
     group.add_argument('--pretrained_weights', type=str, help='Pretrained weights.')
+    group.add_argument('--checkpoint_monitor', type=str, help='String to monior PTL logs if saving best.')
+    group.add_argument('--stopping_mode', type=str, default='min', help='Goal for monitored metric e.g. (max or min).')
+    group.add_argument('--stopping_patience', type=int, default=100, help='Number of epochs of non-improvement tolerated before early stopping.')
     group.add_argument('--tolerate_unknown_args', type=utils.str2bool, default=False, help='Skips unknown command line args without exceptions. Useful for HPO, but high risk of silent errors.')
     known_args, leftover_args = parser.parse_known_args()
     
