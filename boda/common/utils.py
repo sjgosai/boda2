@@ -6,6 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 from . import constants 
@@ -134,6 +135,10 @@ def neg_reward_loss(x):
     """
     return -torch.sum(x)
 
+def generate_all_kmers(k=4):
+    for i in range(4**k):
+        yield "".join([ constants.STANDARD_NT[ (i // (4**j)) % 4 ] for j in range(k) ])            
+
 def organize_args(parser, args):
     arg_groups={}
     for group in parser._action_groups:
@@ -165,6 +170,29 @@ def row_dna2tensor(row, in_column_name='padded_seq' , vocab=constants.STANDARD_N
     seq_idxs = torch.tensor([vocab.index(letter) for letter in sequence_str])
     sequence_tensor = F.one_hot(seq_idxs, num_classes=4).transpose(1,0)
     return sequence_tensor.type(torch.float32)
+
+def generate_all_onehots(k=4, num_classes=4):
+    tokens = torch.tensor( 
+        [ 
+            [ 
+                (i // (num_classes**j)) % num_classes 
+                for j in range(k) 
+            ] 
+            for i in range(num_classes**k) 
+        ] 
+    )
+    onehots = F.one_hot( tokens, num_classes=num_classes ) \
+                .permute(0,2,1)
+    return onehots
+
+class KmerFilter(nn.Module):
+    def __init__(self, k):
+        super().__init__()
+        self.k = k
+        self.register_buffer('weight', generate_all_onehots(k,4).float())
+        
+    def forward(self, input_):
+        return F.conv1d(input_, self.weight).eq(self.k).float()
 
 '''
 def reset_parameters(self) -> None:
