@@ -67,8 +67,64 @@ class L1KLmixed(nn.Module):
         combined_loss = MSE_loss.mul(self.mse_scale) + \
                         KL_loss.mul(self.kl_scale)
         
+        return combined_loss#.div(self.mse_scale+self.kl_scale)
+
+class MSEwithEntropy(nn.Module):
+    
+    def __init__(self, reduction='mean', mse_scale=1.0, kl_scale=1.0):
+        
+        super().__init__()
+        
+        self.reduction = reduction
+        self.mse_scale = mse_scale
+        self.kl_scale  = kl_scale
+        
+        self.MSE = nn.MSELoss(reduction=reduction.replace('batch',''))
+        
+    def forward(self, preds, targets):
+        
+        pred_entropy = nn.Softmax(dim=1)(preds)
+        pred_entropy = torch.sum(- pred_entropy * torch.log(pred_entropy), dim=1)
+        
+        targ_entropy = nn.Softmax(dim=1)(targets)
+        targ_entropy = torch.sum(- targ_entropy * torch.log(targ_entropy), dim=1)
+        
+        MSE_loss = self.MSE(preds, targets)
+        SEE_loss = self.MSE(pred_entropy, targ_entropy)
+        
+        combined_loss = MSE_loss.mul(self.mse_scale) + \
+                        SEE_loss.mul(self.kl_scale)
+        
         return combined_loss.div(self.mse_scale+self.kl_scale)
 
+class L1withEntropy(nn.Module):
+    
+    def __init__(self, reduction='mean', mse_scale=1.0, kl_scale=1.0):
+        
+        super().__init__()
+        
+        self.reduction = reduction
+        self.mse_scale = mse_scale
+        self.kl_scale  = kl_scale
+        
+        self.MSE = nn.L1Loss(reduction=reduction.replace('batch',''))
+        
+    def forward(self, preds, targets):
+        
+        pred_entropy = nn.Softmax(dim=1)(preds)
+        pred_entropy = torch.sum(- pred_entropy * torch.log(pred_entropy), dim=1)
+        
+        targ_entropy = nn.Softmax(dim=1)(targets)
+        targ_entropy = torch.sum(- targ_entropy * torch.log(targ_entropy), dim=1)
+        
+        MSE_loss = self.MSE(preds, targets)
+        SEE_loss = self.MSE(pred_entropy, targ_entropy)
+        
+        combined_loss = MSE_loss.mul(self.mse_scale) + \
+                        SEE_loss.mul(self.kl_scale)
+        
+        return combined_loss#.div(self.mse_scale+self.kl_scale)
+    
 ##################
 #     Layers     #
 ##################
@@ -137,8 +193,7 @@ class RepeatLayer(nn.Module):
 class BranchedLinear(nn.Module):
     def __init__(self, in_features, hidden_group_size, out_group_size, 
                  n_branches=1, n_layers=1, 
-                 activation='ReLU', dropout_p=0.5, 
-                 intake_passthrough=False):
+                 activation='ReLU', dropout_p=0.5):
         super().__init__()
         
         self.in_features = in_features
@@ -152,12 +207,8 @@ class BranchedLinear(nn.Module):
         self.nonlin  = getattr(nn, activation)()                               
         self.dropout = nn.Dropout(p=dropout_p)
         
-        if not intake_passthrough:
-            self.intake = nn.Linear(in_features, hidden_group_size*n_branches, bias=True)
-            cur_size = hidden_group_size
-        else:
-            self.intake = RepeatLayer(1, n_branches)
-            cur_size = in_features
+        self.intake = RepeatLayer(1, n_branches)
+        cur_size = in_features
         
         for i in range(n_layers):
             if i + 1 == n_layers:
@@ -171,8 +222,8 @@ class BranchedLinear(nn.Module):
         hook = self.intake(x)
         
         for i in range(self.n_layers):
-            hook = self.dropout( self.nonlin(hook) )
             hook = getattr(self, f'branched_layer_{i+1}')(hook)
+            hook = self.dropout( self.nonlin(hook) )
             
         return hook
     
@@ -369,6 +420,7 @@ class BassetBranched(ptl.LightningModule):
         group.add_argument('--use_batch_norm', type=utils.str2bool, default=True)
         group.add_argument('--use_weight_norm',type=utils.str2bool, default=False)
         
+        group.add_argument('--loss_criterion', type=str, default='MSEKLmixed')
         group.add_argument('--criterion_reduction', type=str, default='mean')
         group.add_argument('--mse_scale', type=float, default=1.0)
         group.add_argument('--kl_scale', type=float, default=1.0)
@@ -391,7 +443,8 @@ class BassetBranched(ptl.LightningModule):
                  linear_activation='ReLU', linear_dropout_p=0.3, 
                  n_branched_layers=1, branched_channels=250, 
                  branched_activation='ReLU6', branched_dropout_p=0., 
-                 n_outputs=280, criterion_reduction='mean', 
+                 n_outputs=280, loss_criterion='MSEKLmixed', 
+                 criterion_reduction='mean', 
                  mse_scale=1.0, kl_scale=1.0, 
                  use_batch_norm=True, use_weight_norm=False):                                                
         super().__init__()        
@@ -420,7 +473,8 @@ class BassetBranched(ptl.LightningModule):
         self.branched_dropout_p= branched_dropout_p
         
         self.n_outputs         = n_outputs
-                
+        
+        self.loss_criterion    = loss_criterion
         self.criterion_reduction=criterion_reduction
         self.mse_scale         = mse_scale
         self.kl_scale          = kl_scale
@@ -470,8 +524,7 @@ class BassetBranched(ptl.LightningModule):
         self.branched = BranchedLinear(next_in_channels, self.branched_channels, 
                                        self.branched_channels, 
                                        self.n_outputs, self.n_branched_layers, 
-                                       self.branched_activation, self.branched_dropout_p,
-                                       intake_passthrough=True)
+                                       self.branched_activation, self.branched_dropout_p)
             
         self.output  = GroupedLinear(self.branched_channels, 1, self.n_outputs)
         
@@ -479,9 +532,11 @@ class BassetBranched(ptl.LightningModule):
         
         self.dropout = nn.Dropout(p=self.linear_dropout_p)
         
-        self.criterion =  L1KLmixed(reduction=self.criterion_reduction,
-                                    mse_scale=self.mse_scale,
-                                    kl_scale =self.kl_scale)
+        self.criterion =  globals()[self.loss_criterion](
+            reduction=self.criterion_reduction,
+            mse_scale=self.mse_scale,
+            kl_scale =self.kl_scale
+        )
         
     def encode(self, x):
         hook = self.nonlin( self.conv1( self.pad1( x ) ) )
@@ -501,11 +556,8 @@ class BassetBranched(ptl.LightningModule):
                     getattr(self,f'linear{i+1}')(hook)
                 )
             )
-        hook = self.dropout(
-            self.nonlin(
-                self.branched(hook)
-            )
-        )
+        hook = self.branched(hook)
+
         return hook
     
     def classify(self, x):
