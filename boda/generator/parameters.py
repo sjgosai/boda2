@@ -150,7 +150,7 @@ class GumbelSoftmaxParameters(ParamsBase):
         
     @property
     def shape(self):
-        return get_logits().shape
+        return self.get_logits().shape
     
     def get_logits(self):
         my_attr = [ getattr(self, x) for x in ['theta', 'left_flank', 'right_flank'] ]
@@ -169,5 +169,5 @@ class GumbelSoftmaxParameters(ParamsBase):
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
     
-    def prior_nll(self):
-        return self.theta.transpose(self.batch_dim, 0).flatten(1).pow(2).div(2*self.prior_var).mean(1)
+#     def prior_nll(self):
+#         return self.theta.transpose(self.batch_dim, 0).flatten(1).pow(2).div(2*self.prior_var).mean(1)
