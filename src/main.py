@@ -38,7 +38,8 @@ def main(args):
         use_callbacks = {
             'model_checkpoint': ModelCheckpoint(
                 save_top_k=1,
-                monitor=args['Main args'].checkpoint_monitor
+                monitor=args['Main args'].checkpoint_monitor, 
+                mode=args['Main args'].stopping_mode
             ),
             'early_stopping': EarlyStopping(
                 monitor=args['Main args'].checkpoint_monitor, 
