@@ -3,3 +3,6 @@
 
 # Ignore datasets
 data
+
+# Ignore analysis
+analysis
