@@ -1,8 +1,5 @@
 import argparse
 import sys
-import math
-
-from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -503,14 +500,7 @@ class BassetBranched(ptl.LightningModule):
                                 bias=True, 
                                 batch_norm=self.use_batch_norm, 
                                 weight_norm=self.use_weight_norm)
-        
-        self.pad4 = nn.ConstantPad1d((1,1), 0.)
 
-        self.maxpool_3 = nn.MaxPool1d(3, padding=0)
-        self.maxpool_4 = nn.MaxPool1d(4, padding=0)
-        
-        next_in_channels = self.conv3_channels*13
-        
         for i in range(self.n_linear_layers):
             
             setattr(self, f'linear{i+1}', 
@@ -527,11 +517,10 @@ class BassetBranched(ptl.LightningModule):
                                        self.branched_activation, self.branched_dropout_p)
             
         self.output  = GroupedLinear(self.branched_channels, 1, self.n_outputs)
-        
-        self.nonlin  = getattr(nn, self.linear_activation)()                               
-        
-        self.dropout = nn.Dropout(p=self.linear_dropout_p)
-        
+
+        self.MSE = nn.MSELoss(reduction=reduction.replace('batch',''))
+        self.KL  = nn.KLDivLoss(reduction=reduction, log_target=True)
+
         self.criterion =  globals()[self.loss_criterion](
             reduction=self.criterion_reduction,
             mse_scale=self.mse_scale,
@@ -563,10 +552,9 @@ class BassetBranched(ptl.LightningModule):
     def classify(self, x):
         output = self.output( x )
         return output
-        
+
     def forward(self, x):
         encoded = self.encode(x)
         decoded = self.decode(encoded)
         output  = self.classify(decoded)
         return output
-
