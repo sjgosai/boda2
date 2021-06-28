@@ -88,8 +88,12 @@ class HMC(nn.Module):
         for m in range(n_burnin):
             theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia )
             with torch.no_grad():
-                self.params.theta.data = theta_m
-                burnin.append( {'params':theta_m, 'energy': U_m, 'acceptance': accept_m, 'epsilon': epsilon.clone().detach()} )
+                burnin.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': epsilon.clone().detach()} 
+                )
             if len(burnin[-burnin_history:]) == burnin_history and m % burnin_history == 0:
                 aap = torch.stack([ x['acceptance'] for x in burnin[-burnin_history:] ], dim=0) \
                         .float().mean(dim=0)
@@ -105,8 +109,12 @@ class HMC(nn.Module):
         for m in range(n_samples):
             theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia )
             with torch.no_grad():
-                self.params.theta.data = theta_m
-                samples.append( {'params':theta_m, 'energy': U_m, 'acceptance': accept_m, 'epsilon': epsilon.clone().detach()} )
+                samples.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': epsilon.clone().detach()} 
+                )
             
         return {'samples': samples, 'burnin': burnin}
 
