@@ -89,7 +89,7 @@ class StraightThroughParameters(ParamsBase):
 
         self.noise_factor = 0
 
-        self.instance_norm = nn.InstanceNorm1d(num_features=self.token_dim, affine=self.affine)
+        self.instance_norm = nn.InstanceNorm1d(num_features=self.num_classes, affine=self.affine)
         
     @property
     def shape(self):
@@ -103,7 +103,7 @@ class StraightThroughParameters(ParamsBase):
         logits = self.instance_norm(self.theta)
         return F.softmax(logits, dim=self.token_dim)
         
-    def get_samples(self):
+    def get_sample(self):
         probs = self.get_probs()
         sampled_idxs = Categortical( torch.transpose(probs, self.token_dim, self.cat_axis) )
         samples = sampled.idxs.sample( (self.n_samples, ) )
@@ -118,7 +118,7 @@ class StraightThroughParameters(ParamsBase):
         if self.left_flank is not None:
             pieces.append( self.left_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
             
-        pieces.append( self.get_samples() )
+        pieces.append( self.get_sample() )
         
         if self.right_flank is not None:
             pieces.append( self.right_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
@@ -138,7 +138,9 @@ class GumbelSoftmaxParameters(ParamsBase):
                  cat_axis=-1,
                  n_samples=1,
                  tau=1.,
-                 prior_var=1.
+                 prior_var=1.,
+                 use_norm=False,
+                 use_affine=False
                 ):
         
         super().__init__()
@@ -153,9 +155,19 @@ class GumbelSoftmaxParameters(ParamsBase):
         self.tau = tau
         self.prior_var = prior_var
         
+        self.use_norm = use_norm
+        self.use_affine = use_affine
+        
         self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
+        self.repeater   = [ 1 for i in range(self.n_dims) ]
         self.batch_size = self.theta.shape[self.batch_dim]
+        
+        if self.use_norm:
+            self.norm = nn.InstanceNorm1d(num_features=self.num_classes, 
+                                          affine=self.use_affine)
+        else:
+            self.norm = nn.Identity()
         
     @property
     def shape(self):
@@ -166,14 +178,23 @@ class GumbelSoftmaxParameters(ParamsBase):
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
     
     def get_sample(self):
-        logits = self.get_logits()
-        samples= [ F.gumbel_softmax(logits, tau=self.tau, hard=True, dim=1) 
-                   for i in range(self.n_samples) ]
-        return torch.stack(samples, dim=0)
+        hook = self.norm( self.theta )
+        hook = [ F.gumbel_softmax(hook, tau=self.tau, hard=True, dim=1) 
+                 for i in range(self.n_samples) ]
+        return torch.stack(hook, dim=0)
     
     def forward(self):
-        sample = self.get_sample()
-        return sample.flatten(0,1)
+        pieces = []
+        
+        if self.left_flank is not None:
+            pieces.append( self.left_flank.repeat(self.n_samples, *self.repeater) )
+            
+        pieces.append( self.get_sample() )
+        
+        if self.right_flank is not None:
+            pieces.append( self.right_flank.repeat(self.n_samples, *self.repeater) )
+            
+        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
         
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
