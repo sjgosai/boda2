@@ -61,71 +61,80 @@ class BasicParameters(ParamsBase):
 
 class StraightThroughParameters(ParamsBase):
     def __init__(self,
-                 data,
+                 data, 
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
+                 token_dim=1,
                  cat_axis=-1,
                  n_samples=1,
-                 temperature=1.,
-                ):
-        
+                 affine=True,
+                 **kwrags):
         super().__init__()
-        
+ 
         self.register_parameter('theta', data)
         self.register_buffer('left_flank', left_flank)
         self.register_buffer('right_flank', right_flank)
         
         self.cat_axis = cat_axis
         self.batch_dim = batch_dim
+        self.token_dim = token_dim
         self.n_samples = n_samples
-        self.temperature = temperature
+        self.prior_var = prior_var
         
-        self.softmax    = nn.Softmax(dim=-1)
-        self.num_classes= self.theta.shape[1]
+        self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
-        self.batch_size = self.theta.shape[batch_dim]
+        self.batch_size = self.theta.shape[self.batch_dim]
+
+
+        self.noise_factor = 0
+
+        self.instance_norm = nn.InstanceNorm1d(num_features=self.token_dim, affine=self.affine)
         
-        self.perm_order   = [0] + list(range(2,self.n_dims)) + [1]
-        self.reverse_perm = [0,self.n_dims-1] + list(range(1,self.n_dims-1))
-                
     @property
     def shape(self):
-        return get_logits().shape
-    
+        return self.get_logits().shape
+        
     def get_logits(self):
-        my_attr = [ getattr(self, x) for x in ['theta', 'left_flank', 'right_flank'] ]
+        my_attr = [ getattr(self, x) for x in ['left_flank', 'theta', 'right_flank'] ]
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
-    
-    def get_probs_and_dist(self):
-        logits = self.get_logits()
-        logits = logits.permute( *self.perm_order ) \
-                   .div(self.temperature)
-        probs  = self.softmax(logits)
-        dist   = Categorical(probs=probs)
-        return probs, dist
-    
-    def sample(self):
-        probs, dist = self.get_probs_and_dist()
-        sample = dist.sample((self.n_samples,))
-        sample = F.one_hot(sample, self.num_classes)
-        sample = sample - probs.detach() + probs
-        sample = sample.flatten(0,1)
-        sample = sample.permute( *self.reverse_perm )
-        return sample
-    
+        
+    def get_probs(self):
+        logits = self.instance_norm(self.theta)
+        return F.softmax(logits, dim=self.token_dim)
+        
+    def get_samples(self):
+        probs = self.get_probs()
+        sampled_idxs = Categortical( torch.transpose(probs, self.token_dim, self.cat_axis) )
+        samples = sampled.idxs.sample( (self.n_samples, ) )
+        samples = F.one_hot(samples, num_classes=self.num_classes)
+        samples = torch.transpose(samples, self.token_dim, self.cat_axis)
+        probs = probs.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ])
+        return samples - probs.detach() + probs
+        
     def forward(self):
-        return self.sample()
-    
+        pieces = []
+        
+        if self.left_flank is not None:
+            pieces.append( self.left_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
+            
+        pieces.append( self.get_samples() )
+        
+        if self.right_flank is not None:
+            pieces.append( self.right_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
+            
+        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
+        
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
-    
+
 class GumbelSoftmaxParameters(ParamsBase):
     def __init__(self,
                  data, 
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
+                 token_dim=1,
                  cat_axis=-1,
                  n_samples=1,
                  tau=1.,
@@ -139,21 +148,21 @@ class GumbelSoftmaxParameters(ParamsBase):
         
         self.cat_axis = cat_axis
         self.batch_dim = batch_dim
+        self.token_dim = token_dim
         self.n_samples = n_samples
         self.tau = tau
         self.prior_var = prior_var
         
-        self.softmax    = nn.Softmax(dim=-1)
-        self.num_classes= self.theta.shape[1]
+        self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
-        self.batch_size = self.theta.shape[batch_dim]
+        self.batch_size = self.theta.shape[self.batch_dim]
         
     @property
     def shape(self):
         return self.get_logits().shape
     
     def get_logits(self):
-        my_attr = [ getattr(self, x) for x in ['theta', 'left_flank', 'right_flank'] ]
+        my_attr = [ getattr(self, x) for x in ['left_flank', 'theta', 'right_flank'] ]
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
     
     def get_sample(self):
@@ -168,6 +177,6 @@ class GumbelSoftmaxParameters(ParamsBase):
         
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
-    
+
 #     def prior_nll(self):
 #         return self.theta.transpose(self.batch_dim, 0).flatten(1).pow(2).div(2*self.prior_var).mean(1)

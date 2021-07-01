@@ -8,9 +8,177 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as ag
+from torch.utils.data import TensorDataset, DataLoader
 from torch.distributions.categorical import Categorical
 
-class HMC(nn.Module):
+class LeapfrogBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def calc_energy(self, T=1.0):
+        energy = self.energy_fn(self.params()).div(T)
+        energy = self.params.rebatch( energy )
+        try:
+            prior = self.params.prior_nll()
+            energy= energy + prior
+        except NotImplementedError:
+            warnings.warn("Prior Negative Log-Likelihood Not Implemented.", RuntimeWarning)
+            pass
+        return energy
+    
+    def leapfrog(self, theta, r, epsilon, T=1.0):
+        
+        #print(f'leap in params:\n{theta[0,:,100]}')
+        #print(f'leap in momentum:\n{r[0,:,100]}')
+        self.params.theta.data = theta
+        self.params.zero_grad()
+        energy = self.calc_energy(T)
+        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
+        #print(f'first grad:\n{grad_U[0,:,100]}')
+        
+        with torch.no_grad():
+            r = r - grad_U.mul(epsilon).div(2.)
+            #print(f'first momentum update:\n{r[0,:,100]}')
+            
+            theta = theta + r.mul(epsilon)
+            #print(f'params update:\n{theta[0,:,100]}')
+            
+        self.params.theta.data = theta
+        self.params.zero_grad()
+        energy = self.calc_energy(T)
+        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
+        #print(f'second grad:\n{grad_U[0,:,100]}')
+        
+        with torch.no_grad():
+            r = r - grad_U.mul(epsilon).div(2.)
+            #print(f'second momentum update:\n{r[0,:,100]}')
+            
+        #print(f'leap out:\n{theta[0,:,100]}')
+        #print('')
+        return theta, r, energy, grad_U
+    
+    def eval_samples(self, sample_tensor):
+        with torch.no_grad():
+            nlls = []
+            for theta in sample_tensor:
+                self.params.theta.data = theta
+                self.params.zero_grad()
+                nll = self.energy_fn(self.params())
+                nll = self.params.rebatch( nll )
+                nlls.append( nll.clone().detach().cpu() )
+        return torch.stack(nlls, dim=0)
+
+class TemperatureScheduleBase(nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def step(inner=None, outer=None):
+        return None
+        
+    def forward():
+        return 1.0
+    
+class WaveSchedule(TemperatureScheduleBase):
+    def __init__(self, T_init=1.0, T_max=None, T_min=None, 
+                 outer_warmup=None, outer_cooldown=None, 
+                 inner_warmup=None, inner_cooldown=None):
+        super().__init__()
+        
+        self.T_init = T_init
+        self.T_max  = T_max
+        self.T_min  = T_min
+        
+        self.outer_warmup = outer_warmup
+        self.outer_cooldown = outer_cooldown
+        self.inner_warmup = inner_warmup
+        self.inner_cooldown = inner_cooldown
+        
+        self.use_outer = (outer_warmup is not None) and (outer_cooldown is not None)
+        self.use_inner = (inner_warmup is not None) and (inner_cooldown is not None)
+        
+        self.outer_step = 0
+        self.inner_step = 0
+        
+        self.T_hist = []
+        
+    def step(self, inner=None, outer=None):
+        
+        if inner is not None:
+            self.inner_step = inner
+            
+        if outer is not None:
+            self.outer_step = outer
+            
+        return {'outer_step':self.outer_step, 
+                'inner_step':self.inner_step}
+    
+    def get_inner_T(self):
+        if self.inner_step < self.inner_warmup:
+            hook = self.inner_step/self.inner_warmup
+            hook = (self.T_max - self.T_init)*hook
+            hook = hook + self.T_init
+        elif self.inner_step < self.inner_warmup+self.inner_cooldown:
+            hook = (self.inner_step-(self.inner_warmup+self.inner_cooldown)) / self.inner_cooldown
+            hook = -((1 - hook**2)**0.5)
+            hook = hook*(self.T_max)
+            hook = hook + self.T_max + self.T_min
+        else:
+            hook = 0.
+            
+        return hook
+    
+    def get_outer_T(self):
+        if self.outer_step < self.outer_warmup:
+            hook = self.T_init + (self.outer_step/self.outer_warmup)
+        elif self.outer_step < self.outer_warmup+self.outer_cooldown:
+            hook = (1+self.T_init)*(1 - ((self.outer_step-self.outer_warmup)/self.outer_cooldown))
+        else:
+            hook = 0.
+        return hook
+    
+    def forward(self):
+        if self.use_inner and not self.use_outer:
+            hook = self.get_inner_T()
+        elif self.use_outer and not self.use_inner:
+            hook = self.get_outer_T() - self.T_init
+            hook = hook * (self.T_max/2)
+            hook = hook + self.T_init
+        elif self.use_outer and self.use_inner:
+            hook = self.get_outer_T() * self.get_inner_T()
+        else:
+            hook = self.T_init
+            
+        hook = max(self.T_min, min(self.T_max, hook))
+        self.T_hist.append(hook)
+            
+        return hook
+
+class GDTest(LeapfrogBase):
+    def __init__(self,
+                 params,
+                 energy_fn
+                ):
+        super().__init__()
+        self.params = params
+        self.energy_fn = energy_fn
+        
+    def collect_samples(self, epsilon, n_samples=1):
+        
+        samples = []
+        theta_m = self.params.theta.clone().detach()
+        
+        for m in range(n_samples):
+            r_0 = torch.zeros_like(theta_m)
+            theta_m, r_m, U_m, grad_U = self.leapfrog(theta_m, r_0, epsilon)
+            samples.append( 
+                {'params':theta_m.clone().detach().cpu(), 
+                 'energy': U_m.clone().detach().cpu(), 
+                 'grad': grad_U.clone().detach().cpu()} 
+            )
+                
+        return {'samples': samples}
+    
+class HMC(LeapfrogBase):
     def __init__(self,
                  params,
                  energy_fn
@@ -20,38 +188,7 @@ class HMC(nn.Module):
         self.energy_fn = energy_fn
         
         
-    def calc_energy(self):
-        energy = self.energy_fn(self.params())
-        energy = self.params.rebatch( energy )
-        try:
-            prior = self.params.prior_nll()
-            energy= energy + prior
-        except NotImplementedError:
-            warnings.warn("Prior Negative Log-Likelihood Not Implemented.", RuntimeWarning)
-            pass
-        return energy
-
-    def leapfrog(self, theta, r, epsilon):
-        
-        self.params.theta.data = theta
-        energy = self.calc_energy()
-        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
-        
-        with torch.no_grad():
-            r = r - grad_U.mul(epsilon).div(2.)
-            
-            theta = theta + r.mul(epsilon)
-            
-        self.params.theta.data = theta
-        energy = self.calc_energy()
-        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
-        
-        with torch.no_grad():
-            r = r - grad_U.mul(epsilon).div(2.)
-            
-        return theta, r, energy
-
-    def sample_trajectory(self, theta, epsilon, L, inertia=1.):
+    def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
         theta_0 = theta
         self.params.theta.data = theta
         r = torch.randn_like( theta ).div(inertia)
@@ -60,13 +197,26 @@ class HMC(nn.Module):
             c_U = self.calc_energy()
             c_K = r.pow(2).flatten(1).sum(1).div(2.)
         
-        for i in range(L):
-            theta, r, energy = self.leapfrog(theta, r, epsilon)
+        for i in range(L//2):
+            r = r.mul(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.mul(alpha**0.5)
+            
+        if L % 2 == 1:
+            r = r.mul(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.div(alpha**0.5)
+            
+        for i in range(L//2):
+            r = r.div(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.div(alpha**0.5)
             
         r = r.mul(-1)
         
         with torch.no_grad():
-            p_U = energy
+            
+            p_U = self.calc_energy()
             p_K = r.pow(2).flatten(1).sum(1).div(2.)
             
             accept = torch.rand_like(c_U) < (c_U - p_U + c_K - p_K).exp()
@@ -78,7 +228,7 @@ class HMC(nn.Module):
             
             return theta_p, U, accept
 
-    def collect_samples(self, epsilon, L, inertia=1., n_samples=1, n_burnin=0):
+    def collect_samples(self, epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
         burnin_history = min(n_burnin // 10, 50)
         
         samples = []
@@ -86,7 +236,7 @@ class HMC(nn.Module):
         theta_m = self.params.theta.clone().detach()
         
         for m in range(n_burnin):
-            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia )
+            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
             with torch.no_grad():
                 burnin.append( 
                     {'params':theta_m, 
@@ -98,16 +248,16 @@ class HMC(nn.Module):
                 aap = torch.stack([ x['acceptance'] for x in burnin[-burnin_history:] ], dim=0) \
                         .float().mean(dim=0)
                 try:
-                    epsilon[ aap < 0.5 ] *= 0.8
-                    epsilon[ aap > 0.7 ] *= 1.25
+                    epsilon[ aap < 0.55 ] *= 0.8
+                    epsilon[ aap > 0.70 ] *= 1.25
                 except (IndexError, TypeError) as e:
-                    if aap.mean() < 0.5:
+                    if aap.mean() < 0.55:
                         epsilon *= 0.8
-                    elif aap.mean() > 0.7:
+                    elif aap.mean() > 0.70:
                         epsilon *= 1.25
 
         for m in range(n_samples):
-            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia )
+            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
             with torch.no_grad():
                 samples.append( 
                     {'params':theta_m, 
@@ -118,7 +268,107 @@ class HMC(nn.Module):
             
         return {'samples': samples, 'burnin': burnin}
 
-class NUTS3(nn.Module):
+class AnnealingHMC(LeapfrogBase):
+    def __init__(self,
+                 params,
+                 energy_fn,
+                 temperature_schedule
+                ):
+        super().__init__()
+        self.params = params
+        self.energy_fn = energy_fn
+        self.temperature_schedule = temperature_schedule
+        
+    def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
+        theta_0 = theta
+        self.params.theta.data = theta
+        r = torch.randn_like( theta ).div(inertia)
+        
+        with torch.no_grad():
+            c_U = self.calc_energy()
+            c_K = r.pow(2).flatten(1).sum(1).div(2.)
+        
+        for i in range(L//2):
+            r = r.mul(alpha**0.5)
+            T = self.temperature_schedule()
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon, T)
+            self.temperature_schedule.step(inner=i)
+            r = r.mul(alpha**0.5)
+            
+        if L % 2 == 1:
+            i += 1
+            r = r.mul(alpha**0.5)
+            T = self.temperature_schedule()
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon, T)
+            self.temperature_schedule.step(inner=i)
+            r = r.div(alpha**0.5)
+            
+        for j in range(L//2):
+            r = r.div(alpha**0.5)
+            T = self.temperature_schedule()
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon, T)
+            self.temperature_schedule.step(inner=i+j)
+            r = r.div(alpha**0.5)
+            
+        r = r.mul(-1)
+        
+        with torch.no_grad():
+            
+            p_U = self.calc_energy()
+            p_K = r.pow(2).flatten(1).sum(1).div(2.)
+            
+            accept = torch.rand_like(c_U) < (c_U - p_U + c_K - p_K).exp()
+            
+            theta_p = torch.stack([theta_0, theta], dim=0) \
+                        [accept.long(), torch.arange(c_U.numel())]
+            U       = torch.stack([c_U, p_U], dim=0) \
+                        [accept.long(), torch.arange(c_U.numel())]
+            
+            return theta_p, U, accept
+
+    def collect_samples(self, epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
+        burnin_history = min(n_burnin // 10, 50)
+        
+        samples = []
+        burnin  = []
+        theta_m = self.params.theta.clone().detach()
+        
+        for m in range(n_burnin):
+            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
+            self.temperature_schedule.step(outer=m)
+            with torch.no_grad():
+                burnin.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': epsilon.clone().detach()} 
+                )
+            if len(burnin[-burnin_history:]) == burnin_history and m % burnin_history == 0:
+                aap = torch.stack([ x['acceptance'] for x in burnin[-burnin_history:] ], dim=0) \
+                        .float().mean(dim=0)
+                try:
+                    epsilon[ aap < 0.55 ] *= 0.8
+                    epsilon[ aap > 0.70 ] *= 1.25
+                except (IndexError, TypeError) as e:
+                    if aap.mean() < 0.55:
+                        epsilon *= 0.8
+                    elif aap.mean() > 0.70:
+                        epsilon *= 1.25
+
+        for m in range(n_samples):
+            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
+            self.temperature_schedule.step(outer=m+n_burnin)
+            with torch.no_grad():
+                samples.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': epsilon.clone().detach()} 
+                )
+            
+        return {'samples': samples, 'burnin': burnin}
+
+class NUTS3(LeapfrogBase):
     def __init__(self,
                  params,
                  energy_fn,
@@ -132,41 +382,10 @@ class NUTS3(nn.Module):
         
         self.d_max = 1000.
         
-    def calc_energy(self):
-        energy = self.energy_fn(self.params())
-        energy = self.params.rebatch( energy )
-        try:
-            prior = self.params.prior_nll()
-            energy= energy + prior
-        except NotImplementedError:
-            warnings.warn("Prior Negative Log-Likelihood Not Implemented.", RuntimeWarning)
-            pass
-        return energy
-
-    def leapfrog(self, theta, r, epsilon):
-        
-        self.params.theta.data = theta
-        energy = self.calc_energy()
-        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
-        
-        with torch.no_grad():
-            r = r - grad_U.mul(epsilon).div(2.)
-            
-            theta = theta + r.mul(epsilon)
-            
-        self.params.theta.data = theta
-        energy = self.calc_energy()
-        grad_U = ag.grad( energy.sum(), self.params.theta )[0]
-        
-        with torch.no_grad():
-            r = r - grad_U.mul(epsilon).div(2.)
-            
-        return theta, r, energy
-        
     def buildtree(self, theta, r, u, v, j, epsilon):
         #print(f'current j: {j}')
         if j == 0:
-            theta_p, r_p, energy_p = self.leapfrog(theta, r, v*epsilon)
+            theta_p, r_p, energy_p, grad_p = self.leapfrog(theta, r, v*epsilon)
             batch_dot = torch.einsum('bs,bs->b', r_p.flatten(1), r_p.flatten(1))
             hamilton  = energy_p + batch_dot.div(2.)
             n_p = (u <= torch.exp(-hamilton)).type(torch.long)
@@ -253,12 +472,28 @@ class NUTS3(nn.Module):
         
         return theta_m.detach().clone()
     
-    def collect_samples(self, epsilon, n_samples=1, inertia=1.):
+    def collect_samples(self, epsilon, inertia=1., n_samples=1, n_burnin=1):
+        
         samples = []
+        burnin  = []
         theta_m = self.params.theta.clone().detach()
+        
+        for m in range(n_burnin):
+            theta_m = self.sample_trajectory( theta_m, epsilon, inertia )
+            with torch.no_grad():
+                self.params.theta.data = theta_m
+                burnin.append( 
+                    {'params':theta_m, 
+                     'energy': self.calc_energy()} 
+                )
+        
         for m in range(n_samples):
             theta_m = self.sample_trajectory( theta_m, epsilon, inertia )
             with torch.no_grad():
                 self.params.theta.data = theta_m
-                samples.append( [theta_m, self.calc_energy()] )
-        return samples
+                samples.append( 
+                    {'params':theta_m, 
+                     'energy': self.calc_energy()} 
+                )
+        
+        return {'samples': samples, 'burnin': burnin}
