@@ -11,6 +11,8 @@ import torch.autograd as ag
 from torch.utils.data import TensorDataset, DataLoader
 from torch.distributions.categorical import Categorical
 
+from tqdm import tqdm
+
 class LeapfrogBase(nn.Module):
     def __init__(self):
         super().__init__()
@@ -235,7 +237,7 @@ class HMC(LeapfrogBase):
         burnin  = []
         theta_m = self.params.theta.clone().detach()
         
-        for m in range(n_burnin):
+        for m in tqdm(range(n_burnin)):
             theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
             with torch.no_grad():
                 burnin.append( 
@@ -256,7 +258,7 @@ class HMC(LeapfrogBase):
                     elif aap.mean() > 0.70:
                         epsilon *= 1.25
 
-        for m in range(n_samples):
+        for m in tqdm(range(n_samples)):
             theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
             with torch.no_grad():
                 samples.append( 
