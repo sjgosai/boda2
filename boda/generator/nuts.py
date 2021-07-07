@@ -1,6 +1,7 @@
 import sys
 import time
 import warnings
+import math
 
 import numpy as np
 import pandas as pd
@@ -59,6 +60,27 @@ class LeapfrogBase(nn.Module):
         #print('')
         return theta, r, energy, grad_U
     
+    def init_eta(self, epsilon, inertia=1.):
+        theta_0 = self.params.theta.data.clone().detach()
+        energy_0= self.calc_energy()
+        r_0     = torch.randn_like( theta_0 ).div(inertia)
+        epsilon = epsilon.to(r_0.device)
+        nll_0 = energy_0 + r_0.pow(2).flatten(1).sum(1).div(2.)
+        theta_p, r_p, energy_p, grad_U = self.leapfrog(theta_0, r_0, epsilon, T=1.0)
+        nll_p = energy_p + r_p.pow(2).flatten(1).sum(1).div(2.)
+        
+        a = (nll_0 - nll_p).exp().ge(0.5).float().mul(2.).add(-1)
+        s = (nll_0 - nll_p).exp().pow(a) > a.mul(-math.log(2.)).exp()
+        
+        while s.sum() > 0:
+            proposal = a.mul(math.log(2.)).exp() * epsilon.squeeze()
+            epsilon[s] = proposal[s].view(*epsilon[s].shape)
+            theta_p, r_p, energy_p, grad_U = self.leapfrog(theta_0, r_0, epsilon, T=1.0)
+            nll_p = energy_p + r_p.pow(2).flatten(1).sum(1).div(2.)
+            s = (nll_0 - nll_p).exp().pow(a) > a.mul(-math.log(2.)).exp()
+            
+        return epsilon
+
     def eval_samples(self, sample_tensor):
         with torch.no_grad():
             nlls = []
@@ -78,7 +100,8 @@ class TemperatureScheduleBase(nn.Module):
         return None
         
     def forward():
-        return 1.0
+        return 1.0    
+    
     
 class WaveSchedule(TemperatureScheduleBase):
     def __init__(self, T_init=1.0, T_max=None, T_min=None, 
@@ -229,7 +252,7 @@ class HMC(LeapfrogBase):
                         [accept.long(), torch.arange(c_U.numel())]
             
             return theta_p, U, accept
-
+        
     def collect_samples(self, epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
         burnin_history = min(n_burnin // 10, 50)
         
@@ -259,7 +282,8 @@ class HMC(LeapfrogBase):
                         epsilon *= 1.25
 
         for m in tqdm(range(n_samples)):
-            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
+            jitter = torch.rand_like(epsilon).mul(0.2).add(0.9)
+            theta_m, U_m, accept_m = self.sample_trajectory( theta_m, epsilon.mul(jitter), L, inertia, alpha )
             with torch.no_grad():
                 samples.append( 
                     {'params':theta_m, 
@@ -270,6 +294,119 @@ class HMC(LeapfrogBase):
             
         return {'samples': samples, 'burnin': burnin}
 
+class HMCDA(LeapfrogBase):
+    def __init__(self,
+                 params,
+                 energy_fn
+                ):
+        super().__init__()
+        self.params = params
+        self.energy_fn = energy_fn
+        
+    def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
+        theta_0 = theta
+        self.params.theta.data = theta
+        r = torch.randn_like( theta ).div(inertia)
+        
+        with torch.no_grad():
+            c_U = self.calc_energy()
+            c_K = r.pow(2).flatten(1).sum(1).div(2.)
+        
+        for i in range(L//2):
+            r = r.mul(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.mul(alpha**0.5)
+            
+        if L % 2 == 1:
+            r = r.mul(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.div(alpha**0.5)
+            
+        for i in range(L//2):
+            r = r.div(alpha**0.5)
+            theta, r, energy, grad_U = self.leapfrog(theta, r, epsilon)
+            r = r.div(alpha**0.5)
+            
+        r = r.mul(-1)
+        
+        with torch.no_grad():
+            
+            p_U = self.calc_energy()
+            p_K = r.pow(2).flatten(1).sum(1).div(2.)
+            
+            accept_prob = (c_U - p_U + c_K - p_K).exp().clamp(max=1.)
+            
+            accept = torch.rand_like(c_U) < accept_prob
+            
+            theta_p = torch.stack([theta_0, theta], dim=0) \
+                        [accept.long(), torch.arange(c_U.numel())]
+            U       = torch.stack([c_U, p_U], dim=0) \
+                        [accept.long(), torch.arange(c_U.numel())]
+            
+            return theta_p, U, accept, accept_prob
+        
+    def collect_samples(self,
+                        epsilon_base, 
+                        inertia=1., 
+                        alpha=1., 
+                        n_samples=1, 
+                        n_burnin=1, 
+                        delta=0.65, 
+                        lambd=1.0, 
+                        gamma=0.05, 
+                        kappa=0.75, 
+                        t_0=10
+                       ):
+
+        epsilon = self.init_eta(epsilon_base, inertia=inertia)
+        eps_bar = epsilon_base.to(epsilon.device)
+        mu = epsilon.mul(10.).log()
+        
+        samples = []
+        burnin  = []
+        theta_m = self.params.theta.clone().detach()
+        H_bar   = torch.zeros_like( self.calc_energy() )
+        
+        for m in tqdm(range(n_burnin)):
+            L = epsilon.div(lambd).pow(-1).round().clamp(min=1.).max().long().item()
+            print(f'Leapfrog steps: {L}')
+            print(f'Epsilon steps: {epsilon}')
+            theta_m, U_m, accept_m, accept_prob = self.sample_trajectory( theta_m, epsilon, L, inertia, alpha )
+            print(f'Accept probs: {accept_prob}')
+            
+            H_update = accept_prob.add(-delta).mul(-1).div(m + 1 + t_0)
+            H_old    = H_bar.mul( 1 - ( 1 / (m + 1 + t_0) ) )
+            H_bar    = H_old + H_update
+            
+            epsilon = H_bar.view( *mu.shape ).mul( ((m+1)**0.5)/gamma ).mul(-1).add(mu).exp()
+            eps_bar = eps_bar.log().mul( 1 - ((m+1)**-kappa) ) + epsilon.log().mul( (m+1)**-kappa )
+            eps_bar = eps_bar.exp()
+            
+            with torch.no_grad():
+                burnin.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': epsilon.clone().detach(),
+                     'steps': L} 
+                )
+
+        L = eps_bar.div(lambd).pow(-1).round().clamp(min=1.).max().long().item()
+        for m in tqdm(range(n_samples)):
+            jitter = torch.rand_like(eps_bar).mul(0.2).add(0.9)
+            theta_m, U_m, accept_m, accept_prob = self.sample_trajectory( theta_m, eps_bar.mul(jitter), L, inertia, alpha )
+            with torch.no_grad():
+                samples.append( 
+                    {'params':theta_m, 
+                     'energy': U_m, 
+                     'acceptance': accept_m, 
+                     'epsilon': eps_bar.clone().detach(),
+                     'steps': L} 
+                )
+            
+        return {'samples': samples, 'burnin': burnin}
+
+    
 class AnnealingHMC(LeapfrogBase):
     def __init__(self,
                  params,
