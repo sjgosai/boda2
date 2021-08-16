@@ -101,8 +101,47 @@ class TemperatureScheduleBase(nn.Module):
         
     def forward():
         return 1.0    
+
+class CosineAnnealingSchedule(TemperatureScheduleBase):
+    def __init__(self, T_max, eta_max, eta_min=None):
+        super().__init__()
+        
+        self.T_max = T_max
+        self.eta_max = eta_max
+        if eta_min is None:
+            self.eta_min = torch.zeros_like(eta_max)
+        else:
+            self.eta_min = eta_min
+            
+        self._step = 0
+        
+    def step(self, value=None):
+        
+        if value is None:
+            self._step += 1
+        else:
+            self._step = value % (self.T_max+1)
+            
+        return {'_step':self._step}
     
-    
+    def forward(self):
+        
+        hook = torch.tensor( math.pi * self._step / self.T_max )
+        hook = torch.cos( hook ) + 1
+        hook = (self.eta_max - self.eta_min).mul(hook).div(2.)
+        return hook + self.eta_min
+        
+class LogCosineSchedule(CosineAnnealingSchedule):
+    def __init__(self, T_max, eta_max, eta_min=None):
+        super().__init__(T_max, eta_max, eta_min)
+        
+    def forward(self):
+        
+        hook = torch.tensor( math.pi * self._step / self.T_max )
+        hook = torch.cos( hook ) + 1
+        hook = (self.eta_max - self.eta_min).mul(hook).div(2.)
+        return torch.exp( hook + self.eta_min )
+            
 class WaveSchedule(TemperatureScheduleBase):
     def __init__(self, T_init=1.0, T_max=None, T_min=None, 
                  outer_warmup=None, outer_cooldown=None, 

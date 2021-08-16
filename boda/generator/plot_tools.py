@@ -12,6 +12,8 @@ import torch.nn.functional as F
 
 from ..common import constants
 
+from tqdm import tqdm
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -74,6 +76,22 @@ def logits_to_dms(in_tensor, target='dms_motif.png', ax=None):
         fig.savefig(target,dpi=400)
     return fig, ax
 
+def samples_to_dms(in_tensor, target='dms_motif.png', ax=None):
+    motif = in_tensor.sum(dim=0)
+    motif = counts_to_ppm( motif )
+    motif = ppm_to_IC( motif )
+    motif = tensor_to_pandas(motif)
+    fig, ax = dmslogo.draw_logo(data=motif,
+                                x_col='site',
+                                letter_col='letter',
+                                letter_height_col='height',
+                                color_col='color',
+                                fixed_ymax=2.0,
+                                ax=ax)
+    if target is not None:
+        fig.savefig(target,dpi=400)
+    return fig, ax
+
 def dms_video(theta_tensor, energy_tensor, target='my_motif.mp4'):
     images = []
     writer = imageio.get_writer(target, fps=25)
@@ -82,7 +100,7 @@ def dms_video(theta_tensor, energy_tensor, target='my_motif.mp4'):
     fig_len = max(1,seq_len//50)*12
     min_e = energy_tensor.min()
     max_e = energy_tensor.max()
-    for i, a_theta in enumerate([ x for x in theta_tensor ]):
+    for i, a_theta in enumerate(tqdm([ x for x in theta_tensor ])):
         #_ = tensor_to_dms(a_theta, target='dms_motif.png')
         
         fig = plt.figure(figsize=(fig_len,8))
