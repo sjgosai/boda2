@@ -4,10 +4,7 @@ import torch.nn as nn
 import random
 from tqdm import tqdm
 
-import sys
-sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2
 from boda.common import utils, constants
-
 
 # Adapted from https://github.com/samsinai/FLEXS/blob/master/flexs/baselines/explorers/adalead.py
 class AdaLead(nn.Module):
@@ -49,7 +46,7 @@ class AdaLead(nn.Module):
         self.register_buffer('downPad_logits', downPad_logits)
 
         #This tensor is used to get the device of the model in .propose_sequences()
-        #since the padding tensors are None is padding_len=0.
+        #since the padding tensors are None when padding_len=0.
         #The device is used in .run()
         self.register_buffer('device_reference_tensor', torch.zeros(1))    
         self.dflt_device = self.device_reference_tensor.device
@@ -124,7 +121,6 @@ class AdaLead(nn.Module):
         """Propose top `sequences_batch_size` sequences for evaluation."""
         measured_sequence_set = set(initial_sequences)
         measured_fitnesses = self.get_fitness(initial_sequences)
-        #print(measured_fitnesses)
         
         # Get all sequences within `self.threshold` percentile of the top_fitness
         top_fitness = measured_fitnesses.max()
@@ -132,12 +128,9 @@ class AdaLead(nn.Module):
                                     1 - np.sign(top_fitness) * self.threshold)))
         top_inds = top_inds.reshape(-1).tolist()
         self.initial_top_fitness = top_fitness
-        #print(top_inds)
-        #print(f'Initial top fitness: {self.top_fitness}')
         
         parents = [initial_sequences[i] for i in top_inds]
         parents = np.resize(np.array(parents), self.sequences_batch_size,)
-        #print(parents)
         
         sequences = {}
         previous_model_cost = self.model_cost
@@ -182,7 +175,6 @@ class AdaLead(nn.Module):
                     for idx, child, fitness in zip(child_idxs, children, fitnesses):
                         if fitness >= root_fitnesses[idx]:
                             nodes.append((idx, child))
-                    #print(nodes)
         if len(sequences) == 0:
             raise ValueError(
                 "No sequences generated. If `model_queries_per_batch` is small, try "
@@ -198,35 +190,11 @@ class AdaLead(nn.Module):
         self.dflt_device = self.device_reference_tensor.device    
         if self.measured_sequences is None:
             self.new_seqs = self.start_from_random_sequences(self.sequences_batch_size)
-            #print('Starting from random sequences')
         else:
             self.new_seqs = self.measured_sequences
-            #print('Starting from given initial sequences')
         pbar = tqdm(range(num_iterations), desc='Iterations')
         for iteration in pbar:
             self.new_seqs, self.preds = self.propose_sequences(self.new_seqs)
             self.final_top_fitness = max(self.preds)
             pbar.set_postfix({'Initial top fitness': self.initial_top_fitness, 'Final top fitness': self.final_top_fitness})
-    
-    
-#--------------------------- EXAMPLE ----------------------------------------
-if __name__ == '__main__':
-    from functools import partial
-    #utils.set_all_seeds(0)
-    
-    generator = AdaLead(model_queries_per_batch = 5000,
-                    eval_batch_size = 20,
-                    sequences_batch_size = 100,
-                    rho = 50,
-                    threshold = 0.1,
-                    recomb_rate = 0.1,
-                    mu = 1,
-                    seq_len = 100,
-                    padding_len = 0,
-                    fitness_fn = partial(utils.first_token_rewarder, pct=0.99))
-    generator.run(num_iterations=11)
-    # print('')
-    # print(f'Top 5 sequences: {generator.new_seqs[:5]}')
-    # print(f'Top 5 fitnesses: {generator.preds[:5]}')
-    
     
