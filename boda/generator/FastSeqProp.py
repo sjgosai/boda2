@@ -16,7 +16,7 @@ class FastSeqProp(nn.Module):
         try: self.energy_fn.eval()
         except: pass
     
-    def run(self, steps=20, learning_rate=0.5, step_print=5, lr_scheduler=True, create_plot=True):
+    def run(self, steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True):
      
         if lr_scheduler: etaMin = 1e-6
         else: etaMin = learning_rate
@@ -40,6 +40,6 @@ class FastSeqProp(nn.Module):
         if create_plot:
             plt.plot(energy_hist)
             plt.xlabel('Steps')
-            vert_label=plt.ylabel('Energy')
+            vert_label = plt.ylabel('Energy')
             vert_label.set_rotation(90)
             plt.show()
