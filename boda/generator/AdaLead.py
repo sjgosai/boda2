@@ -46,7 +46,7 @@ class AdaLead(nn.Module):
         self.register_buffer('downPad_logits', downPad_logits)
 
         #This tensor is used to get the device of the model in .propose_sequences()
-        #since the padding tensors are None when padding_len=0.
+        #(The padding tensors are None when padding_len=0, we can't use them as references)
         #The device is used in .run()
         self.register_buffer('device_reference_tensor', torch.zeros(1))    
         self.dflt_device = self.device_reference_tensor.device
