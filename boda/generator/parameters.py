@@ -65,14 +65,14 @@ class StraightThroughParameters(ParamsBase):
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
-                 token_dim=1,
+                 token_dim=-2,
                  cat_axis=-1,
                  n_samples=1,
                  affine=True,
                  **kwrags):
         super().__init__()
- 
-        self.register_parameter('theta', data)
+
+        self.theta = nn.Parameter(data)
         self.register_buffer('left_flank', left_flank)
         self.register_buffer('right_flank', right_flank)
         
@@ -80,14 +80,11 @@ class StraightThroughParameters(ParamsBase):
         self.batch_dim = batch_dim
         self.token_dim = token_dim
         self.n_samples = n_samples
-        self.prior_var = prior_var
+        self.affine = affine
         
         self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
         self.batch_size = self.theta.shape[self.batch_dim]
-
-
-        self.noise_factor = 0
 
         self.instance_norm = nn.InstanceNorm1d(num_features=self.num_classes, affine=self.affine)
         
@@ -105,25 +102,22 @@ class StraightThroughParameters(ParamsBase):
         
     def get_sample(self):
         probs = self.get_probs()
-        sampled_idxs = Categortical( torch.transpose(probs, self.token_dim, self.cat_axis) )
-        samples = sampled.idxs.sample( (self.n_samples, ) )
+        sampled_idxs = Categorical( torch.transpose(probs, self.token_dim, self.cat_axis) )
+        samples = sampled_idxs.sample( (self.n_samples, ) )
         samples = F.one_hot(samples, num_classes=self.num_classes)
         samples = torch.transpose(samples, self.token_dim, self.cat_axis)
-        probs = probs.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ])
-        return samples - probs.detach() + probs
+        probs = probs.repeat( self.n_samples, *[1 for i in range(self.n_dims)] )
+        samples = samples - probs.detach() + probs
+        return samples
         
     def forward(self):
-        pieces = []
-        
+        pieces = []    
         if self.left_flank is not None:
-            pieces.append( self.left_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
-            
-        pieces.append( self.get_sample() )
-        
+            pieces.append(self.left_flank.repeat(self.n_samples, self.batch_size, *[1 for i in range(self.n_dims-1)]))          
+        pieces.append(self.get_sample())  
         if self.right_flank is not None:
-            pieces.append( self.right_flank.repeat(self.n_samples, *[ 1 for i in range(self.n_dims) ]) )
-            
-        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
+            pieces.append(self.right_flank.repeat(self.n_samples, self.batch_size, *[1 for i in range(self.n_dims-1)]))          
+        return torch.cat(pieces, axis=self.cat_axis ).flatten(0,1)
         
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
