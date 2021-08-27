@@ -162,7 +162,7 @@ class MPRA_Basset(pl.LightningModule):
         
     def configure_optimizers(self):
         optimizer = getattr(torch.optim, self.optimizer)(self.parameters(), lr=self.learning_rate,
-                                                         weight_decay=self.weight_decay)#, amsgrad=True) #I hard-coded amsgrad for Adam  
+                                                         weight_decay=self.weight_decay)  
         if self.scheduler:
             lr_scheduler = {
                 'scheduler' : torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.epochs, eta_min=1e-6),
