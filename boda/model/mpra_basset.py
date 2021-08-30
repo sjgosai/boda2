@@ -93,7 +93,10 @@ class MPRA_Basset(pl.LightningModule):
             try:
                 self.basset_net.load_state_dict(torch.load(self.basset_weights_path))
             except:
-                self.basset_net.load_state_dict(torch.load(self.basset_weights_path, map_location=torch.device('cpu')))
+                try:
+                    self.basset_net.load_state_dict(torch.load(self.basset_weights_path, map_location=torch.device('cpu')))
+                except:
+                    print('Not able to load Basset weights')
         
         self.basset_last_hidden_width = self.basset_net.linear2_channels
 
