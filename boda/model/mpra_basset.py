@@ -121,7 +121,7 @@ class MPRA_Basset(pl.LightningModule):
         self.example_input_array = torch.rand(1, 4, 600)
         
     def forward(self, x):
-        _, basset_last_hidden = self.basset_net(x)
+        basset_last_hidden = self.basset_net.decode(x)
         output_1 = self.output_1(basset_last_hidden)
         output_2 = self.output_2(basset_last_hidden)
         output_3 = self.output_3(basset_last_hidden)
