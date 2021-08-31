@@ -135,7 +135,6 @@ def parse_streme_output(streme_output):
                     summ_dict[key] = int(value)
                 except ValueError:
                     summ_dict[key] = int(float(value))
-                #summ_dict[key] = int(value)
             else:
                 summ_dict[key] = float(value)
         pwm = []
