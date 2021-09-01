@@ -195,6 +195,21 @@ class KmerFilter(nn.Module):
         return F.conv1d(input_, self.weight).eq(self.k).float()
 
 def batch2fasta(batch, file_name):
+    """
+    Converts a tensor of one-hot sequences into a Fasta file and saves it.
+
+    Parameters
+    ----------
+    batch : torch tensor
+        DESCRIPTION.
+    file_name : path and name for fasta file
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     with open(file_name, 'w') as ofile:
         batch_size = batch.shape[0]
         #seq_list = []
