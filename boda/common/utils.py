@@ -194,6 +194,20 @@ class KmerFilter(nn.Module):
     def forward(self, input_):
         return F.conv1d(input_, self.weight).eq(self.k).float()
 
+def batch2fasta(batch, file_name):
+    with open(file_name, 'w') as ofile:
+        batch_size = batch.shape[0]
+        #seq_list = []
+        for seq_idx in range(batch_size):
+            seq_name = 'sequence_' + str(seq_idx)
+            seq_tensor = batch[seq_idx, :, :]
+            idxs = torch.argmax(seq_tensor, dim=0).numpy()
+            sequence_str = ''
+            for idx in idxs:
+                sequence_str += constants.STANDARD_NT[idx]
+            #seq_list.append(sequence_str)
+            ofile.write(">" + seq_name + "\n" + sequence_str + "\n")
+            
 '''
 def reset_parameters(self) -> None:
     init.kaiming_uniform_(self.weight, a=math.sqrt(5))
