@@ -36,9 +36,10 @@ class FastSeqProp(nn.Module):
             energy_hist.append(energy.item())
             if step % step_print == 0:
                 pbar.set_postfix({'Loss': energy.item(), 'LR': scheduler.get_last_lr()[0]})
-                
+        
+        self.energy_hist = energy_hist
         if create_plot:
-            plt.plot(energy_hist)
+            plt.plot(self.energy_hist)
             plt.xlabel('Steps')
             vert_label = plt.ylabel('Energy')
             vert_label.set_rotation(90)
