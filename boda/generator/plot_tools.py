@@ -92,7 +92,8 @@ def samples_to_dms(in_tensor, target='dms_motif.png', ax=None):
         fig.savefig(target,dpi=400)
     return fig, ax
 
-def matrix_to_dms(in_tensor, ax=None, y_max=2, fontaspect=.6, widthscale=1.2, axisfontscale=0.7):
+def matrix_to_dms(in_tensor, ax=None, y_max=2, fontaspect=.65, widthscale=0.8,
+                  axisfontscale=0.6, heightscale=0.5):
     motif = tensor_to_pandas(in_tensor)
     fig, ax = dmslogo.draw_logo(data=motif,
                                 x_col='site',
@@ -103,7 +104,8 @@ def matrix_to_dms(in_tensor, ax=None, y_max=2, fontaspect=.6, widthscale=1.2, ax
                                 fixed_ymax=y_max,
                                 fontaspect=fontaspect,
                                 widthscale=widthscale,
-                                axisfontscale=axisfontscale)
+                                axisfontscale=axisfontscale,
+                                heightscale=heightscale)
     return fig, ax
 
 def dms_video(theta_tensor, energy_tensor, target='my_motif.mp4'):
