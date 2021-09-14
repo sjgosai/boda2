@@ -92,6 +92,22 @@ def samples_to_dms(in_tensor, target='dms_motif.png', ax=None):
         fig.savefig(target,dpi=400)
     return fig, ax
 
+def matrix_to_dms(in_tensor, ax=None, y_max=2, fontaspect=.65, widthscale=0.8,
+                  axisfontscale=0.6, heightscale=0.5):
+    motif = tensor_to_pandas(in_tensor)
+    fig, ax = dmslogo.draw_logo(data=motif,
+                                x_col='site',
+                                letter_col='letter',
+                                letter_height_col='height',
+                                color_col='color',
+                                ax=ax,
+                                fixed_ymax=y_max,
+                                fontaspect=fontaspect,
+                                widthscale=widthscale,
+                                axisfontscale=axisfontscale,
+                                heightscale=heightscale)
+    return fig, ax
+
 def dms_video(theta_tensor, energy_tensor, target='my_motif.mp4'):
     images = []
     writer = imageio.get_writer(target, fps=25)
