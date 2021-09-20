@@ -132,7 +132,7 @@ class MPRA_Basset(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_pred = self(x)
-        shannon_pred, shannon_target = utils.shannon_entropy(y_pred), Shannon_entropy(y)
+        shannon_pred, shannon_target = utils.shannon_entropy(y_pred), utils.shannon_entropy(y)
         loss = self.criterion(y_pred, y) + self.sneaky_factor*self.criterion(shannon_pred, shannon_target)
         self.log('train_loss', loss, on_epoch=True)
         return loss
@@ -154,7 +154,7 @@ class MPRA_Basset(pl.LightningModule):
         preds = torch.cat([out['pred'] for out in validation_step_outputs], dim=0)
         targets  = torch.cat([out['target'] for out in validation_step_outputs], dim=0)
         pearsons, mean_pearson = utils.pearson_correlation(preds, targets)
-        shannon_pred, shannon_target = utils.shannon_entropy(preds), Shannon_entropy(targets)
+        shannon_pred, shannon_target = utils.shannon_entropy(preds), utils.shannon_entropy(targets)
         specificity_pearson, specificity_mean_pearson = utils.pearson_correlation(shannon_pred, shannon_target)
         self.log('Pearson', mean_pearson)
         self.log('Pearson_Shannon', specificity_mean_pearson)
