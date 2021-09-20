@@ -132,7 +132,7 @@ class MPRA_Basset(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_pred = self(x)
-        shannon_pred, shannon_target = Shannon_entropy(y_pred), Shannon_entropy(y)
+        shannon_pred, shannon_target = utils.shannon_entropy(y_pred), Shannon_entropy(y)
         loss = self.criterion(y_pred, y) + self.sneaky_factor*self.criterion(shannon_pred, shannon_target)
         self.log('train_loss', loss, on_epoch=True)
         return loss
