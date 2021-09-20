@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 
 import sys
 from .basset import Basset
+from ..graph import utils
 
 class MPRA_Basset(pl.LightningModule):
     
@@ -152,9 +153,9 @@ class MPRA_Basset(pl.LightningModule):
     def validation_epoch_end(self, validation_step_outputs):
         preds = torch.cat([out['pred'] for out in validation_step_outputs], dim=0)
         targets  = torch.cat([out['target'] for out in validation_step_outputs], dim=0)
-        pearsons, mean_pearson = Pearson_correlation(preds, targets)
-        shannon_pred, shannon_target = Shannon_entropy(preds), Shannon_entropy(targets)
-        specificity_pearson, specificity_mean_pearson = Pearson_correlation(shannon_pred, shannon_target)
+        pearsons, mean_pearson = utils.pearson_correlation(preds, targets)
+        shannon_pred, shannon_target = utils.shannon_entropy(preds), Shannon_entropy(targets)
+        specificity_pearson, specificity_mean_pearson = utils.pearson_correlation(shannon_pred, shannon_target)
         self.log('Pearson', mean_pearson)
         self.log('Pearson_Shannon', specificity_mean_pearson)
         res_str = '|'
