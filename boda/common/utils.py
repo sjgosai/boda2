@@ -153,17 +153,24 @@ def parse_file(file_path, columns):
 
 def row_pad_sequence(row,
                      in_column_name='nt_sequence',
-                     padded_seq_len=600,
+                     padded_seq_len=400,
                      upStreamSeq=constants.MPRA_UPSTREAM,
                      downStreamSeq=constants.MPRA_DOWNSTREAM):
     sequence = row[in_column_name]
     origSeqLen = len(sequence)
     paddingLen = padded_seq_len - origSeqLen
     assert paddingLen <= (len(upStreamSeq) + len(downStreamSeq)), 'Not enough padding available'
-    upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
-    downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
-    paddedSequence = upPad + sequence + downPad            
-    return paddedSequence
+    if paddingLen > 0:
+        if -paddingLen//2 + paddingLen%2 < 0:
+            upPad = upStreamSeq[-paddingLen//2 + paddingLen%2:]
+        else:
+            upPad = ''
+        downPad = downStreamSeq[:paddingLen//2 + paddingLen%2]
+        paddedSequence = upPad + sequence + downPad
+        assert len(paddedSequence) == padded_seq_len, 'Kiubo?'
+        return paddedSequence
+    else:
+        return sequence
 
 def row_dna2tensor(row, in_column_name='padded_seq' , vocab=constants.STANDARD_NT):
     sequence_str = row[in_column_name]
