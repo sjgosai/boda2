@@ -46,7 +46,7 @@ class AdaLead(nn.Module):
         self.register_buffer('downPad_logits', downPad_logits)
 
         #This tensor is used to get the device of the model in .propose_sequences()
-        #(The padding tensors are None when padding_len=0, we can't use them as references)
+        #since the padding tensors are None is padding_len=0.
         #The device is used in .run()
         self.register_buffer('device_reference_tensor', torch.zeros(1))    
         self.dflt_device = self.device_reference_tensor.device
@@ -56,7 +56,7 @@ class AdaLead(nn.Module):
         batch = self.string_list_to_tensor(sequence_list).to(self.dflt_device)
         batch = self.pad(batch)
         fitnesses = self.fitness_fn(batch)
-        return fitnesses.squeeze().cpu().numpy()
+        return fitnesses.squeeze().cpu().detach().numpy()
     
     def string_list_to_tensor(self, sequence_list):
         batch_len = len(sequence_list)
@@ -173,8 +173,9 @@ class AdaLead(nn.Module):
 
                     nodes = []
                     for idx, child, fitness in zip(child_idxs, children, fitnesses):
-                        if fitness >= root_fitnesses[idx]:
+                        if fitness > root_fitnesses[idx]:
                             nodes.append((idx, child))
+                    #print(nodes)
         if len(sequences) == 0:
             raise ValueError(
                 "No sequences generated. If `model_queries_per_batch` is small, try "
@@ -185,16 +186,20 @@ class AdaLead(nn.Module):
         preds = np.array(list(sequences.values()))
         sorted_order = np.argsort(preds)[: -self.sequences_batch_size : -1]
         return new_seqs[sorted_order], preds[sorted_order]
-        
+
     def run(self, num_iterations=10):
         self.dflt_device = self.device_reference_tensor.device    
         if self.measured_sequences is None:
-            self.new_seqs = self.start_from_random_sequences(self.sequences_batch_size)
+            new_seqs = self.start_from_random_sequences(self.sequences_batch_size)
+            #print('Starting from random sequences')
         else:
-            self.new_seqs = self.measured_sequences
-        pbar = tqdm(range(num_iterations), desc='Iterations')
+            new_seqs = self.measured_sequences
+            #print('Starting from given initial sequences')
+        pbar = tqdm(range(num_iterations), desc='Iterations', position=0, leave=True)
         for iteration in pbar:
-            self.new_seqs, self.preds = self.propose_sequences(self.new_seqs)
-            self.final_top_fitness = max(self.preds)
-            pbar.set_postfix({'Initial top fitness': self.initial_top_fitness, 'Final top fitness': self.final_top_fitness})
+            new_seqs, preds = self.propose_sequences(new_seqs)
+            final_top_fitness = max(preds)
+            pbar.set_postfix({'Initial top fitness': self.initial_top_fitness, 'Final top fitness': final_top_fitness})
+        self.new_seqs = new_seqs
+        self.preds = preds
     
