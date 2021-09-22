@@ -23,7 +23,7 @@ class AdaLead(nn.Module):
                  eval_batch_size = 20,
                  **kwargs):
         
-        super(AdaLead, self).__init__()
+        super().__init__()
         self.fitness_fn = fitness_fn
         self.measured_sequences = measured_sequences
         self.sequences_batch_size = sequences_batch_size
