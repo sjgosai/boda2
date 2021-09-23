@@ -187,7 +187,7 @@ class AdaLead(nn.Module):
         sorted_order = np.argsort(preds)[: -self.sequences_batch_size : -1]
         return new_seqs[sorted_order], preds[sorted_order]
 
-    def run(self, num_iterations=10):
+    def run(self, num_iterations=10, desc_str='Iterations'):
         self.dflt_device = self.device_reference_tensor.device    
         if self.measured_sequences is None:
             new_seqs = self.start_from_random_sequences(self.sequences_batch_size)
@@ -195,7 +195,7 @@ class AdaLead(nn.Module):
         else:
             new_seqs = self.measured_sequences
             #print('Starting from given initial sequences')
-        pbar = tqdm(range(num_iterations), desc='Iterations', position=0, leave=True)
+        pbar = tqdm(range(num_iterations), desc=desc_str, position=0, leave=True)
         for iteration in pbar:
             new_seqs, preds = self.propose_sequences(new_seqs)
             final_top_fitness = max(preds)
