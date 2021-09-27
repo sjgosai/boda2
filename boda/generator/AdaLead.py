@@ -145,7 +145,7 @@ class AdaLead(nn.Module):
                     child_idxs = []
                     children = []
                     while len(children) < len(nodes):
-                        idx, node = nodes[len(children) - 1]
+                        idx, node = nodes[len(children)]
 
                         child = self.generate_random_mutant(node,
                                                             self.mu * 1 / len(node),
@@ -168,7 +168,7 @@ class AdaLead(nn.Module):
                     for idx, child, fitness in zip(child_idxs, children, fitnesses):
                         if fitness > root_fitnesses[idx]:
                             nodes.append((idx, child))
-                    #print(nodes)
+
         if len(sequences) == 0:
             raise ValueError(
                 "No sequences generated. If `model_queries_per_batch` is small, try "
