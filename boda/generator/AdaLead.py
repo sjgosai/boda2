@@ -59,14 +59,7 @@ class AdaLead(nn.Module):
         return fitnesses.squeeze().cpu().detach().numpy()
     
     def string_list_to_tensor(self, sequence_list):
-        batch_len = len(sequence_list)
-        batch_tensor_size = (batch_len, self.vocab_len, self.seq_len)
-        batch_tensor = torch.zeros(batch_tensor_size)
-        for idx, seq_str in enumerate(sequence_list):
-            tensor = utils.dna2tensor(seq_str)
-            batch_tensor[idx, :, :] = tensor
-        self.register_buffer('batch_tensor', batch_tensor)
-        return batch_tensor
+        return torch.stack([utils.dna2tensor(sequence) for sequence in sequence_list])
              
     def pad(self, tensor):
         if self.padding_len > 0:
