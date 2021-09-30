@@ -53,7 +53,7 @@ class BasicParameters(ParamsBase):
         return self().shape
 
     def forward(self):
-        my_attr = [ getattr(self, x) for x in ['theta', 'left_flank', 'right_flank'] ]
+        my_attr = [ getattr(self, x) for x in ['left_flank', 'theta', 'right_flank'] ]
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
     
     def rebatch(self, input):
