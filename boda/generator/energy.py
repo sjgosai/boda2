@@ -5,6 +5,10 @@ import torch.nn.functional as F
 import torch.distributions as dist
 from torch.autograd import grad
 
+boda_src = os.path.join( os.path.dirname( os.path.dirname( os.getcwd() ) ), 'src' )
+sys.path.insert(0, boda_src)
+from pymeme import streme, parse_streme_output
+
 class BaseEnergy(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -56,6 +60,17 @@ class OverMaxEnergy(BaseEnergy):
         
         return hook[...,[ x for x in range(hook.shape[-1]) if x != self.bias_cell]].max(-1).values \
                  - hook[...,self.bias_cell].mul(self.bias_alpha)
+    
+    def register_penalty(self, x):
+        try:
+            self.penalty = x.type_as(self.penalty)
+        except AttributeError:
+            self.register_buffer('penalty', x)
+            
+    def streme_penalty(self, streme_output):
+        motif_data = parse_streme_output(streme_results['output'])
+        top_ppm    = motif_data['motif_results'][0]['ppm']
+        
     
 class EntropyEnergy(BaseEnergy):
     def __init__(self, model, bias_cell=None, bias_alpha=1.):
