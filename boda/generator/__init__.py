@@ -3,6 +3,7 @@ from .metropolis_hastings import NaiveMH, SimulatedAnnealing
 from .parameters import BasicParameters, StraightThroughParameters, GumbelSoftmaxParameters
 from .FastSeqProp import FastSeqProp
 from .AdaLead import AdaLead
+from .energy import BaseEnergy, OverMaxEnergy, EntropyEnergy
 
 __all__ = [
     'NUTS3', 'HMC', 'HMCDA', 
