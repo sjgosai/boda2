@@ -126,14 +126,10 @@ class OverMaxEnergy(BaseEnergy):
     def motif_penalty(self, x):
         try:
             motif_scores = F.conv1d(x, self.penalty_filters)
-            print('scores shape: {}'.format(motif_scores.shape))
             score_thresholds = torch.ones_like(motif_scores) * self.score_thresholds[None, :, None]
-            print('thresh shape: {}'.format(score_thresholds.shape))
             mask = torch.ge(motif_scores, score_thresholds)
-            print('mask shape: {}'.format(mask.shape))
             #masked_scores = torch.masked_select(motif_scores, mask)
             masked_scores = motif_scores * mask.float()
-            print('masked scores shape: {}'.format(masked_scores.shape))
             return masked_scores.flatten(1).sum(dim=-1).div((self.penalty_filters.shape[0] // 2) * x.shape[0])
 
         except AttributeError:
