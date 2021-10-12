@@ -230,6 +230,58 @@ def batch2fasta(batch, file_name):
             #seq_list.append(sequence_str)
             ofile.write(">" + seq_name + "\n" + sequence_str + "\n")
             
+def reverse_complement_onehot(x, nt_order=constants.STANDARD_NT, 
+                              complements=constants.DNA_COMPLEMENTS):
+    """
+    Returns the reverse complement of a onehot DNA sequence tensor.
+    
+    Parameters
+    ----------
+    x : torch.tensor
+        A one-hot DNA tensor
+    
+    nt_order: list
+        A list of nucleotide tokens with same ordering as one-hot encoding
+        
+    complements: dict
+        A dictionary specifying complementary nucleotides, one-to-one.
+        
+    Returns
+    -------
+    torch.tensor
+    """
+    
+    comp_alphabet = [ complements[nt] for nt in nt_order ]
+    permutation = [ nt_order.index(nt) for nt in comp_alphabet ]
+    
+    return torch.flip(x[..., permutation, :], dims=[-1])
+
+def align_to_alphabet(x, in_order=['A','C','G','T'], out_order=constants.STANDARD_NT):
+    """
+    Reorder the channel dimension of a tensor (e.g. of shape [..., C, L])
+    
+    Prameters
+    ---------
+    x: torch.tensor
+        A tensor of shape [..., C, L] where the C channels are ordered 
+        by their correspondence to `in_order`
+        
+    in_order: list
+        A list that specifies the ordering of an alphabet that is consistant 
+        with the input, `x`.
+        
+    out_order: list
+        A list that specifies the target ordering of the alphabet which will 
+        be used to permute the appropriate dimension of `x`.
+    
+    Returns
+    -------
+    torch.tensor
+    """
+    
+    permutation = [ in_order.index(tk) for tk in out_order ]
+    return x[..., permutation, :]
+            
 '''
 def reset_parameters(self) -> None:
     init.kaiming_uniform_(self.weight, a=math.sqrt(5))
