@@ -18,6 +18,8 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import boda
 from boda.common import utils
 
+import hypertune
+
 def main(args):
     
     data_module = getattr(boda.data, args['Main args'].data_module)
@@ -55,6 +57,22 @@ def main(args):
     trainer.fit(model, data)
     
     model = _set_best(model, use_callbacks)
+    
+    if use_callbacks is not None:
+        try:
+            mc_dict = vars(use_callbacks['model_checkpoint'])
+            keys = ['monitor', 'best_model_score']
+            tag, metric = [ mc_dict[key] for key in keys ]
+            model.hpt.report_hyperparameter_tuning_metric(
+                hyperparameter_metric_tag=tag,
+                metric_value=metric.item(),
+                global_step=model.global_step + 1)
+            print(f'{tag} at {model.global_step}: {metric}', file=sys.stderr)
+        except AttributeError:
+            print("No hypertune instance found.", file=sys.stderr)
+            pass
+    else:
+        print("No callbacks used", file=sys.stderr)
     
     _save_model(data_module, model_module, graph_module, 
                 model, trainer, args)
