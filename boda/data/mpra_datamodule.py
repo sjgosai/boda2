@@ -88,7 +88,11 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--num_workers', type=int, default=8, 
                            help='number of gpus or cpu cores to be used') 
         group.add_argument('--normalize', type=utils.str2bool, default=False, 
-                           help='apply standard score normalization') 
+                           help='apply standard score normalization')
+        group.add_argument('--duplication_cutoff', type=float, 
+                           help='sequences with max activities higher then this are duplicated in training')
+        group.add_argument('--use_reverse_complements', type=utils.str2bool, default=False,
+                           help='Reverse complement to augment/duplicate training examples')
         return parser
     
     @staticmethod
