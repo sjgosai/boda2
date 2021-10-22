@@ -11,7 +11,53 @@ import pytorch_lightning as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset, ConcatDataset
 
 from ..common import constants, utils
+
+class DNAActivityDataset(Dataset):
+    
+    def __init__(self, dna_tensor, activity_tensor, sort_tensor=None, 
+                 duplication_cutoff=None, use_reverse_complements=False):
+        self.dna_tensor = dna_tensor
+        self.activity_tensor = activity_tensor
+        self.duplication_cutoff = duplication_cutoff
+        self.use_reverse_complements = use_reverse_complements
         
+        self.n_examples   = self.dna_tensor.shape[0]
+        self.n_duplicated = 0
+        
+        if duplication_cutoff is not None:
+            _, sort_order = torch.sort(sort_tensor, descending=True, stable=True)
+            self.dna_tensor = dna_tensor[sort_order]
+            self.activity_tensor = self.activity_tensor[sort_order]
+            
+            self.n_duplicated = (sort_tensor >= duplication_cutoff).sum().item()
+        
+    def __len__(self):
+        dataset_len = self.dna_tensor.shape[0] + self.n_duplicated
+        if self.use_reverse_complements:
+            dataset_len = 2 * dataset_len
+        return dataset_len
+    
+    def __getitem__(self, idx):
+        if idx >= len(self):
+            raise IndexError(f"index {idx} is out of bounds for dataset with size {len(self)}")
+        if idx < 0:
+            if -idx > len(self):
+                raise ValueError(f"absolute value of {idx} is out of bounds for dataset with size {len(self)}")
+            
+        if self.use_reverse_complements:
+            take_rc = idx % 2 == 1
+            item_idx= (idx // 2) % self.n_examples
+        else:
+            take_rc = False            
+            item_idx= idx % self.n_examples
+            
+        dna      = self.dna_tensor[item_idx]
+        activity = self.activity_tensor[item_idx]
+
+        if take_rc:
+            dna = utils.reverse_complement_onehot(dna)
+        
+        return dna, activity
 
 class MPRA_DataModule(pl.LightningDataModule):
     
@@ -26,7 +72,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
         group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'])
         group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''])
-        group.add_argument('--val_chrs', type=str, nargs='+', default=['17','19','21','X'])
+        group.add_argument('--val_chrs', type=str, nargs='+', default=['19','21','X'])
         group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'])
         group.add_argument('--chr_column', type=str, default='chr')
         group.add_argument('--std_multiple_cut', type=float, default=6.0)
@@ -56,12 +102,12 @@ class MPRA_DataModule(pl.LightningDataModule):
 
     def __init__(self,
                  datafile_path,
-                 data_project=['BODA', 'UKBB'],
+                 data_project=['BODA', 'UKBB', 'GTEX'],
                  project_column='data_project',
                  sequence_column='nt_sequence',
                  activity_columns=['K562_mean', 'HepG2_mean', 'SKNSH_mean'],
                  exclude_chr_train=[''],
-                 val_chrs=['17','19','21','X'],
+                 val_chrs=['19','21','X'],
                  test_chrs=['7','13'],
                  chr_column='chr',
                  std_multiple_cut=6.0,
@@ -74,6 +120,8 @@ class MPRA_DataModule(pl.LightningDataModule):
                  padded_seq_len=600, 
                  num_workers=8,
                  normalize=False,
+                 duplication_cutoff=None,
+                 use_reverse_complements=False,
                  **kwargs):       
         """
         Takes a .txt file with a column cotaining DNA sequences,
@@ -120,6 +168,12 @@ class MPRA_DataModule(pl.LightningDataModule):
             number of gpus or cpu cores to be used, right?. The default is 8.
         normalize : bool, optional
             DESCRIPTION. The default is False.
+        duplication_cutoff: float, optional
+            All sequences with max activity across cell types above this value will be
+            duplicated during training.
+        use_reverse_complements: bool, optional
+            If true, reverse complements of training sequences will be added to 
+            training set.
         **kwargs : TYPE
             DESCRIPTION.
 
@@ -149,6 +203,8 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.padded_seq_len = padded_seq_len        
         self.num_workers = num_workers
         self.normalize = normalize
+        self.duplication_cutoff = duplication_cutoff
+        self.use_reverse_complements = use_reverse_complements
         
         self.pad_column_name = 'padded_seq'
         self.tensor_column_name = 'onehot_seq'
@@ -233,6 +289,10 @@ class MPRA_DataModule(pl.LightningDataModule):
             sequences_train  = torch.stack(sequences_train)
             activities_train = torch.Tensor(activities_train)    
             self.chr_dataset_train = TensorDataset(sequences_train, activities_train)
+            self.chr_dataset_train = DNAActivityDataset(sequences_train, activities_train, 
+                                                        sort_tensor=torch.max(activities_train, dim=-1).values, 
+                                                        duplication_cutoff=self.duplication_cutoff, 
+                                                        use_reverse_complements=self.use_reverse_complements)
         
         if len(self.val_chrs) > 0:
             sequences_val  = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
@@ -262,8 +322,18 @@ class MPRA_DataModule(pl.LightningDataModule):
     
             synth_dataset_split = random_split(synth_dataset,
                                                [synth_train_size, synth_val_size, synth_test_size],
-                                               generator=torch.Generator().manual_seed(self.synth_seed))       
+                                               generator=torch.Generator().manual_seed(self.synth_seed))
             self.synth_dataset_train, self.synth_dataset_val, self.synth_dataset_test = synth_dataset_split
+            
+            # Repackage training synth
+            dna, activities = list(zip(*list(self.synth_dataset_train)))
+            dna = torch.stack(dna, dim=0)
+            activities = torch.stack(activities, dim=0)
+            self.synth_dataset_train = DNAActivityDataset(dna, activities, 
+                                                          sort_tensor=torch.max(activities, dim=-1).values, 
+                                                          duplication_cutoff=self.duplication_cutoff, 
+                                                          use_reverse_complements=self.use_reverse_complements)
+
             
             if self.chr_dataset_train is None:
                 if self.synth_chr not in self.exclude_chr_train:
@@ -305,7 +375,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         print(f'Number of examples in test:  {self.test_size} ({test_pct}%)')
         print('')
         print(f'Excluded from train: {excluded_size} ({excluded_pct})%')
-        print('-'*50)       
+        print('-'*50)    
                 
     def train_dataloader(self):
         return DataLoader(self.dataset_train, batch_size=self.batch_size,
