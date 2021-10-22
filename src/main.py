@@ -49,10 +49,13 @@ def main(args):
                 mode=args['Main args'].stopping_mode
             )
         }
+        trainer_callbacks = list(use_callbacks.values())
+    else:
+        trainer_callbacks = None
         
     os.makedirs('/tmp/output/artifacts', exist_ok=True)
     trainer = Trainer.from_argparse_args(args['pl.Trainer'], 
-                                         callbacks=list(use_callbacks.values()))
+                                         callbacks=trainer_callbacks)
     
     trainer.fit(model, data)
     
