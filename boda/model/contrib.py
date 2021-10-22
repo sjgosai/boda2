@@ -224,6 +224,7 @@ class BranchedLinear(nn.Module):
         for i in range(self.n_layers):
             hook = getattr(self, f'branched_layer_{i+1}')(hook)
             hook = self.dropout( self.nonlin(hook) )
+        #hook = getattr(self, f'branched_layer_{i+2}')(hook)
             
         return hook
     
