@@ -8,7 +8,7 @@ import pandas as pd
 
 import torch
 import pytorch_lightning as pl
-from torch.utils.data import random_split, DataLoader, TensorDataset, ConcatDataset
+from torch.utils.data import random_split, DataLoader, TensorDataset, ConcatDataset, Dataset
 
 from ..common import constants, utils
 
