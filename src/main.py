@@ -12,6 +12,7 @@ import subprocess
 
 import torch
 from pytorch_lightning import Trainer
+from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
@@ -52,10 +53,23 @@ def main(args):
         trainer_callbacks = list(use_callbacks.values())
     else:
         trainer_callbacks = None
+    
+    try:
+        AIP_logs = os.environ['AIP_TENSORBOARD_LOG_DIR']
+        tb_logger = pl_loggers.TensorBoardLogger(
+            save_dir=AIP_logs
+        )
+        print(f"Saving logs to AIP provided target: {AIP_logs}")
+    except KeyError:
+        tb_logger = True
+        print("Saving logs to PTL default")
         
     os.makedirs('/tmp/output/artifacts', exist_ok=True)
-    trainer = Trainer.from_argparse_args(args['pl.Trainer'], 
-                                         callbacks=trainer_callbacks)
+    trainer = Trainer.from_argparse_args(
+        args['pl.Trainer'], 
+        callbacks=trainer_callbacks,
+        logger=tb_logger
+    )
     
     trainer.fit(model, data)
     
