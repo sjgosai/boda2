@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, CTCLoss, NLLLoss, PoissonNLLLoss, GaussianNLLLoss, KLDivLoss, BCELoss, BCEWithLogitsLoss, MarginRankingLoss, HingeEmbeddingLoss, MultiLabelMarginLoss, HuberLoss, SmoothL1Loss, SoftMarginLoss, MultiLabelSoftMarginLoss, CosineEmbeddingLoss, MultiMarginLoss, TripletMarginLoss, TripletMarginWithDistanceLoss
+
 import pytorch_lightning as ptl
 
 from ..common import utils 
@@ -221,10 +223,11 @@ class BranchedLinear(nn.Module):
         
         hook = self.intake(x)
         
-        for i in range(self.n_layers):
+        i = -1
+        for i in range(self.n_layers-1):
             hook = getattr(self, f'branched_layer_{i+1}')(hook)
             hook = self.dropout( self.nonlin(hook) )
-        #hook = getattr(self, f'branched_layer_{i+2}')(hook)
+        hook = getattr(self, f'branched_layer_{i+2}')(hook)
             
         return hook
     
