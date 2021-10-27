@@ -18,7 +18,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import boda
 from boda.common import utils
-from boda.common.utils import unpack_artifact, model_fn
+from boda.common.utils import set_best, save_model, unpack_artifact, model_fn
 
 import hypertune
 
@@ -41,18 +41,16 @@ def main(args):
         'learning_rate_monitor': LearningRateMonitor()
     }
     if args['Main args'].checkpoint_monitor is not None:
-        use_callbacks = {
-            'model_checkpoint': ModelCheckpoint(
-                save_top_k=1,
-                monitor=args['Main args'].checkpoint_monitor, 
-                mode=args['Main args'].stopping_mode
-            ),
-            'early_stopping': EarlyStopping(
-                monitor=args['Main args'].checkpoint_monitor, 
-                patience=args['Main args'].stopping_patience,
-                mode=args['Main args'].stopping_mode
-            )
-        }
+        use_callbacks['model_checkpoint'] = ModelCheckpoint(
+            save_top_k=1,
+            monitor=args['Main args'].checkpoint_monitor, 
+            mode=args['Main args'].stopping_mode
+        )
+        use_callbacks['early_stopping'] = EarlyStopping(
+            monitor=args['Main args'].checkpoint_monitor, 
+            patience=args['Main args'].stopping_patience,
+            mode=args['Main args'].stopping_mode
+        )
     
     try:
         AIP_logs = os.environ['AIP_TENSORBOARD_LOG_DIR']
@@ -73,7 +71,7 @@ def main(args):
     
     trainer.fit(model, data)
     
-    model = _set_best(model, use_callbacks)
+    model = set_best(model, use_callbacks)
     
     try:
         mc_dict = vars(use_callbacks['model_checkpoint'])
@@ -90,51 +88,9 @@ def main(args):
         print("No hypertune instance found.", file=sys.stderr)
         pass
     
-    _save_model(data_module, model_module, graph_module, 
-                model, trainer, args)
+    save_model(data_module, model_module, graph_module, 
+               model, trainer, args)
     
-def _set_best(my_model, callbacks):
-    try:
-        best_path = callbacks['model_checkpoint'].best_model_path
-        get_epoch = re.search('epoch=(\d*)', best_path).group(1)
-        ckpt = torch.load( best_path )
-        my_model.load_state_dict( ckpt['state_dict'] )
-        print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
-    except KeyError:
-        print('Setting most recent model', file=sys.stderr)
-    return my_model
-
-def _save_model(data_module, model_module, graph_module, 
-                model, trainer, args):
-    local_dir = args['pl.Trainer'].default_root_dir
-    save_dict = {
-        'data_module'  : data_module.__name__,
-        'data_hparams' : data_module.process_args(args),
-        'model_module' : model_module.__name__,
-        'model_hparams': model_module.process_args(args),
-        'graph_module' : graph_module.__name__,
-        'graph_hparams': graph_module.process_args(args),
-        'model_state_dict': model.state_dict(),
-        'timestamp'    : time.strftime("%Y%m%d_%H%M%S"),
-        'random_tag'   : random.randint(100000,999999)
-    }
-    torch.save(save_dict, os.path.join(local_dir,'torch_checkpoint.pt'))
-    
-    filename=f'model_artifacts__{save_dict["timestamp"]}__{save_dict["random_tag"]}.tar.gz'
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = '/tmp/output'
-        with tarfile.open(os.path.join(tmpdirname,filename), 'w:gz') as tar:
-            tar.add(local_dir,arcname='artifacts')
-
-        if 'gs://' in args['Main args'].artifact_path:
-            clound_target = os.path.join(args['Main args'].artifact_path,filename)
-            subprocess.check_call(
-                ['gsutil', 'cp', os.path.join(tmpdirname,filename), clound_target]
-            )
-        else:
-            os.makedirs(args['Main args'].artifact_path, exist_ok=True)
-            shutil.copy(os.path.join(tmpdirname,filename), args['Main args'].artifact_path)
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="BODA trainer", add_help=False)
     group = parser.add_argument_group('Main args')
