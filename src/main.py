@@ -100,7 +100,7 @@ def _set_best(my_model, callbacks):
         ckpt = torch.load( best_path )
         my_model.load_state_dict( ckpt['state_dict'] )
         print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
-    except TypeError:
+    except KeyError:
         print('Setting most recent model', file=sys.stderr)
     return my_model
 
