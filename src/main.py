@@ -13,7 +13,7 @@ import subprocess
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import boda
@@ -37,7 +37,9 @@ def main(args):
         vars(graph_module.process_args(args))
     )
     
-    use_callbacks = None
+    use_callbacks = {
+        'learning_rate_monitor': LearningRateMonitor()
+    }
     if args['Main args'].checkpoint_monitor is not None:
         use_callbacks = {
             'model_checkpoint': ModelCheckpoint(
@@ -51,9 +53,6 @@ def main(args):
                 mode=args['Main args'].stopping_mode
             )
         }
-        trainer_callbacks = list(use_callbacks.values())
-    else:
-        trainer_callbacks = None
     
     try:
         AIP_logs = os.environ['AIP_TENSORBOARD_LOG_DIR']
@@ -68,7 +67,7 @@ def main(args):
     os.makedirs('/tmp/output/artifacts', exist_ok=True)
     trainer = Trainer.from_argparse_args(
         args['pl.Trainer'], 
-        callbacks=trainer_callbacks,
+        callbacks=list(use_callbacks.values()),
         logger=tb_logger
     )
     
@@ -76,21 +75,20 @@ def main(args):
     
     model = _set_best(model, use_callbacks)
     
-    if use_callbacks is not None:
-        try:
-            mc_dict = vars(use_callbacks['model_checkpoint'])
-            keys = ['monitor', 'best_model_score']
-            tag, metric = [ mc_dict[key] for key in keys ]
-            model.hpt.report_hyperparameter_tuning_metric(
-                hyperparameter_metric_tag=tag,
-                metric_value=metric.item(),
-                global_step=model.global_step + 1)
-            print(f'{tag} at {model.global_step}: {metric}', file=sys.stderr)
-        except AttributeError:
-            print("No hypertune instance found.", file=sys.stderr)
-            pass
-    else:
-        print("No callbacks used", file=sys.stderr)
+    try:
+        mc_dict = vars(use_callbacks['model_checkpoint'])
+        keys = ['monitor', 'best_model_score']
+        tag, metric = [ mc_dict[key] for key in keys ]
+        model.hpt.report_hyperparameter_tuning_metric(
+            hyperparameter_metric_tag=tag,
+            metric_value=metric.item(),
+            global_step=model.global_step + 1)
+        print(f'{tag} at {model.global_step}: {metric}', file=sys.stderr)
+    except KeyError:
+        print('Used default checkpointing.', file=sys.stderr)
+    except AttributeError:
+        print("No hypertune instance found.", file=sys.stderr)
+        pass
     
     _save_model(data_module, model_module, graph_module, 
                 model, trainer, args)
