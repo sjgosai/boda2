@@ -281,7 +281,31 @@ def align_to_alphabet(x, in_order=['A','C','G','T'], out_order=constants.STANDAR
     
     permutation = [ in_order.index(tk) for tk in out_order ]
     return x[..., permutation, :]
-            
+
+def unpack_artifact(artifact_path,download_path='./'):
+    if 'gs' in artifact_path:
+        subprocess.call(['gsutil','cp',artifact_path,download_path])
+        if os.path.isdir(download_path):
+            tar_model = os.path.join(download_path, os.path.basename(artifact_path))
+        elif os.path.isfile(download_path):
+            tar_model = download_path
+    else:
+        assert os.path.isfile(artifact_path), "Could not find file at expected path."
+        tar_model = artifact_path
+        
+    assert tarfile.is_tarfile(tar_model), f"Expected a tarfile at {tar_model}. Not found."
+    
+    shutil.unpack_archive(tar_model)
+
+def model_fn(model_dir):
+    checkpoint = torch.load(os.path.join(model_dir,'torch_checkpoint.pt'))
+    model_module = getattr(boda.model, checkpoint['model_module'])
+    model        = model_module(**vars(checkpoint['model_hparams']))
+    model.load_state_dict(checkpoint['model_state_dict'])
+    print(f'Loaded model from {checkpoint["timestamp"]} in eval mode')
+    model.eval()
+    return model
+
 '''
 def reset_parameters(self) -> None:
     init.kaiming_uniform_(self.weight, a=math.sqrt(5))
