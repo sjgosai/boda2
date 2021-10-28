@@ -16,7 +16,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from . import constants 
+from . import constants
+from .. import model as _model
 
 def set_all_seeds(seed):
     """Fixes all random seeds
@@ -297,10 +298,10 @@ def set_best(my_model, callbacks):
     try:
         best_path = callbacks['model_checkpoint'].best_model_path
         get_epoch = re.search('epoch=(\d*)', best_path).group(1)
-        if 'gs://' in best_paths:
+        if 'gs://' in best_path:
             with tempfile.TemporaryDirectory() as tmpdirname:
-                subprocess.call(['gsutil','cp',best_paths,tmpdirname])
-                best_paths = os.path.join( tmpdirname, os.path.basename(best_paths) )
+                subprocess.call(['gsutil','cp',best_path,tmpdirname])
+                best_path = os.path.join( tmpdirname, os.path.basename(best_path) )
         ckpt = torch.load( best_path )
         my_model.load_state_dict( ckpt['state_dict'] )
         print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
@@ -355,11 +356,11 @@ def unpack_artifact(artifact_path,download_path='./'):
         
     assert tarfile.is_tarfile(tar_model), f"Expected a tarfile at {tar_model}. Not found."
     
-    shutil.unpack_archive(tar_model)
+    shutil.unpack_archive(tar_model, download_path)
 
 def model_fn(model_dir):
     checkpoint = torch.load(os.path.join(model_dir,'torch_checkpoint.pt'))
-    model_module = getattr(boda.model, checkpoint['model_module'])
+    model_module = getattr(_model, checkpoint['model_module'])
     model        = model_module(**vars(checkpoint['model_hparams']))
     model.load_state_dict(checkpoint['model_state_dict'])
     print(f'Loaded model from {checkpoint["timestamp"]} in eval mode')

@@ -214,7 +214,7 @@ class CNNTransferLearning(CNNBasicTraining):
         with tempfile.TemporaryDirectory() as tmpdirname:
             if 'tar.gz' in self.parent_weights:
                 utils.unpack_artifact(self.parent_weights, tmpdirname)
-                old_model = utils.model_fn(tmpdirname)
+                old_model = utils.model_fn(os.path.join( tmpdirname, 'artifacts' ))
                 the_weights = os.path.join( tmpdirname, 'stash_dict.pkl' )
                 torch.save(old_model.state_dict(), the_weights)
             elif 'gs://' in self.parent_weights:
