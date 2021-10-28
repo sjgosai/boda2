@@ -6,6 +6,9 @@ import re
 import time
 import os
 import tempfile
+import tarfile
+import subprocess
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -294,6 +297,10 @@ def set_best(my_model, callbacks):
     try:
         best_path = callbacks['model_checkpoint'].best_model_path
         get_epoch = re.search('epoch=(\d*)', best_path).group(1)
+        if 'gs://' in best_paths:
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                subprocess.call(['gsutil','cp',best_paths,tmpdirname])
+                best_paths = os.path.join( tmpdirname, os.path.basename(best_paths) )
         ckpt = torch.load( best_path )
         my_model.load_state_dict( ckpt['state_dict'] )
         print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
@@ -319,7 +326,6 @@ def save_model(data_module, model_module, graph_module,
     
     filename=f'model_artifacts__{save_dict["timestamp"]}__{save_dict["random_tag"]}.tar.gz'
     with tempfile.TemporaryDirectory() as tmpdirname:
-        tmpdirname = '/tmp/output'
         with tarfile.open(os.path.join(tmpdirname,filename), 'w:gz') as tar:
             tar.add(local_dir,arcname='artifacts')
 
