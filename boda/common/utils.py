@@ -295,18 +295,20 @@ def align_to_alphabet(x, in_order=['A','C','G','T'], out_order=constants.STANDAR
 #####################
 
 def set_best(my_model, callbacks):
-    try:
-        best_path = callbacks['model_checkpoint'].best_model_path
-        get_epoch = re.search('epoch=(\d*)', best_path).group(1)
-        if 'gs://' in best_path:
-            with tempfile.TemporaryDirectory() as tmpdirname:
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        try:
+            best_path = callbacks['model_checkpoint'].best_model_path
+            get_epoch = re.search('epoch=(\d*)', best_path).group(1)
+            if 'gs://' in best_path:
                 subprocess.call(['gsutil','cp',best_path,tmpdirname])
                 best_path = os.path.join( tmpdirname, os.path.basename(best_path) )
-        ckpt = torch.load( best_path )
-        my_model.load_state_dict( ckpt['state_dict'] )
-        print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
-    except KeyError:
-        print('Setting most recent model', file=sys.stderr)
+            print(f'Best model stashed at: {best_path}')
+            print(f'Exists: {os.path.isfile(best_path)}')
+            ckpt = torch.load( best_path )
+            my_model.load_state_dict( ckpt['state_dict'] )
+            print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
+        except KeyError:
+            print('Setting most recent model', file=sys.stderr)
     return my_model
 
 def save_model(data_module, model_module, graph_module, 
