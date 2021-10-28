@@ -109,15 +109,14 @@ class CNNBasicTraining(LightningModule):
         optim_class = getattr(torch.optim,self.optimizer)
         my_optimizer= optim_class(self.parameters(), **self.optimizer_args)
         if self.scheduler is not None:
-            opt_dict = {
-                'optimizer': my_optimizer, 
+            sch_dict = {
                 'scheduler': getattr(torch.optim.lr_scheduler,self.scheduler)(my_optimizer, **self.scheduler_args), 
                 'interval': self.scheduler_interval, 
                 'name': 'learning_rate'
             }
             if self.scheduler_monitor is not None:
-                opt_dict['monitor'] = self.scheduler_monitor
-            return opt_dict
+                sch_dict['monitor'] = self.scheduler_monitor
+            return [my_optimizer], [sch_dict]
         else:
             return my_optimizer
     
@@ -213,7 +212,12 @@ class CNNTransferLearning(CNNBasicTraining):
         
     def setup(self, stage='training'):
         with tempfile.TemporaryDirectory() as tmpdirname:
-            if 'gs://' in self.parent_weights:
+            if 'tar.gz' in self.parent_weights:
+                utils.unpack_artifact(self.parent_weights, tmpdirname)
+                old_model = utils.model_fn(tmpdirname)
+                the_weights = os.path.join( tmpdirname, 'stash_dict.pkl' )
+                torch.save(old_model.state_dict(), the_weights)
+            elif 'gs://' in self.parent_weights:
                 subprocess.call(['gsutil','cp',self.parent_weights,tmpdirname])
                 the_weights = os.path.join( tmpdirname, os.path.basename(self.parent_weights) )
             else:
