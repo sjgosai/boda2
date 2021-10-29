@@ -10,6 +10,8 @@ import tarfile
 import subprocess
 import shutil
 
+from collections.abc import Iterable
+
 import numpy as np
 import pandas as pd
 import torch
@@ -51,6 +53,21 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
         
+class ExtendAction(argparse.Action):
+    """Pulled from https://bugs.python.org/issue16399#msg224964
+       an extend action with default override
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not isinstance(self.default, Iterable):
+            self.default = [self.default]
+        self.reset_dest = False
+    def __call__(self, parser, namespace, values, option_string=None):
+        if not self.reset_dest:
+            setattr(namespace, self.dest, [])
+            self.reset_dest = True
+        getattr(namespace, self.dest).extend(values)
+
         
 def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
     """
@@ -302,8 +319,8 @@ def set_best(my_model, callbacks):
             if 'gs://' in best_path:
                 subprocess.call(['gsutil','cp',best_path,tmpdirname])
                 best_path = os.path.join( tmpdirname, os.path.basename(best_path) )
-            print(f'Best model stashed at: {best_path}')
-            print(f'Exists: {os.path.isfile(best_path)}')
+            print(f'Best model stashed at: {best_path}', file=sys.stderr)
+            print(f'Exists: {os.path.isfile(best_path)}', file=sys.stderr)
             ckpt = torch.load( best_path )
             my_model.load_state_dict( ckpt['state_dict'] )
             print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
