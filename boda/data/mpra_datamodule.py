@@ -67,7 +67,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group  = parser.add_argument_group('Data Module args')
         
         group.add_argument('--datafile_path', type=str, required=True)
-        group.add_argument('--data_project', type=str, nargs='+', action=utils.ExtendAction, default=['BODA', 'UKBB', 'GTEX'])
+        group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'])
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
         group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'])

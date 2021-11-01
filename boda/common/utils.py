@@ -62,11 +62,17 @@ class ExtendAction(argparse.Action):
         if not isinstance(self.default, Iterable):
             self.default = [self.default]
         self.reset_dest = False
+        print("------------> poised for reset", file=sys.stdout)
     def __call__(self, parser, namespace, values, option_string=None):
         if not self.reset_dest:
+            print("------------> trigger reset", file=sys.stdout)
             setattr(namespace, self.dest, [])
+            self.default = []
             self.reset_dest = True
+        else:
+            print("------------> no reset", file=sys.stdout)
         getattr(namespace, self.dest).extend(values)
+        print(getattr(namespace, self.dest))
 
         
 def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
@@ -166,6 +172,7 @@ def generate_all_kmers(k=4):
 
 def organize_args(parser, args):
     arg_groups={}
+    print(args)
     for group in parser._action_groups:
         group_dict={a.dest:getattr(args,a.dest,None) for a in group._group_actions}
         arg_groups[group.title]=argparse.Namespace(**group_dict)
