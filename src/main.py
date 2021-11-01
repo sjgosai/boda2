@@ -52,15 +52,7 @@ def main(args):
             mode=args['Main args'].stopping_mode
         )
     
-    try:
-        AIP_logs = os.environ['AIP_TENSORBOARD_LOG_DIR']
-        tb_logger = pl_loggers.TensorBoardLogger(
-            save_dir=AIP_logs
-        )
-        print(f"Saving logs to AIP provided target: {AIP_logs}")
-    except KeyError:
-        tb_logger = True
-        print("Saving logs to PTL default")
+    tb_logger = True
         
     os.makedirs('/tmp/output/artifacts', exist_ok=True)
     trainer = Trainer.from_argparse_args(
