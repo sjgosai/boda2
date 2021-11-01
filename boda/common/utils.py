@@ -62,17 +62,12 @@ class ExtendAction(argparse.Action):
         if not isinstance(self.default, Iterable):
             self.default = [self.default]
         self.reset_dest = False
-        print("------------> poised for reset", file=sys.stdout)
     def __call__(self, parser, namespace, values, option_string=None):
         if not self.reset_dest:
-            print("------------> trigger reset", file=sys.stdout)
             setattr(namespace, self.dest, [])
             self.default = []
             self.reset_dest = True
-        else:
-            print("------------> no reset", file=sys.stdout)
         getattr(namespace, self.dest).extend(values)
-        print(getattr(namespace, self.dest))
 
         
 def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
