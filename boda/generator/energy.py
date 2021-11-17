@@ -115,6 +115,9 @@ class BasePenalty(torch.nn.Module):
         return hook
 
 class StremePenalty(BasePenalty):
+    def __init__(self):
+        super().__init__()
+
     def penalty(self, x):
         return self.motif_penalty(x)
 
