@@ -56,23 +56,27 @@ class BaseEnergy(torch.nn.Module):
         return hook
 
 class OverMaxEnergy(BaseEnergy):
-    def __init__(self, model, bias_cell=0, bias_alpha=1., score_pct=.3):
+    def __init__(self, model, bias_cell=0, bias_alpha=1., bending_factor=0.):
         super().__init__()
         
         self.model = model
         self.model.eval()
-        
+
         self.bias_cell = bias_cell
         self.bias_alpha= bias_alpha
-        self.score_pct = score_pct
+        self.bending_factor = bending_factor
+
+    def bend(self, x):
+        return x - self.bending_factor * (torch.exp(-x) - 1)
         
     def energy_calc(self, x):
-        hook = x.to(self.model.device)
+        hook = x#.to(self.model.device)
         
-        hook = self.model(hook)
-        
-        return hook[...,[ x for x in range(hook.shape[-1]) if x != self.bias_cell]].max(-1).values \
+        hook = self.bend(self.model(hook))
+        energy = hook[...,[ x for x in range(hook.shape[-1]) if x != self.bias_cell]].max(-1).values \
                  - hook[...,self.bias_cell].mul(self.bias_alpha)
+        return energy
+    
         
 class EntropyEnergy(BaseEnergy):
     def __init__(self, model, bias_cell=None, bias_alpha=1.):
@@ -115,8 +119,11 @@ class BasePenalty(torch.nn.Module):
         return hook
 
 class StremePenalty(BasePenalty):
-    def __init__(self):
+    def __init__(self, score_pct, sequence_sets):
         super().__init__()
+        
+        self.score_pct = score_pct
+        self.sequence_sets = []
 
     def penalty(self, x):
         return self.motif_penalty(x)

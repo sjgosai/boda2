@@ -32,8 +32,7 @@ if __name__ == '__main__':
     group.add_argument('--monitor', type=str, help='')
     
     group.add_argument('--energy_threshold', type=float, help='')
-    group.add_argument('--n_samples', type=int, help='')
-    group.add_argument('--n_rounds', type=int, help='')
+    group.add_argument('--n_samples', type=list, help='')
     
     group.add_argument('--tolerate_unknown_args', type=utils.str2bool, default=False, help='Skips unknown command line args without exceptions. Useful for HPO, but high risk of silent errors.')
     

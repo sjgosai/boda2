@@ -82,14 +82,14 @@ def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
 
 class NaiveMH(MHBase):
     def __init__(self, 
-                 params,
                  energy_fn, 
+                 params,
                  n_positions=1, 
                  temperature=1.0
                 ):
         super().__init__()
-        self.params = params
         self.energy_fn = energy_fn
+        self.params = params
         self.n_positions = n_positions
         self.temperature = temperature
         
