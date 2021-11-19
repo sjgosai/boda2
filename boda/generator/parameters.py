@@ -78,13 +78,15 @@ class BasicParameters(ParamsBase):
             param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
                      .sample().permute(0,2,1)
         
-        param_args.left_flank = utils.dna2tensor( 
-            param_args.left_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.left_flank is not None:
+            param_args.left_flank = utils.dna2tensor( 
+                param_args.left_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
 
-        param_args.right_flank= utils.dna2tensor( 
-            param_args.right_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.right_flank is not None:
+            param_args.right_flank= utils.dna2tensor( 
+                param_args.right_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
         
         del param_args.batch_size
         del param_args.n_channels
@@ -170,13 +172,15 @@ class StraightThroughParameters(ParamsBase):
             param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
                      .sample().permute(0,2,1)
         
-        param_args.left_flank = utils.dna2tensor( 
-            param_args.left_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.left_flank is not None:
+            param_args.left_flank = utils.dna2tensor( 
+                param_args.left_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
 
-        param_args.right_flank= utils.dna2tensor( 
-            param_args.right_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.right_flank is not None:
+            param_args.right_flank= utils.dna2tensor( 
+                param_args.right_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
         
         del param_args.batch_size
         del param_args.n_channels
@@ -193,8 +197,7 @@ class StraightThroughParameters(ParamsBase):
                  token_dim=-2,
                  cat_axis=-1,
                  n_samples=1,
-                 use_affine=True,
-                 **kwrags):
+                 use_affine=True):
         super().__init__()
 
         self.theta = nn.Parameter(data)
@@ -299,13 +302,15 @@ class GumbelSoftmaxParameters(ParamsBase):
             param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
                      .sample().permute(0,2,1)
         
-        param_args.left_flank = utils.dna2tensor( 
-            param_args.left_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.left_flank is not None:
+            param_args.left_flank = utils.dna2tensor( 
+                param_args.left_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
 
-        param_args.right_flank= utils.dna2tensor( 
-            param_args.right_flank 
-        ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if param_args.right_flank is not None:
+            param_args.right_flank= utils.dna2tensor( 
+                param_args.right_flank 
+            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
         
         del param_args.batch_size
         del param_args.n_channels
