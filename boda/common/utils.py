@@ -228,6 +228,17 @@ class KmerFilter(nn.Module):
     def forward(self, input_):
         return F.conv1d(input_, self.weight).eq(self.k).float()
 
+def batch2list(batch, vocab_list=constants.STANDARD_NT):
+    assert len(batch.shape) == 3, "Expects 3D tensor [batch, channel, length]"
+    assert batch.shape[1] == len(constants.STANDARD_NT), 'Channel dim size must equal length of vocab_list'
+    
+    batch_size = batch.shape[0]
+    idx_tensor = torch.argmax(batch, dim=1)
+    for seq_idx in range(batch_size):
+        idxs = idx_tensor[seq_idx, :].numpy()
+        yield ''.join([ vocab_list[idx] for idx in idxs ])
+    
+    
 def batch2fasta(batch, file_name):
     """
     Converts a tensor of one-hot sequences into a Fasta file and saves it.

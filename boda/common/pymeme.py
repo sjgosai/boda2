@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 import os
 import re
+import types
 
 import numpy as np
 
@@ -44,7 +45,7 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
         else:
             streme_cmd = ['streme', '--p', tmp.name]
             
-            if isinstance(p, list):
+            if isinstance(p, list) or isinstance(p, types.GeneratorType):
                 for i, seq in enumerate(p):
                     tmp.write(f'>seq_{i}\n'.encode('utf-8'))
                     tmp.write(f'{seq}\n'.encode('utf-8'))
@@ -93,7 +94,7 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
 
         for key, value in streme_args.items():
             streme_cmd.append(f'--{key}')
-            streme_cmd.append(value)
+            streme_cmd.append(str(value))
 
         streme_cmd += flags
         streme_cmd += ['--text']

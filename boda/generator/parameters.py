@@ -1,6 +1,7 @@
 import sys
 import time
 import warnings
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as ag
+import torch.distributions as dist
 from torch.distributions.categorical import Categorical
 
 from ..common import constants, utils
@@ -58,14 +60,14 @@ class BasicParameters(ParamsBase):
         
         param_args = grouped_args['Param Module args']
         
-        if params_args.init_seqs is not None:
+        if param_args.init_seqs is not None:
             with tempfile.TemporaryDirectory() as tmpdirname:
-                if 'gs://' in params_args.init_seqs:
-                    subprocess.call(['gsutil','cp',params_args.init_seqs,tmpdirname])
-                    filename = os.path.basename(params_args.init_seqs)
-                    params_args.init_seqs = os.path.join([tmpdirname, filename])
+                if 'gs://' in param_args.init_seqs:
+                    subprocess.call(['gsutil','cp',param_args.init_seqs,tmpdirname])
+                    filename = os.path.basename(param_args.init_seqs)
+                    param_args.init_seqs = os.path.join([tmpdirname, filename])
                     
-                with open(params_args.init_seqs, 'r') as f:
+                with open(param_args.init_seqs, 'r') as f:
                     param_args.data = torch.stack(
                         [ utils.dna2tensor(line) for line in f.readlines() ], 
                         dim=0
@@ -91,7 +93,7 @@ class BasicParameters(ParamsBase):
         del param_args.batch_size
         del param_args.n_channels
         del param_args.length
-        del params_args.init_seqs
+        del param_args.init_seqs
         
         return param_args
         
@@ -105,9 +107,9 @@ class BasicParameters(ParamsBase):
         
         super().__init__()
         
-        self.register_parameter('theta', data)
-        self.register_buffer('left_flank', left_flank)
-        self.register_buffer('right_flank', right_flank)
+        self.register_parameter('theta', nn.Parameter(data.detach().clone()))
+        self.register_buffer('left_flank', left_flank.detach().clone())
+        self.register_buffer('right_flank', right_flank.detach().clone())
         
         self.cat_axis = cat_axis
         self.batch_dim = batch_dim
@@ -125,7 +127,7 @@ class BasicParameters(ParamsBase):
 
 class StraightThroughParameters(ParamsBase):
 
-        @staticmethod
+    @staticmethod
     def add_param_specific_args(parent_parser):
         
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
@@ -200,9 +202,9 @@ class StraightThroughParameters(ParamsBase):
                  use_affine=True):
         super().__init__()
 
-        self.theta = nn.Parameter(data)
-        self.register_buffer('left_flank', left_flank)
-        self.register_buffer('right_flank', right_flank)
+        self.theta = nn.Parameter(data.detach().clone())
+        self.register_buffer('left_flank', left_flank.detach().clone())
+        self.register_buffer('right_flank', right_flank.detach().clone())
         
         self.cat_axis = cat_axis
         self.batch_dim = batch_dim
@@ -334,9 +336,9 @@ class GumbelSoftmaxParameters(ParamsBase):
                 ):
         
         super().__init__()
-        self.register_parameter('theta', data)
-        self.register_buffer('left_flank', left_flank)
-        self.register_buffer('right_flank', right_flank)
+        self.register_parameter('theta', nn.Parameter(data.detach().clone()))
+        self.register_buffer('left_flank', left_flank.detach().clone())
+        self.register_buffer('right_flank', right_flank.detach().clone())
         
         self.cat_axis = cat_axis
         self.batch_dim = batch_dim

@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 
 import numpy as np
 import torch
@@ -11,9 +12,8 @@ from torch.autograd import grad
 from boda.generator.plot_tools import ppm_to_IC, ppm_to_pwm
 from boda import common
 
-boda_src = os.path.join( os.path.dirname( os.path.dirname( os.getcwd() ) ), 'src' )
-sys.path.insert(0, boda_src)
-from pymeme import streme, parse_streme_output
+from boda.common.utils import unpack_artifact, model_fn
+from boda.common.pymeme import streme, parse_streme_output
 
 ######################
 ##                  ##
@@ -56,6 +56,31 @@ class BaseEnergy(torch.nn.Module):
         return hook
 
 class OverMaxEnergy(BaseEnergy):
+    
+    @staticmethod
+    def add_energy_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Energy Module args')
+        group.add_argument('--model_artifact', type=str)
+        group.add_argument('--bias_cell', type=int, default=0)
+        group.add_argument('--bias_alpha', type=float, default=1.)
+        group.add_argument('--bending_factor', type=float, default=0.)
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        energy_args = grouped_args['Energy Module args']
+        
+        unpack_artifact(energy_args.model_artifact)
+        model = model_fn('./artifacts')
+        model.cuda()
+        model.eval()
+        energy_args.model = model
+
+        del energy_args.model_artifact
+        
+        return energy_args
+
     def __init__(self, model, bias_cell=0, bias_alpha=1., bending_factor=0.):
         super().__init__()
         
@@ -70,7 +95,7 @@ class OverMaxEnergy(BaseEnergy):
         return x - self.bending_factor * (torch.exp(-x) - 1)
         
     def energy_calc(self, x):
-        hook = x#.to(self.model.device)
+        hook = x.to(self.model.device)
         
         hook = self.bend(self.model(hook))
         energy = hook[...,[ x for x in range(hook.shape[-1]) if x != self.bias_cell]].max(-1).values \
@@ -119,11 +144,22 @@ class BasePenalty(torch.nn.Module):
         return hook
 
 class StremePenalty(BasePenalty):
-    def __init__(self, score_pct, sequence_sets):
+    @staticmethod
+    def add_penalty_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Penalty Module args')
+        group.add_argument('--score_pct', type=float, default=0.3)
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        penalty_args = grouped_args['Penalty Module args']
+        return penalty_args
+    
+    def __init__(self, score_pct):
         super().__init__()
         
         self.score_pct = score_pct
-        self.sequence_sets = []
 
     def penalty(self, x):
         return self.motif_penalty(x)
@@ -178,7 +214,7 @@ class StremePenalty(BasePenalty):
             
         self.register_penalty(penalty_filters)
         self.register_threshold(score_thresholds)
-            
+                    
     def motif_penalty(self, x):
         try:
             motif_scores = F.conv1d(x, self.penalty_filters)
@@ -190,3 +226,14 @@ class StremePenalty(BasePenalty):
 
         except AttributeError:
             return 0
+
+    def update_penalty(self, proposal):
+        proposals_list = common.utils.batch2list(proposal['proposals'])
+        streme_results = streme(proposals_list, w=8)
+        self.streme_penalty(streme_results)
+        update_summary = {
+            'streme_output': streme_results,
+            'filters': self.penalty_filters.detach().clone(),
+            'score_thresholds': self.score_thresholds.detach().clone()
+        }
+        return update_summary
