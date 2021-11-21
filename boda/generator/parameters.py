@@ -37,10 +37,10 @@ class ParamsBase(nn.Module):
 class BasicParameters(ParamsBase):
     
     @staticmethod
-    def add_param_specific_args(parent_parser):
+    def add_params_specific_args(parent_parser):
         
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        group  = parser.add_argument_group('Param Module args')
+        group  = parser.add_argument_group('Params Module args')
         
         group.add_argument('--batch_size', type=int, default=1)
         group.add_argument('--n_channels', type=int, default=4)
@@ -58,44 +58,44 @@ class BasicParameters(ParamsBase):
     @staticmethod
     def process_args(grouped_args):
         
-        param_args = grouped_args['Param Module args']
+        params_args = grouped_args['Params Module args']
         
-        if param_args.init_seqs is not None:
+        if params_args.init_seqs is not None:
             with tempfile.TemporaryDirectory() as tmpdirname:
-                if 'gs://' in param_args.init_seqs:
-                    subprocess.call(['gsutil','cp',param_args.init_seqs,tmpdirname])
-                    filename = os.path.basename(param_args.init_seqs)
-                    param_args.init_seqs = os.path.join([tmpdirname, filename])
+                if 'gs://' in params_args.init_seqs:
+                    subprocess.call(['gsutil','cp',params_args.init_seqs,tmpdirname])
+                    filename = os.path.basename(params_args.init_seqs)
+                    params_args.init_seqs = os.path.join([tmpdirname, filename])
                     
-                with open(param_args.init_seqs, 'r') as f:
-                    param_args.data = torch.stack(
+                with open(params_args.init_seqs, 'r') as f:
+                    params_args.data = torch.stack(
                         [ utils.dna2tensor(line) for line in f.readlines() ], 
                         dim=0
                     )
         
         else:
-            logits = torch.randn(param_args.batch_size,
-                                 param_args.n_channels,
-                                 param_args.length)
-            param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
+            logits = torch.randn(params_args.batch_size,
+                                 params_args.n_channels,
+                                 params_args.length)
+            params_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
                      .sample().permute(0,2,1)
         
-        if param_args.left_flank is not None:
-            param_args.left_flank = utils.dna2tensor( 
-                param_args.left_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.left_flank is not None:
+            params_args.left_flank = utils.dna2tensor( 
+                params_args.left_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
 
-        if param_args.right_flank is not None:
-            param_args.right_flank= utils.dna2tensor( 
-                param_args.right_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.right_flank is not None:
+            params_args.right_flank= utils.dna2tensor( 
+                params_args.right_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
         
-        del param_args.batch_size
-        del param_args.n_channels
-        del param_args.length
-        del param_args.init_seqs
+        del params_args.batch_size
+        del params_args.n_channels
+        del params_args.length
+        del params_args.init_seqs
         
-        return param_args
+        return params_args
         
     def __init__(self,
                  data,
@@ -128,10 +128,10 @@ class BasicParameters(ParamsBase):
 class StraightThroughParameters(ParamsBase):
 
     @staticmethod
-    def add_param_specific_args(parent_parser):
+    def add_params_specific_args(parent_parser):
         
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        group  = parser.add_argument_group('Param Module args')
+        group  = parser.add_argument_group('Params Module args')
         
         group.add_argument('--batch_size', type=int, default=1)
         group.add_argument('--n_channels', type=int, default=4)
@@ -152,7 +152,7 @@ class StraightThroughParameters(ParamsBase):
     @staticmethod
     def process_args(grouped_args):
         
-        param_args = grouped_args['Param Module args']
+        params_args = grouped_args['Params Module args']
         
         if params_args.init_seqs is not None:
             with tempfile.TemporaryDirectory() as tmpdirname:
@@ -162,34 +162,33 @@ class StraightThroughParameters(ParamsBase):
                     params_args.init_seqs = os.path.join([tmpdirname, filename])
                     
                 with open(params_args.init_seqs, 'r') as f:
-                    param_args.data = torch.stack(
+                    params_args.data = torch.stack(
                         [ utils.dna2tensor(line) for line in f.readlines() ], 
                         dim=0
                     )
         
         else:
-            logits = torch.randn(param_args.batch_size,
-                                 param_args.n_channels,
-                                 param_args.length)
-            param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
-                     .sample().permute(0,2,1)
+            logits = torch.randn(params_args.batch_size,
+                                 params_args.n_channels,
+                                 params_args.length)
+            params_args.data = logits
         
-        if param_args.left_flank is not None:
-            param_args.left_flank = utils.dna2tensor( 
-                param_args.left_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.left_flank is not None:
+            params_args.left_flank = utils.dna2tensor( 
+                params_args.left_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
 
-        if param_args.right_flank is not None:
-            param_args.right_flank= utils.dna2tensor( 
-                param_args.right_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.right_flank is not None:
+            params_args.right_flank= utils.dna2tensor( 
+                params_args.right_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
         
-        del param_args.batch_size
-        del param_args.n_channels
-        del param_args.length
+        del params_args.batch_size
+        del params_args.n_channels
+        del params_args.length
         del params_args.init_seqs
         
-        return param_args
+        return params_args
         
     def __init__(self,
                  data, 
@@ -202,7 +201,7 @@ class StraightThroughParameters(ParamsBase):
                  use_affine=True):
         super().__init__()
 
-        self.theta = nn.Parameter(data.detach().clone())
+        self.register_parameter('theta', nn.Parameter(data.detach().clone()))
         self.register_buffer('left_flank', left_flank.detach().clone())
         self.register_buffer('right_flank', right_flank.detach().clone())
         
@@ -214,6 +213,7 @@ class StraightThroughParameters(ParamsBase):
         
         self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
+        self.repeater   = [ 1 for i in range(self.n_dims) ]
         self.batch_size = self.theta.shape[self.batch_dim]
 
         self.instance_norm = nn.InstanceNorm1d(num_features=self.num_classes, affine=self.use_affine)
@@ -232,7 +232,8 @@ class StraightThroughParameters(ParamsBase):
         
     def get_sample(self):
         probs = self.get_probs()
-        sampled_idxs = Categorical( torch.transpose(probs, self.token_dim, self.cat_axis) )
+        probs_t = torch.transpose(probs, self.token_dim, self.cat_axis)
+        sampled_idxs = Categorical( probs_t )
         samples = sampled_idxs.sample( (self.n_samples, ) )
         samples = F.one_hot(samples, num_classes=self.num_classes)
         samples = torch.transpose(samples, self.token_dim, self.cat_axis)
@@ -241,24 +242,28 @@ class StraightThroughParameters(ParamsBase):
         return samples
         
     def forward(self):
-        pieces = []    
-        if self.left_flank is not None:
-            pieces.append(self.left_flank.repeat(self.n_samples, self.batch_size, *[1 for i in range(self.n_dims-1)]))          
-        pieces.append(self.get_sample())  
-        if self.right_flank is not None:
-            pieces.append(self.right_flank.repeat(self.n_samples, self.batch_size, *[1 for i in range(self.n_dims-1)]))          
-        return torch.cat(pieces, axis=self.cat_axis ).flatten(0,1)
+        pieces = []
         
+        if self.left_flank is not None:
+            pieces.append( self.left_flank.repeat(self.n_samples, *self.repeater) )
+            
+        pieces.append( self.get_sample() )
+        
+        if self.right_flank is not None:
+            pieces.append( self.right_flank.repeat(self.n_samples, *self.repeater) )
+            
+        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
+                
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
 
 class GumbelSoftmaxParameters(ParamsBase):
     
     @staticmethod
-    def add_param_specific_args(parent_parser):
+    def add_params_specific_args(parent_parser):
         
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        group  = parser.add_argument_group('Param Module args')
+        group  = parser.add_argument_group('Params Module args')
         
         group.add_argument('--batch_size', type=int, default=1)
         group.add_argument('--n_channels', type=int, default=4)
@@ -282,7 +287,7 @@ class GumbelSoftmaxParameters(ParamsBase):
     @staticmethod
     def process_args(grouped_args):
         
-        param_args = grouped_args['Param Module args']
+        params_args = grouped_args['Params Module args']
         
         if params_args.init_seqs is not None:
             with tempfile.TemporaryDirectory() as tmpdirname:
@@ -292,34 +297,34 @@ class GumbelSoftmaxParameters(ParamsBase):
                     params_args.init_seqs = os.path.join([tmpdirname, filename])
                     
                 with open(params_args.init_seqs, 'r') as f:
-                    param_args.data = torch.stack(
+                    params_args.data = torch.stack(
                         [ utils.dna2tensor(line) for line in f.readlines() ], 
                         dim=0
                     )
         
         else:
-            logits = torch.randn(param_args.batch_size,
-                                 param_args.n_channels,
-                                 param_args.length)
-            param_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
+            logits = torch.randn(params_args.batch_size,
+                                 params_args.n_channels,
+                                 params_args.length)
+            params_args.data = dist.OneHotCategorical(logits=logits.permute(0,2,1)) \
                      .sample().permute(0,2,1)
         
-        if param_args.left_flank is not None:
-            param_args.left_flank = utils.dna2tensor( 
-                param_args.left_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.left_flank is not None:
+            params_args.left_flank = utils.dna2tensor( 
+                params_args.left_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
 
-        if param_args.right_flank is not None:
-            param_args.right_flank= utils.dna2tensor( 
-                param_args.right_flank 
-            ).unsqueeze(0).expand(param_args.data.shape[0], -1, -1)
+        if params_args.right_flank is not None:
+            params_args.right_flank= utils.dna2tensor( 
+                params_args.right_flank 
+            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
         
-        del param_args.batch_size
-        del param_args.n_channels
-        del param_args.length
+        del params_args.batch_size
+        del params_args.n_channels
+        del params_args.length
         del params_args.init_seqs
         
-        return param_args
+        return params_args
         
     def __init__(self,
                  data, 

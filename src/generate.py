@@ -46,16 +46,16 @@ def main(args):
     
     args_copy = copy.copy(args)
     
-    param_module     = getattr(boda.generator.parameters, args['Main args'].param_module)
+    params_module     = getattr(boda.generator.parameters, args['Main args'].params_module)
     energy_module    = getattr(boda.generator.energy    , args['Main args'].energy_module)
     generator_module = getattr(boda.generator           , args['Main args'].generator_module)
     
-    param_args     = vars(param_module.process_args(args))
+    params_args     = vars(params_module.process_args(args))
     energy_args    = vars(energy_module.process_args(args))
-    generator_args = vars(generator_module.process_args(args))
-    generator_constructor_args, generator_runtime_args = generator_args
+    generator_args = generator_module.process_args(args)
+    generator_constructor_args, generator_runtime_args = [ vars(arg_subset) for arg_subset in generator_args ]
     
-    params    = param_module(**param_args)
+    params    = params_module(**params_args)
     energy    = energy_module(**energy_args)
     
     if args['Main args'].penalty_module is not None:
@@ -84,7 +84,7 @@ def main(args):
             current_penalty = energy.update_penalty(proposal)
             
         if args['Main args'].reset_params:
-            generator.params = param_module(**param_args)
+            generator.params = params_module(**params_args)
     
     save_proposals(proposal_sets, args_copy)
     return None
@@ -92,28 +92,27 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="BODA generator", add_help=False)
     group = parser.add_argument_group('Main args')
-    
-    group.add_argument('--param_module', type=str, required=True, help='')
+
+    group.add_argument('--params_module', type=str, required=True, help='')
     group.add_argument('--energy_module', type=str, required=True, help='')    
     group.add_argument('--generator_module', type=str, required=True, help='')
     group.add_argument('--penalty_module', type=str, help='')
     group.add_argument('--monitor', type=str, help='')
-    group.add_argument('--n_proposals', type=list, help='')
+    group.add_argument('--n_proposals', nargs='+', type=int, help='')
     group.add_argument('--reset_params', type=utils.str2bool, default=True)
     group.add_argument('--proposal_path', type=str)
-    
+
     group.add_argument('--tolerate_unknown_args', type=utils.str2bool, default=False, help='Skips unknown command line args without exceptions. Useful for HPO, but high risk of silent errors.')
     
     known_args, leftover_args = parser.parse_known_args()
     
-    Param     = getattr(boda.generator, known_args.param_module)
+    Params    = getattr(boda.generator, known_args.params_module)
     Energy    = getattr(boda.generator.energy, known_args.energy_module)
     Generator = getattr(boda.generator, known_args.generator_module)
     
-    parser = Param.add_param_specific_args(parser)
+    parser = Params.add_params_specific_args(parser)
     parser = Energy.add_energy_specific_args(parser)
-    parser = Generator.add_generator_constructor_specific_args(parser)
-    parser = Generator.add_generator_runtime_specific_args(parser)
+    parser = Generator.add_generator_specific_args(parser)
     
     if known_args.penalty_module is not None:
         Penalty = getattr(boda.generator.energy, known_args.penalty_module)

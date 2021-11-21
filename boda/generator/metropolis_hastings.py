@@ -18,7 +18,7 @@ class MHBase(nn.Module):
     def __init__(self):
         super().__init__()
         
-    def collect_samples(self, n_samples=1, n_burnin=0, keep_burnin=False):
+    def collect_samples(self, n_steps=1, n_burnin=0, keep_burnin=False):
         burnin = None
         samples= None
         
@@ -35,10 +35,10 @@ class MHBase(nn.Module):
         if keep_burnin:
             burnin = { k: torch.stack(v, dim=0) for k,v in burnin.items() }
     
-        if n_samples >= 1:
+        if n_steps >= 1:
             print('collect samples', file=sys.stderr)
             samples = {'samples':[], 'energies': [], 'acceptances': []}
-            for t in tqdm(range(n_samples)):
+            for t in tqdm(range(n_steps)):
                 sample = self.mh_engine(self.params, self.energy_fn, **self.mh_kwargs)
                 samples['states'].append(sample['state'])
                 samples['energies'].append(sample['energy'])
@@ -56,6 +56,7 @@ def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
     old_params = params.theta.detach().clone()
     old_seq    = params()
     old_energy = energy_fn(old_seq)
+    old_energy = params.rebatch( old_energy )
     old_nll = old_params * -115
     
     pos_shuffle = torch.argsort( torch.rand(old_params.shape[0], old_params.shape[-1]), dim=-1 )
@@ -71,6 +72,7 @@ def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
     params.theta.data = new_params # temporary update
     new_seq    = params()
     new_energy = energy_fn(new_seq)
+    new_energy = params.rebatch( new_energy )
     
     u = torch.rand_like(old_energy).log()
     accept = u.le( (old_energy-new_energy)/temperature )
@@ -102,7 +104,7 @@ class NaiveMH(MHBase):
         
         self.mh_engine = naive_mh_step
         
-class PolynomialDecay(nn.Module):
+class PolynomialDecay:
     def __init__(self,
                  a = 1,
                  b = 1,
@@ -113,11 +115,11 @@ class PolynomialDecay(nn.Module):
         self.gamma = gamma
         self.t = 0
         
-    def forward(self):
+    def __call__(self):
         return self.a*((self.b+self.t)**-self.gamma)
     
     def step(self):
-        val = self.forward()
+        val = self()
         self.t += 1
         return val
     
@@ -128,22 +130,19 @@ class PolynomialDecay(nn.Module):
 class SimulatedAnnealing(nn.Module):
     
     @staticmethod
-    def add_generator_constructor_specific_args(parent_parser):
+    def add_generator_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        
         group  = parser.add_argument_group('Generator Constructor args')
         group.add_argument('--n_positions', type=int, default=1)
         group.add_argument('--a', type=float, default=1.)
         group.add_argument('--b', type=float, default=1.)
         group.add_argument('--gamma', type=float, default=1.)
-        return parser
-    
-    @staticmethod
-    def add_generator_runtime_specific_args(parent_parser):
-        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        
         group  = parser.add_argument_group('Generator Runtime args')
         group.add_argument('--energy_threshold', type=float, default=float("Inf"))
         group.add_argument('--max_attempts', type=int, default=10000)
-        group.add_argument('--n_samples', type=int, default=1)
+        group.add_argument('--n_steps', type=int, default=1)
         group.add_argument('--n_burnin', type=int, default=0)
         group.add_argument('--keep_burnin', type=utils.str2bool, default=False)
         return parser
@@ -174,7 +173,7 @@ class SimulatedAnnealing(nn.Module):
         
         self.mh_engine = naive_mh_step
 
-    def collect_samples(self, n_samples=1, n_burnin=0, keep_burnin=False):
+    def collect_samples(self, n_steps=1, n_burnin=0, keep_burnin=False):
         burnin = None
         samples= None
         
@@ -193,11 +192,11 @@ class SimulatedAnnealing(nn.Module):
         if keep_burnin:
             burnin = { k: torch.stack(v, dim=0) for k,v in burnin.items() }
     
-        if n_samples >= 1:
+        if n_steps >= 1:
             print('collect samples', file=sys.stderr)
             samples = {'states':[], 'energies': [], 'acceptances': []}
             self.temperature_schedule.reset()
-            for t in tqdm(range(n_samples)):
+            for t in tqdm(range(n_steps)):
                 temp = self.temperature_schedule.step()
                 sample = self.mh_engine(self.params, self.energy_fn, n_positions=self.n_positions, temperature=temp)
                 samples['states'].append(sample['state'])
@@ -209,7 +208,7 @@ class SimulatedAnnealing(nn.Module):
         return {'burnin': burnin, 'samples':samples}
 
     def generate(self, n_proposals=1, energy_threshold=float("Inf"), 
-                 max_attempts=10000, n_samples=1, n_burnin=0, keep_burnin=False):
+                 max_attempts=10000, n_steps=1, n_burnin=0, keep_burnin=False):
         
         batch_size, *theta_shape = self.params.theta.shape
         proposals = torch.randn([0,*theta_shape])
@@ -224,7 +223,7 @@ class SimulatedAnnealing(nn.Module):
             FLAG = attempts < max_attempts
             
             trajectory = self.collect_samples(
-                n_samples=n_samples, n_burnin=n_burnin, keep_burnin=keep_burnin
+                n_steps=n_steps, n_burnin=n_burnin, keep_burnin=keep_burnin
             )
             
             final_states  = trajectory['samples']['states'][-1]
