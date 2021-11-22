@@ -227,7 +227,10 @@ class SimulatedAnnealing(nn.Module):
             )
             
             final_states  = trajectory['samples']['states'][-1]
-            final_energies= trajectory['samples']['energies'][-1]
+            self.params.theta.data = final_states
+            final_energies = self.energy_fn.energy_calc( self.params() )
+            final_energies = self.params.rebatch( final_energies ) \
+                               .detach().clone().cpu()
             
             energy_filter = final_energies <= energy_threshold
             

@@ -92,7 +92,7 @@ class FastSeqProp(nn.Module):
             )
             
             final_states   = self.params.theta.detach().clone().cpu()
-            final_energies = self.energy_fn( self.params() )
+            final_energies = self.energy_fn.energy_calc( self.params() )
             final_energies = self.params.rebatch( final_energies ) \
                                .detach().clone().cpu()
         

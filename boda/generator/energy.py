@@ -34,7 +34,8 @@ class BaseEnergy(torch.nn.Module):
         try:
             pen = self.penalty(x_in)
             hook = hook + pen
-        except NotImplementedError:
+        except AttributeError:
+            print("Penalty not implemented", file=sys.stderr)
             pass
         
         return hook
@@ -48,13 +49,6 @@ class BaseEnergy(torch.nn.Module):
 
         return hook
       
-    def penalty(self, x):
-        raise NotImplementedError("Penalty not implemented")
-        
-        hook = x
-        
-        return hook
-
 class OverMaxEnergy(BaseEnergy):
     
     @staticmethod
@@ -113,7 +107,7 @@ class EntropyEnergy(BaseEnergy):
         self.bias_cell = bias_cell
         self.bias_alpha= bias_alpha
         
-    def forward(self, x):
+    def energy_calc(self, x):
         hook   = x.to(self.model.device)
         
         hook   = self.model(hook)
@@ -162,7 +156,8 @@ class StremePenalty(BasePenalty):
         self.score_pct = score_pct
 
     def penalty(self, x):
-        return self.motif_penalty(x)
+        hook = x.to(self.model.device)
+        return self.motif_penalty(hook)
 
     def register_penalty(self, x):
         try:
