@@ -99,6 +99,8 @@ if __name__ == '__main__':
     group.add_argument('--penalty_module', type=str, help='')
     group.add_argument('--monitor', type=str, help='')
     group.add_argument('--n_proposals', nargs='+', type=int, help='')
+    group.add_argument('--energy_threshold', type=float, default=float("Inf"))
+    group.add_argument('--max_attempts', type=int, default=10000)
     group.add_argument('--reset_params', type=utils.str2bool, default=True)
     group.add_argument('--proposal_path', type=str)
 
