@@ -92,21 +92,26 @@ class FastSeqProp(nn.Module):
             
             with torch.no_grad():
                 final_states   = self.params.theta
-                final_samples  = self.params()
-                final_energies = self.energy_fn.energy_calc( final_samples )
+                final_energies = self.energy_fn.energy_calc( self.params() )
                 
-                state_bs, sample_bs = final_states.shape[0], final_samples.shape[0]
+                state_bs, energy_bs = final_states.shape[0], final_energies.shape[0]
+                
+                try:
+                    final_samples = self.params.get_sample().flatten(0,1)
+                except AttributeError:
+                    final_samples = final_states.detach().clone()
 
-                if state_bs != sample_bs:
+                if state_bs != energy_bs:
+                    print(f"samples initial shape: {final_samples.shape}", file=sys.stderr)
                     rebatch_samples = final_samples.unflatten(
-                        0, (sample_bs//state_bs, state_bs)
+                        0, (energy_bs//state_bs, state_bs)
                     )
                     rebatch_energies= final_energies.unflatten(
-                        0, (sample_bs//state_bs, state_bs)
+                        0, (energy_bs//state_bs, state_bs)
                     )
                     
                     best_sample_idx = rebatch_energies.argmin(dim=0)
-                    range_slicer    = torch.arange(final_energies.shape[1])
+                    range_slicer    = torch.arange(rebatch_energies.shape[1])
 
                     final_samples   =  final_samples[best_sample_idx, range_slicer]
 
