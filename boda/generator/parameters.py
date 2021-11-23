@@ -30,6 +30,10 @@ class ParamsBase(nn.Module):
         raise NotImplementedError("Rebatch function not implemented.")
         return None
     
+    def reset(self, input):
+        raise NotImplementedError("Reset function not implemented.")
+        return None
+    
     def prior_nll(self):
         raise NotImplementedError("Prior Negative Log-Likelihood not implemented.")
         return None
@@ -51,6 +55,7 @@ class BasicParameters(ParamsBase):
         group.add_argument('--right_flank', type=str, 
                            default=constants.MPRA_DOWNSTREAM[:200])
         group.add_argument('--batch_dim', type=int, default=0)
+        group.add_argument('--token_dim', type=int, default=-2)
         group.add_argument('--cat_axis', type=int, default=-1)
         
         return parser
@@ -102,6 +107,7 @@ class BasicParameters(ParamsBase):
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
+                 token_dim=-2,
                  cat_axis=-1
                 ):
         
@@ -111,8 +117,9 @@ class BasicParameters(ParamsBase):
         self.register_buffer('left_flank', left_flank.detach().clone())
         self.register_buffer('right_flank', right_flank.detach().clone())
         
-        self.cat_axis = cat_axis
         self.batch_dim = batch_dim
+        self.token_dim = token_dim
+        self.cat_axis  = cat_axis
         
     @property
     def shape(self):
@@ -121,6 +128,13 @@ class BasicParameters(ParamsBase):
     def forward(self):
         my_attr = [ getattr(self, x) for x in ['left_flank', 'theta', 'right_flank'] ]
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
+    
+    def reset(self):
+        logits = torch.randn_like( self.theta )
+        theta_n= dist.OneHotCategorical(logits=logits.transpose(-1,self.token_dim)) \
+                   .sample().transpose(-1,self.token_dim)
+        self.theta.data = theta_n
+        return None
     
     def rebatch(self, input):
         return input
@@ -254,6 +268,10 @@ class StraightThroughParameters(ParamsBase):
             
         return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
                 
+    def reset(self):
+        self.theta.data = torch.randn_like( self.theta )
+        return None
+        
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
 
@@ -393,6 +411,10 @@ class GumbelSoftmaxParameters(ParamsBase):
             
         return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
         
+    def reset(self):
+        self.theta.data = torch.randn_like( self.theta )
+        return None
+
     def rebatch(self, input):
         return input.unflatten(0, (self.n_samples, self.batch_size)).mean(dim=0)
 
