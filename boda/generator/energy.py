@@ -155,10 +155,6 @@ class StremePenalty(BasePenalty):
         
         self.score_pct = score_pct
 
-    def penalty(self, x):
-        hook = x.to(self.model.device)
-        return self.motif_penalty(hook)
-
     def register_penalty(self, x):
         try:
             self.penalty_filters = x.type_as(self.penalty_filters)
@@ -222,9 +218,13 @@ class StremePenalty(BasePenalty):
         except AttributeError:
             return 0
 
+    def penalty(self, x):
+        hook = x.to(self.model.device)
+        return self.motif_penalty(hook)
+
     def update_penalty(self, proposal):
         proposals_list = common.utils.batch2list(proposal['proposals'])
-        streme_results = streme(proposals_list, w=8)
+        streme_results = streme(proposals_list, w=15)
         self.streme_penalty(streme_results)
         update_summary = {
             'streme_output': streme_results,
