@@ -140,8 +140,6 @@ class SimulatedAnnealing(nn.Module):
         group.add_argument('--gamma', type=float, default=1.)
         
         group  = parser.add_argument_group('Generator Runtime args')
-        group.add_argument('--energy_threshold', type=float, default=float("Inf"))
-        group.add_argument('--max_attempts', type=int, default=10000)
         group.add_argument('--n_steps', type=int, default=1)
         group.add_argument('--n_burnin', type=int, default=0)
         group.add_argument('--keep_burnin', type=utils.str2bool, default=False)
@@ -227,7 +225,7 @@ class SimulatedAnnealing(nn.Module):
             )
             
             final_states  = trajectory['samples']['states'][-1]
-            self.params.theta.data = final_states
+            self.params.theta.data = final_states.to(self.params.theta.device)
             final_energies = self.energy_fn.energy_calc( self.params() )
             final_energies = self.params.rebatch( final_energies ) \
                                .detach().clone().cpu()
