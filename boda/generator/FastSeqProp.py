@@ -15,8 +15,6 @@ class FastSeqProp(nn.Module):
         # Empty
         
         group  = parser.add_argument_group('Generator Runtime args')
-        group.add_argument('--energy_threshold', type=float, default=float("Inf"))
-        group.add_argument('--max_attempts', type=int, default=10000)
         group.add_argument('--n_steps', type=int, default=20)
         group.add_argument('--learning_rate', type=float, default=0.5)
         group.add_argument('--step_print', type=int, default=10)
@@ -33,8 +31,8 @@ class FastSeqProp(nn.Module):
 
     def __init__(self,
                  energy_fn,
-                 params,
-                 **kwargs):
+                 params
+                ):
         super().__init__()
         self.energy_fn = energy_fn
         self.params = params                           
@@ -45,7 +43,7 @@ class FastSeqProp(nn.Module):
     def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True):
      
         if lr_scheduler: etaMin = 1e-6
-        else: etaMin = learning_rate                                                                                                                                                                                                                                                                                                                                 
+        else: etaMin = learning_rate
         
         optimizer = torch.optim.Adam(self.params.parameters(), lr=learning_rate)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_steps, eta_min=etaMin)  
@@ -76,13 +74,14 @@ class FastSeqProp(nn.Module):
                  n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=False):
         
         batch_size, *theta_shape = self.params.theta.shape
+        
         proposals = torch.randn([0,*theta_shape])
+        states    = torch.randn([0,*theta_shape])
         energies  = torch.randn([0])
         
         attempts = 0
-        FLAG = True
         
-        while (proposals.shape[0] < n_proposals) and FLAG:
+        while (proposals.shape[0] < n_proposals) and (attempts < max_attempts):
             
             attempts += 1
         
@@ -91,14 +90,47 @@ class FastSeqProp(nn.Module):
                 lr_scheduler=lr_scheduler, create_plot=create_plot
             )
             
-            final_states   = self.params.theta.detach().clone().cpu()
-            final_energies = self.energy_fn.energy_calc( self.params() )
-            final_energies = self.params.rebatch( final_energies ) \
-                               .detach().clone().cpu()
-        
-            energy_filter = final_energies <= energy_threshold
+            with torch.no_grad():
+                final_states   = self.params.theta
+                final_samples  = self.params()
+                final_energies = self.energy_fn.energy_calc( final_samples )
+                
+                state_bs, sample_bs = final_states.shape[0], final_samples.shape[0]
+
+                if state_bs != sample_bs:
+                    rebatch_samples = final_samples.unflatten(
+                        0, (sample_bs//state_bs, state_bs)
+                    )
+                    rebatch_energies= final_energies.unflatten(
+                        0, (sample_bs//state_bs, state_bs)
+                    )
+                    
+                    best_sample_idx = rebatch_energies.argmin(dim=0)
+                    range_slicer    = torch.arange(final_energies.shape[1])
+
+                    final_samples   =  final_samples[best_sample_idx, range_slicer]
+
+                final_energies = self.params.rebatch( final_energies )
+                                   
+                energy_filter = final_energies <= energy_threshold
+                
+                final_states  = final_states.detach().clone()
+                final_samples = final_samples.detach().clone()
+                final_energies= final_energies.detach().clone()
+                
+            states    = torch.cat([states,     final_states[energy_filter].cpu()], dim=0)
+            proposals = torch.cat([proposals, final_samples[energy_filter].cpu()], dim=0)
+            energies  = torch.cat([energies, final_energies[energy_filter].cpu()], dim=0)
             
-            proposals = torch.cat([proposals,  final_states[energy_filter]], dim=0)
-            energies  = torch.cat([energies, final_energies[energy_filter]], dim=0)
+            try:
+                self.params.reset()
+            except NotImplementedError:
+                pass
+            
+        results = {
+            'states': states[:n_proposals],
+            'proposals': proposals[:n_proposals],
+            'energies': energies[:n_proposals]
+        }
         
-        return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals]}
+        return results
