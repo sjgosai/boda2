@@ -205,8 +205,8 @@ class SimulatedAnnealing(nn.Module):
         
         return {'burnin': burnin, 'samples':samples}
 
-    def generate(self, n_proposals=1, energy_threshold=float("Inf"), 
-                 max_attempts=10000, n_steps=1, n_burnin=0, keep_burnin=False):
+    def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, 
+                 n_steps=1, n_burnin=0, keep_burnin=False):
         
         batch_size, *theta_shape = self.params.theta.shape
         proposals = torch.randn([0,*theta_shape])
