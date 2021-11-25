@@ -229,9 +229,11 @@ class StremePenalty(BasePenalty):
             motif_scores = F.conv1d(x, self.penalty_filters)
             score_thresholds = torch.ones_like(motif_scores) * self.score_thresholds[None, :, None]
             mask = torch.ge(motif_scores, score_thresholds)
-            #masked_scores = torch.masked_select(motif_scores, mask)
-            masked_scores = motif_scores * mask.float()
-            return masked_scores.flatten(1).sum(dim=-1).div((self.penalty_filters.shape[0] // 2) * x.shape[0])
+            #masked_scores = motif_scores * mask.float()
+            #return masked_scores.flatten(1).sum(dim=-1).div((self.penalty_filters.shape[0] // 2) * x.shape[0])
+        
+            masked_scores = torch.masked_select(motif_scores, mask)
+            return masked_scores.sum(dim=-1).mean().div((self.penalty_filters.shape[0] // 2) * x.shape[0])
 
         except AttributeError:
             return 0
