@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 import torch
 import torch.nn as nn
@@ -79,6 +80,8 @@ class FastSeqProp(nn.Module):
         states    = torch.randn([0,*theta_shape])
         energies  = torch.randn([0])
         
+        acceptance = torch.randn([0])
+        
         attempts = 0
         
         while (proposals.shape[0] < n_proposals) and (attempts < max_attempts):
@@ -92,20 +95,18 @@ class FastSeqProp(nn.Module):
             
             with torch.no_grad():
                 final_states   = self.params.theta
-                final_energies = self.energy_fn.energy_calc( self.params() )
+                try:
+                    final_samples = self.params.get_sample()
+                    final_energies = self.energy_fn.energy_calc( 
+                        self.params.add_flanks(final_samples).flatten(0,1)
+                    )
+                except AttributeError:
+                    final_samples  = final_states.detach().clone()
+                    final_energies = self.energy_fn.energy_calc( self.params() )
                 
                 state_bs, energy_bs = final_states.shape[0], final_energies.shape[0]
                 
-                try:
-                    final_samples = self.params.get_sample().flatten(0,1)
-                except AttributeError:
-                    final_samples = final_states.detach().clone()
-
                 if state_bs != energy_bs:
-                    print(f"samples initial shape: {final_samples.shape}", file=sys.stderr)
-                    rebatch_samples = final_samples.unflatten(
-                        0, (energy_bs//state_bs, state_bs)
-                    )
                     rebatch_energies= final_energies.unflatten(
                         0, (energy_bs//state_bs, state_bs)
                     )
@@ -113,12 +114,19 @@ class FastSeqProp(nn.Module):
                     best_sample_idx = rebatch_energies.argmin(dim=0)
                     range_slicer    = torch.arange(rebatch_energies.shape[1])
 
-                    final_samples   =  final_samples[best_sample_idx, range_slicer]
+                    final_samples   = final_samples[best_sample_idx, range_slicer] \
+                                        .squeeze()
+                    
+                    final_energies  = rebatch_energies[best_sample_idx, range_slicer] \
+                                        .squeeze()
+                    
+                else:
+                    final_samples = final_samples.squeeze()
+                    
+                #final_energies = self.params.rebatch( final_energies )
 
-                final_energies = self.params.rebatch( final_energies )
-                                   
                 energy_filter = final_energies <= energy_threshold
-                
+                    
                 final_states  = final_states.detach().clone()
                 final_samples = final_samples.detach().clone()
                 final_energies= final_energies.detach().clone()
@@ -126,6 +134,8 @@ class FastSeqProp(nn.Module):
             states    = torch.cat([states,     final_states[energy_filter].cpu()], dim=0)
             proposals = torch.cat([proposals, final_samples[energy_filter].cpu()], dim=0)
             energies  = torch.cat([energies, final_energies[energy_filter].cpu()], dim=0)
+            
+            acceptance = torch.cat([acceptance, energy_filter.cpu().float()], dim=0)
             
             try:
                 self.params.reset()
@@ -135,7 +145,8 @@ class FastSeqProp(nn.Module):
         results = {
             'states': states[:n_proposals],
             'proposals': proposals[:n_proposals],
-            'energies': energies[:n_proposals]
+            'energies': energies[:n_proposals],
+            'acceptance_rate': acceptance.mean()
         }
         
         return results

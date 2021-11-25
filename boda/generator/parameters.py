@@ -254,19 +254,22 @@ class StraightThroughParameters(ParamsBase):
         probs = probs.repeat( self.n_samples, *[1 for i in range(self.n_dims)] )
         samples = samples - probs.detach() + probs
         return samples
-        
-    def forward(self):
+    
+    def add_flanks(self, my_sample):
         pieces = []
         
         if self.left_flank is not None:
             pieces.append( self.left_flank.repeat(self.n_samples, *self.repeater) )
             
-        pieces.append( self.get_sample() )
+        pieces.append( my_sample )
         
         if self.right_flank is not None:
             pieces.append( self.right_flank.repeat(self.n_samples, *self.repeater) )
             
-        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
+        return torch.cat( pieces, axis=self.cat_axis )
+    
+    def forward(self):
+        return self.add_flanks( self.get_sample() ).flatten(0,1)
                 
     def reset(self):
         self.theta.data = torch.randn_like( self.theta )
@@ -398,19 +401,22 @@ class GumbelSoftmaxParameters(ParamsBase):
                  for i in range(self.n_samples) ]
         return torch.stack(hook, dim=0)
     
-    def forward(self):
+    def add_flanks(self, my_sample):
         pieces = []
         
         if self.left_flank is not None:
             pieces.append( self.left_flank.repeat(self.n_samples, *self.repeater) )
             
-        pieces.append( self.get_sample() )
+        pieces.append( my_sample )
         
         if self.right_flank is not None:
             pieces.append( self.right_flank.repeat(self.n_samples, *self.repeater) )
             
-        return torch.cat( pieces, axis=self.cat_axis ).flatten(0,1)
-        
+        return torch.cat( pieces, axis=self.cat_axis )
+    
+    def forward(self):
+        return self.add_flanks( self.get_sample() ).flatten(0,1)
+                
     def reset(self):
         self.theta.data = torch.randn_like( self.theta )
         return None
