@@ -137,6 +137,24 @@ class BasePenalty(torch.nn.Module):
         
         return hook
 
+def sync_width(tensor_1, tensor_2):
+    
+    bs_1, nc_1, ln_1 = tensor_1.shape
+    bs_2, nc_2, ln_2 = tensor_2.shape
+    
+    if ln_1 != ln_2:
+        if ln_1 < ln_2:
+            ln_d = ln_2 - ln_1
+            padded_1 = F.pad(tensor_1,(0,ln_d),mode='constant',value=0.)
+            return padded_1, tensor_2
+        else:
+            ln_d = ln_1 - ln_2
+            padded_2 = F.pad(tensor_2,(0,ln_d),mode='constant',value=0.)
+            return tensor_1, padded_2
+    else:
+        return tensor_1, tensor_2
+
+    
 class StremePenalty(BasePenalty):
     @staticmethod
     def add_penalty_specific_args(parent_parser):
@@ -192,7 +210,7 @@ class StremePenalty(BasePenalty):
         
         try:
             penalty_filters = torch.cat(
-                [self.penalty_filters, proposed_penalty.to(self.penalty_filters.device)], 
+                sync_width(self.penalty_filters, proposed_penalty.to(self.penalty_filters.device)), 
                 dim=0
             ) # (2k+2, 4, L)
             score_thresholds= torch.cat(
@@ -224,7 +242,7 @@ class StremePenalty(BasePenalty):
 
     def update_penalty(self, proposal):
         proposals_list = common.utils.batch2list(proposal['proposals'])
-        streme_results = streme(proposals_list, w=15)
+        streme_results = streme(proposals_list)
         self.streme_penalty(streme_results)
         update_summary = {
             'streme_output': streme_results,
