@@ -1,6 +1,6 @@
 # Available images: 
 # $ gcloud container images list --repository="gcr.io/deeplearning-platform-release"
-FROM gcr.io/deeplearning-platform-release/pytorch-gpu.1-7
+FROM gcr.io/deeplearning-platform-release/pytorch-gpu.1-10
 
 ENV SHELL=/bin/bash
 
