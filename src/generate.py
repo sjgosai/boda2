@@ -71,7 +71,12 @@ def main(args):
 
     generator_constructor_args['params']    = params
     generator_constructor_args['energy_fn'] = energy
+    generator_runtime_args['energy_threshold'] = args['Main args'].energy_threshold
+    generator_runtime_args['max_attempts'] = args['Main args'].max_attempts
     generator = generator_module(**generator_constructor_args)
+    
+    params.cuda()
+    energy.cuda()
     
     proposal_sets = []
     for get_n in args['Main args'].n_proposals:
@@ -80,14 +85,17 @@ def main(args):
         proposal['penalty'] = current_penalty
         proposal_sets.append(proposal)
         
+        #sns.histplot(proposal['energies'].numpy())
+        #plt.show()
+        
         if args['Main args'].penalty_module is not None:
             current_penalty = energy.update_penalty(proposal)
             
         if args['Main args'].reset_params:
             generator.params = params_module(**params_args)
-    
+            
     save_proposals(proposal_sets, args_copy)
-    return None
+    return params, energy, generator, proposal_sets
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="BODA generator", add_help=False)
@@ -131,4 +139,4 @@ if __name__ == '__main__':
         
     args = boda.common.utils.organize_args(parser, args)
     
-    main(args)
+    _ = main(args)
