@@ -92,15 +92,17 @@ class FastSeqProp(nn.Module):
             
             with torch.no_grad():
                 final_states   = self.params.theta
-                final_energies = self.energy_fn.energy_calc( self.params() )
+                try:
+                    final_samples = self.params.get_sample().flatten(0,1)
+                    final_energies = self.energy_fn.energy_calc( 
+                        self.params.add_flanks(final_samples).flatten(0,1)
+                    )
+                except AttributeError:
+                    final_samples  = final_states.detach().clone()
+                    final_energies = self.energy_fn.energy_calc( self.params() )
                 
                 state_bs, energy_bs = final_states.shape[0], final_energies.shape[0]
                 
-                try:
-                    final_samples = self.params.get_sample().flatten(0,1)
-                except AttributeError:
-                    final_samples = final_states.detach().clone()
-
                 if state_bs != energy_bs:
                     print(f"samples initial shape: {final_samples.shape}", file=sys.stderr)
                     rebatch_samples = final_samples.unflatten(
@@ -113,12 +115,13 @@ class FastSeqProp(nn.Module):
                     best_sample_idx = rebatch_energies.argmin(dim=0)
                     range_slicer    = torch.arange(rebatch_energies.shape[1])
 
-                    final_samples   =  final_samples[best_sample_idx, range_slicer]
+                    final_samples   = rebatch_samples[best_sample_idx, range_slicer]
+                    
+                    final_energies  = rebatch_energies[best_sample_idx, range_slicer]
+                #final_energies = self.params.rebatch( final_energies )
 
-                final_energies = self.params.rebatch( final_energies )
-                                   
                 energy_filter = final_energies <= energy_threshold
-                
+                    
                 final_states  = final_states.detach().clone()
                 final_samples = final_samples.detach().clone()
                 final_energies= final_energies.detach().clone()
