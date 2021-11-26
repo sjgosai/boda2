@@ -13,7 +13,7 @@ seaborn==0.11.0
 jupyter==1.0.0
 biopython==1.78
 xlrd==2.0.1
-bioservices==1.7.10
+bioservices==1.8.2
 wordcloud==1.8.1
 torchsummary==1.5.1
 gcsfs==2021.04.0

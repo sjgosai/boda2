@@ -15,8 +15,8 @@ ADD . /home/ubuntu/boda2/
 WORKDIR /home/ubuntu/boda2/
 
 # Installing requirements, including shipped submodules
-RUN pip install --upgrade pip==20.2.3
-RUN pip install --no-cache-dir --use-feature=2020-resolver -r requirements.txt
+RUN pip install --upgrade pip==21.3.1
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Installing BODA as a package
 RUN pip install -e .
