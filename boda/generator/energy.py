@@ -249,8 +249,9 @@ class StremePenalty(BasePenalty):
             common.constants.STANDARD_NT 
         )
         top_ppm = torch.tensor(top_ppm).float()
-        background = [ motif_data['meta_data']['frequencies'][nt] 
-                       for nt in common.constants.STANDARD_NT ]
+        #background = [ motif_data['meta_data']['frequencies'][nt] 
+        #               for nt in common.constants.STANDARD_NT ]
+        background = 4*[0.25]
         top_pwm = ppm_to_pwm(top_ppm, background) * (penalty_weight**0.33) # (4, L)
         max_score = torch.max(top_pwm, dim=0)[0].sum()
         top_pwm_rc = common.utils.reverse_complement_onehot(top_pwm) # (4, L)
