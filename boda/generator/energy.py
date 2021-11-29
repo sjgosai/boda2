@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import math
 
 import numpy as np
 import torch
@@ -59,6 +60,8 @@ class OverMaxEnergy(BaseEnergy):
         group.add_argument('--bias_cell', type=int, default=0)
         group.add_argument('--bias_alpha', type=float, default=1.)
         group.add_argument('--bending_factor', type=float, default=0.)
+        group.add_argument('--a_min', type=float, default=-math.inf)
+        group.add_argument('--a_max', type=float, default=math.inf)
         return parser
 
     @staticmethod
@@ -75,7 +78,7 @@ class OverMaxEnergy(BaseEnergy):
         
         return energy_args
 
-    def __init__(self, model, bias_cell=0, bias_alpha=1., bending_factor=0.):
+    def __init__(self, model, bias_cell=0, bias_alpha=1., bending_factor=0., a_min=-math.inf, a_max=math.inf):
         super().__init__()
         
         self.model = model
@@ -84,6 +87,8 @@ class OverMaxEnergy(BaseEnergy):
         self.bias_cell = bias_cell
         self.bias_alpha= bias_alpha
         self.bending_factor = bending_factor
+        self.a_min = a_min
+        self.a_max = a_max
 
     def bend(self, x):
         return x - self.bending_factor * (torch.exp(-x) - 1)
@@ -91,11 +96,56 @@ class OverMaxEnergy(BaseEnergy):
     def energy_calc(self, x):
         hook = x.to(self.model.device)
         
-        hook = self.bend(self.model(hook))
+        hook = self.bend(self.model(hook).clamp(self.a_min,self.a_max))
         energy = hook[...,[ x for x in range(hook.shape[-1]) if x != self.bias_cell]].max(-1).values \
                  - hook[...,self.bias_cell].mul(self.bias_alpha)
         return energy
+
+class TargetEnergy(BaseEnergy):
     
+    @staticmethod
+    def add_energy_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Energy Module args')
+        group.add_argument('--model_artifact', type=str)
+        group.add_argument('--lamb', type=float, default=1.0)
+        group.add_argument('--targets', type=float, nargs='+', default=[-1.0, -1.0, 4.0])
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        energy_args = grouped_args['Energy Module args']
+        
+        unpack_artifact(energy_args.model_artifact)
+        model = model_fn('./artifacts')
+        model.cuda()
+        model.eval()
+        energy_args.model = model
+
+        del energy_args.model_artifact
+        
+        return energy_args
+
+    def __init__(self, model, lambd=1.0, targets=[-1.0, -1.0, 4.0]):
+        super().__init__()
+        
+        self.model = model
+        self.model.eval()
+        
+        self.lambd = lambd
+        self.targets = self.register_buffer(
+            torch.tensor(targets).to(self.model.device)
+        )
+        
+        self.shrink = nn.SoftShrinkage(lambd=self.lambd)
+
+    def energy_calc(self, x):
+        hook = x.to(self.model.device)
+        
+        energy = self.shrink( self.model(hook) - self.targets ).pow(2.)
+        
+        return energy
+
         
 class EntropyEnergy(BaseEnergy):
     def __init__(self, model, bias_cell=None, bias_alpha=1.):
