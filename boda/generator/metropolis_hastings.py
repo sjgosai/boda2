@@ -212,13 +212,13 @@ class SimulatedAnnealing(nn.Module):
         proposals = torch.randn([0,*theta_shape])
         energies  = torch.randn([0])
         
-        attempts = 0
-        FLAG = True
+        acceptance = torch.randn([0])
         
-        while (proposals.shape[0] < n_proposals) and FLAG:
+        attempts = 0
+        
+        while (proposals.shape[0] < n_proposals) and (attempts < max_attempts):
             
             attempts += 1
-            FLAG = attempts < max_attempts
             
             trajectory = self.collect_samples(
                 n_steps=n_steps, n_burnin=n_burnin, keep_burnin=keep_burnin
@@ -235,6 +235,8 @@ class SimulatedAnnealing(nn.Module):
             proposals = torch.cat([proposals,  final_states[energy_filter]], dim=0)
             energies  = torch.cat([energies, final_energies[energy_filter]], dim=0)
             
-        return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals]}
+            acceptance = torch.cat([acceptance, energy_filter.cpu().float()], dim=0)
+            
+        return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals], 'acceptance_rate': acceptance.mean()}
 
 
