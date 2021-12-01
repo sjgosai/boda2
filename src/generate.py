@@ -22,7 +22,7 @@ import hypertune
 def save_proposals(proposals, args):
     save_dict = {
         'proposals': proposals,
-        #'args'     : args,
+        'args'     : args,
         'timestamp'    : time.strftime("%Y%m%d_%H%M%S"),
         'random_tag'   : random.randint(100000,999999)
     }
@@ -44,7 +44,7 @@ def save_proposals(proposals, args):
 
 def main(args):
     
-    args_copy = copy.copy(args)
+    args_copy = copy.deepcopy(args)
     
     params_module     = getattr(boda.generator.parameters, args['Main args'].params_module)
     energy_module    = getattr(boda.generator.energy    , args['Main args'].energy_module)
