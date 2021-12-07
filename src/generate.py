@@ -41,6 +41,26 @@ def save_proposals(proposals, args):
     final_loc = os.path.join(args['Main args'].proposal_path,filename)
     print(f'Proposals deposited at:\n\t{final_loc}', file=sys.stderr)
 
+def save_proposals(proposals, args):
+    save_dict = {
+        'proposals': proposals,
+        'args'     : args,
+        'timestamp'    : time.strftime("%Y%m%d_%H%M%S"),
+        'random_tag'   : random.randint(100000,999999)
+    }
+    filename = f'{args["Main args"].proposal_path}__{save_dict["timestamp"]}__{save_dict["random_tag"]}.pt'
+    
+    if 'gs://' in args['Main args'].proposal_path:
+        torch.save(save_dict, os.path.basename(filename))
+        subprocess.check_call(
+            ['gsutil', 'cp', os.path.basename(filename), filename]
+        )
+    else:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        torch.save(save_dict, filename)
+    
+    print(f'Proposals deposited at:\n\t{filename}', file=sys.stderr)
+
 
 def main(args):
     
@@ -79,7 +99,8 @@ def main(args):
     energy.cuda()
     
     proposal_sets = []
-    for get_n in args['Main args'].n_proposals:
+    for round_id, get_n in enumerate(args['Main args'].n_proposals):
+        print(f'Starting round: {round_id}, generate {get_n} proposals', file=sys.stderr)
         generator_runtime_args['n_proposals'] = get_n
         proposal = generator.generate(**generator_runtime_args)
         proposal['penalty'] = current_penalty
@@ -93,6 +114,8 @@ def main(args):
             
         if args['Main args'].reset_params:
             generator.params = params_module(**params_args)
+            
+        print('finished round', file=sys.stderr)
             
     save_proposals(proposal_sets, args_copy)
     return params, energy, generator, proposal_sets
