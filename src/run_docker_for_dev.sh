@@ -9,7 +9,7 @@ for_cpu=${6:-false}
 
 container=${docker_registry}/${container_name}:${container_version}
 
-new_entrypoint="jupyter-notebook"
+new_entrypoint="jupyter-lab"
 cmd_on_start="--ip 0.0.0.0 --port ${PORT_A} --no-browser --allow-root"
 
 if $for_cpu
