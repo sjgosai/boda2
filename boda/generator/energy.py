@@ -2,6 +2,7 @@ import os
 import sys
 import argparse
 import math
+import tempfile
 
 import numpy as np
 import torch
@@ -68,8 +69,9 @@ class OverMaxEnergy(BaseEnergy):
     def process_args(grouped_args):
         energy_args = grouped_args['Energy Module args']
         
-        unpack_artifact(energy_args.model_artifact)
-        model = model_fn('./artifacts')
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            unpack_artifact(energy_args.model_artifact, tmpdirname)
+            model = model_fn(os.path.join(tmpdirname,'artifacts'))
         model.cuda()
         model.eval()
         energy_args.model = model

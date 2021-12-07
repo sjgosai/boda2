@@ -167,7 +167,6 @@ def generate_all_kmers(k=4):
 
 def organize_args(parser, args):
     arg_groups={}
-    print(args)
     for group in parser._action_groups:
         group_dict={a.dest:getattr(args,a.dest,None) for a in group._group_actions}
         arg_groups[group.title]=argparse.Namespace(**group_dict)
@@ -389,6 +388,7 @@ def unpack_artifact(artifact_path,download_path='./'):
     assert tarfile.is_tarfile(tar_model), f"Expected a tarfile at {tar_model}. Not found."
     
     shutil.unpack_archive(tar_model, download_path)
+    print(f'archive unpacked in {download_path}', file=sys.stderr)
 
 def model_fn(model_dir):
     checkpoint = torch.load(os.path.join(model_dir,'torch_checkpoint.pt'))
