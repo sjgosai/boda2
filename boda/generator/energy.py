@@ -37,7 +37,11 @@ class BaseEnergy(torch.nn.Module):
             pen = self.penalty(x_in)
             hook = hook + pen
         except AttributeError:
-            print("Penalty not implemented", file=sys.stderr)
+            try:
+                _ = self.you_have_been_warned
+            except AttributeError:
+                print("Penalty not implemented", file=sys.stderr)
+                self.you_have_been_warned = True
             pass
         
         return hook

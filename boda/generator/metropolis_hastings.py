@@ -235,10 +235,13 @@ class SimulatedAnnealing(nn.Module):
             proposals = torch.cat([proposals,  final_states[energy_filter]], dim=0)
             energies  = torch.cat([energies, final_energies[energy_filter]], dim=0)
             
-            print(f'attempt {attempts} acceptance rate: {energy_filter.sum().cpu().item()}/{energy_filter.numel()}')
+            print(f'attempt {attempts} acceptance rate: {energy_filter.sum().item()}/{energy_filter.numel()}')
             
-            acceptance = torch.cat([acceptance, energy_filter.cpu().float()], dim=0)
-            
-        return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals], 'acceptance_rate': acceptance.mean()}
+            if acceptance is None:
+                acceptance = energy_filter.float().mean().item()
+            else:
+                ((attempts/(attempts+1))*acceptance) + ((1/(attempts+1))*energy_filter.float().mean().item())
+                        
+        return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals], 'acceptance_rate': acceptance}
 
 
