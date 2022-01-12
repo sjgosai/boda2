@@ -114,8 +114,10 @@ class TargetEnergy(BaseEnergy):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Energy Module args')
         group.add_argument('--model_artifact', type=str)
-        group.add_argument('--lamb', type=float, default=1.0)
-        group.add_argument('--targets', type=float, nargs='+', default=[-1.0, -1.0, 4.0])
+        group.add_argument('--targets', type=float, nargs='+')
+        group.add_argument('--lambd', type=float, default=0.0)
+        group.add_argument('--a_min', type=float, default=-math.inf)
+        group.add_argument('--a_max', type=float, default=math.inf)
         return parser
 
     @staticmethod
@@ -132,23 +134,26 @@ class TargetEnergy(BaseEnergy):
         
         return energy_args
 
-    def __init__(self, model, lambd=1.0, targets=[-1.0, -1.0, 4.0]):
+    def __init__(self, model, targets, lambd=0.0, a_min=-math.inf, a_max=math.inf):
         super().__init__()
         
         self.model = model
         self.model.eval()
         
         self.lambd = lambd
-        self.targets = self.register_buffer(
-            torch.tensor(targets).to(self.model.device)
+        self.register_buffer(
+            'targets',torch.tensor(targets).to(self.model.device)
         )
         
-        self.shrink = nn.SoftShrinkage(lambd=self.lambd)
+        self.shrink = nn.Softshrink(lambd=self.lambd)
+        
+        self.a_min = a_min
+        self.a_max = a_max
 
     def energy_calc(self, x):
         hook = x.to(self.model.device)
         
-        energy = self.shrink( self.model(hook) - self.targets ).pow(2.)
+        energy = self.shrink( self.model(hook).clamp(self.a_min, self.a_max) - self.targets ).abs().sum(-1)
         
         return energy
 

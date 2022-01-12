@@ -242,6 +242,11 @@ class SimulatedAnnealing(nn.Module):
             else:
                 ((attempts/(attempts+1))*acceptance) + ((1/(attempts+1))*energy_filter.float().mean().item())
                         
+            try:
+                self.params.reset()
+            except NotImplementedError:
+                pass
+            
         return {'proposals': proposals[:n_proposals], 'energies': energies[:n_proposals], 'acceptance_rate': acceptance}
 
 
