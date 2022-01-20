@@ -105,8 +105,7 @@ def matrix_to_dms(in_tensor, ax=None, y_max=2, fontaspect=.65, widthscale=0.8,
                                 fontaspect=fontaspect,
                                 widthscale=widthscale,
                                 axisfontscale=axisfontscale,
-                                heightscale=heightscale,
-                                kwars)
+                                heightscale=heightscale)
     return fig, ax
 
 def dms_video(theta_tensor, energy_tensor, target='my_motif.mp4'):
