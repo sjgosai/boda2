@@ -49,7 +49,7 @@ class OneHotSlicer(nn.Module):
         return hook
 
 class Fasta:
-    def __init__(self, fasta_path, all_upper=False, 
+    def __init__(self, fasta_path, all_upper=True, 
                  alphabet=constants.STANDARD_NT):
         self.fasta_path = fasta_path
         self.all_upper = all_upper
@@ -342,29 +342,37 @@ class VcfDataset(Dataset):
         
         var_loc = record['pos'] - 1
         start   = var_loc - self.relative_end + 1
-        
+
+        trail_start = var_loc + record['ref'].shape[1]
+        trail_end   = start + self.grab_size
+
+        len_dif = record['alt'].shape[1] - record['ref'].shape[1]
+        start_adjust = len_dif // 2
+        end_adjust   = len_dif - start_adjust
+
         try:
+            # Collect reference
             contig = self.fasta[ record['chrom'] ]
             leader = contig[:, start:var_loc]
+            trailer= contig[:, trail_start:trail_end]
+            
+            ref_segments = [leader, record['ref'], trailer]
+            
+            # Collect alternate
+            leader = contig[:, start+start_adjust:var_loc]
+            trailer= contig[:, trail_start:trail_end-end_adjust]
+            
+            alt_segments = [leader, record['alt'], trailer]
+            
+            # Combine segments
+            ref = np.concatenate(ref_segments, axis=-1)
+            alt = np.concatenate(alt_segments, axis=-1)
+            
+            ref = torch.tensor(ref[np.newaxis].astype(np.float32))
+            alt = torch.tensor(alt[np.newaxis].astype(np.float32))
 
-            ref = np.concatenate([leader, record['ref']], axis=-1)
-            alt = np.concatenate([leader, record['alt']], axis=-1)
-
-            trail_start = start + ref.shape[1]
-            ref_end = trail_start + self.grab_size - ref.shape[1]
-            alt_end = trail_start + self.grab_size - alt.shape[1]
-
-            ref_trailer = contig[:, trail_start:ref_end].astype(np.float32)
-            alt_trailer = contig[:, trail_start:alt_end].astype(np.float32)
-
-            ref = np.concatenate([ref, ref_trailer], axis=-1)
-            alt = np.concatenate([alt, alt_trailer], axis=-1)
-
-            ref_segments = torch.tensor(ref[np.newaxis].astype(np.float32))
-            alt_segments = torch.tensor(alt[np.newaxis].astype(np.float32))
-
-            ref_slices = self.window_slicer(ref_segments)
-            alt_slices = self.window_slicer(alt_segments)
+            ref_slices = self.window_slicer(ref)
+            alt_slices = self.window_slicer(alt)
 
 
             if self.reverse_complements:
