@@ -222,7 +222,9 @@ class VCF:
                  max_indel_size=10000,
                  alphabet=constants.STANDARD_NT, 
                  strict=False, 
-                 all_upper=True, chr_prefix=''):
+                 all_upper=True, chr_prefix='', 
+                 verbose=False
+                ):
         
         self.vcf_path = vcf_path
         self.max_allele_size = max_allele_size
@@ -231,16 +233,22 @@ class VCF:
         self.strict   = strict
         self.all_upper= all_upper
         self.chr_prefix = chr_prefix
+        self.verbose = verbose
         
         self.vcf = []
         self.read_vcf()
         
     def _open_vcf(self):
         
+        vcf_colnames = ['chrom','pos','id','ref','alt','qual','filter','info']
+        
         if self.vcf_path.endswith('gz'):
-            return gzip.open(self.vcf_path, 'rt')
+            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None)
         else:
-            return open(self.vcf_path, 'r')
+            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None)
+        
+        data.columns = vcf_colnames[:data.shape[1]]
+        return data
         
     def encode(self, allele):
         
@@ -249,21 +257,20 @@ class VCF:
         
     def read_vcf(self):
         
-        with self._open_vcf() as f:
-            for i, line in enumerate(tqdm.tqdm(f)):
-                if line.startswith('#'):
-                    continue
-                chrom, pos, tag, ref, alt, *others = line.rstrip().split()
+        if True:
+            f = self._open_vcf()
+            for i, line in tqdm.tqdm(f.iterrows(),total=f.shape[0]):
+                chrom, pos, tag, ref, alt, *others = line
                 
                 ref = self.encode(ref)
                 alt = self.encode(alt)
                 
                 if np.abs(ref.shape[1]-alt.shape[1]) > self.max_indel_size:
-                    print(f"skipping large indel at line {i}, id: {tag}", file=sys.stderr)
+                    if self.verbose: print(f"skipping large indel at line {i}, id: {tag}", file=sys.stderr)
                     continue
                 
                 if ref.shape[1] > self.max_allele_size or alt.shape[1] > self.max_allele_size:
-                    print(f"skipping large allele at line {i}, id: {tag}", file=sys.stderr)
+                    if self.verbose: print(f"skipping large allele at line {i}, id: {tag}", file=sys.stderr)
                     continue
                 
                 cat_alleles = np.concatenate([ref,alt],axis=1)
@@ -271,7 +278,7 @@ class VCF:
                 if cat_alleles.sum() == cat_alleles.shape[1]:                
                     self.vcf.append(
                         {
-                            'chrom': self.chr_prefix + chrom,
+                            'chrom': self.chr_prefix + str(chrom),
                             'pos': int(pos),
                             'tag': tag,
                             'ref': ref,
@@ -283,7 +290,7 @@ class VCF:
                     raise ValueError(f"malformed record at line {i}, id: {tag}\nExiting.")
                 else:
                     print(f"skipping malformed record at line {i}, id: {tag}", file=sys.stderr)
-                    print(line.rstrip(), file=sys.stderr)
+                    print(line, file=sys.stderr)
                     
         return None
     
