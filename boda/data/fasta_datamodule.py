@@ -108,7 +108,7 @@ class FastaDataset(Dataset):
                  left_flank='', right_flank='', 
                  alphabet=constants.STANDARD_NT,
                  complement_dict=constants.DNA_COMPLEMENTS,
-                 pad_final=True):
+                 pad_final=False):
         
         super().__init__()
         
@@ -235,64 +235,65 @@ class VCF:
         self.chr_prefix = chr_prefix
         self.verbose = verbose
         
-        self.vcf = []
-        self.read_vcf()
+        self.vcf = self._open_vcf()
+        #self.read_vcf()
         
     def _open_vcf(self):
         
         vcf_colnames = ['chrom','pos','id','ref','alt','qual','filter','info']
+        re_pat = matcher = f'[^{"".join(self.alphabet)}]'
         
+        # Loading to DataFrame
+        print('loading DataFrame', file=sys.stderr)
         if self.vcf_path.endswith('gz'):
-            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None)
+            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None, compression='gzip', usecols=[0,1,2,3,4])
         else:
-            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None)
+            data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None, usecols=[0,1,2,3,4])
         
         data.columns = vcf_colnames[:data.shape[1]]
+        data['chrom']= self.chr_prefix + data['chrom'].astype(str)
+        
+        # Checking and filtering tokens
+        print('Checking and filtering tokens', file=sys.stderr)
+        if self.all_upper:
+            data['ref'] = data['ref'].str.upper()
+            data['alt'] = data['alt'].str.upper()
+        
+        ref_filter = data['ref'].str.contains(re_pat,regex=True)
+        alt_filter = data['alt'].str.contains(re_pat,regex=True)
+        
+        if self.strict:
+            assert ref_filter.sum() > 0, "Found unknown token in ref. Abort."
+            assert alt_filter.sum() > 0, "Found unknown token in alt. Abort."
+        else:
+            total_filter = ~(ref_filter | alt_filter)
+            data = data.loc[ total_filter ]
+        
+        # Length checks
+        print('Allele length checks', file=sys.stderr)
+        ref_lens = data['ref'].str.len()
+        alt_lens = data['alt'].str.len()
+        
+        max_sizes   = np.maximum(ref_lens, alt_lens)
+        indel_sizes = np.abs(ref_lens - alt_lens)
+        
+        size_filter = (max_sizes < self.max_allele_size) & (indel_sizes < self.max_indel_size)
+        data = data.loc[size_filter]
+        
+        print('Done', file=sys.stderr)
         return data
         
-    def encode(self, allele):
+    def __call__(self, loc_idx=None, iloc_idx=None):
         
-        my_allele = allele.upper() if self.all_upper else allele
-        return alphabet_onehotizer(my_allele, self.alphabet)
+        assert (loc_idx is None) ^ (iloc_idx is None), "Use loc XOR iloc"
         
-    def read_vcf(self):
+        if loc_idx is not None:
+            record = self.vcf.loc[loc_idx]
+        else:
+            record = self.vcf.iloc[iloc_idx]
+            
+        return record
         
-        if True:
-            f = self._open_vcf()
-            for i, line in tqdm.tqdm(f.iterrows(),total=f.shape[0]):
-                chrom, pos, tag, ref, alt, *others = line
-                
-                ref = self.encode(ref)
-                alt = self.encode(alt)
-                
-                if np.abs(ref.shape[1]-alt.shape[1]) > self.max_indel_size:
-                    if self.verbose: print(f"skipping large indel at line {i}, id: {tag}", file=sys.stderr)
-                    continue
-                
-                if ref.shape[1] > self.max_allele_size or alt.shape[1] > self.max_allele_size:
-                    if self.verbose: print(f"skipping large allele at line {i}, id: {tag}", file=sys.stderr)
-                    continue
-                
-                cat_alleles = np.concatenate([ref,alt],axis=1)
-                
-                if cat_alleles.sum() == cat_alleles.shape[1]:                
-                    self.vcf.append(
-                        {
-                            'chrom': self.chr_prefix + str(chrom),
-                            'pos': int(pos),
-                            'tag': tag,
-                            'ref': ref,
-                            'alt': alt,
-                            'additional': others,
-                        }
-                    )
-                elif self.strict:
-                    raise ValueError(f"malformed record at line {i}, id: {tag}\nExiting.")
-                else:
-                    print(f"skipping malformed record at line {i}, id: {tag}", file=sys.stderr)
-                    print(line, file=sys.stderr)
-                    
-        return None
     
 class VcfDataset(Dataset):
     
@@ -301,6 +302,7 @@ class VcfDataset(Dataset):
                  relative_start, relative_end,  
                  reverse_complements=True,
                  left_flank='', right_flank='', 
+                 all_upper=True, 
                  alphabet=constants.STANDARD_NT,
                  complement_dict=constants.DNA_COMPLEMENTS):
         
@@ -317,6 +319,7 @@ class VcfDataset(Dataset):
         
         self.left_flank = left_flank
         self.right_flank= right_flank
+        self.all_upper = all_upper
         self.alphabet = alphabet
         self.complement_dict = complement_dict
         self.complement_matrix = torch.tensor( self.parse_complements() ).float()
@@ -333,27 +336,73 @@ class VcfDataset(Dataset):
             comp_mat[target_index,i] = 1
         return comp_mat
     
+    def encode(self, allele):
+        
+        my_allele = allele.upper() if self.all_upper else allele
+        return alphabet_onehotizer(my_allele, self.alphabet)
+        
+    '''
+    def read_vcf(self):
+        
+        f = self._open_vcf()
+        for i, line in tqdm.tqdm(f.iterrows(),total=f.shape[0]):
+            chrom, pos, tag, ref, alt, *others = line
+
+            ref = self.encode(ref)
+            alt = self.encode(alt)
+
+            if np.abs(ref.shape[1]-alt.shape[1]) > self.max_indel_size:
+                if self.verbose: print(f"skipping large indel at line {i}, id: {tag}", file=sys.stderr)
+                continue
+
+            if ref.shape[1] > self.max_allele_size or alt.shape[1] > self.max_allele_size:
+                if self.verbose: print(f"skipping large allele at line {i}, id: {tag}", file=sys.stderr)
+                continue
+
+            cat_alleles = np.concatenate([ref,alt],axis=1)
+
+            if cat_alleles.sum() == cat_alleles.shape[1]:                
+                self.vcf.append(
+                    {
+                        'chrom': self.chr_prefix + str(chrom),
+                        'pos': int(pos),
+                        'tag': tag,
+                        'ref': ref,
+                        'alt': alt,
+                        'additional': others,
+                    }
+                )
+            elif self.strict:
+                raise ValueError(f"malformed record at line {i}, id: {tag}\nExiting.")
+            else:
+                print(f"skipping malformed record at line {i}, id: {tag}", file=sys.stderr)
+                print(line, file=sys.stderr)
+                    
+        return None
+    '''
+    
     def filter_vcf(self):
-        fasta_keys = self.fasta.keys()
-        pre_len = len(self.vcf)
-        print("filtering vcf by contig keys", file=sys.stderr)
-        self.vcf = [ x for x in tqdm.tqdm(self.vcf) if x['chrom'] in fasta_keys ]
-        print(f"returned {len(self.vcf)}/{pre_len} records", file=sys.stderr)
+        pre_len = self.vcf.shape[0]
+        self.vcf = self.vcf.loc[ self.vcf['chrom'].isin(self.fasta.keys()) ]
+        print(f"returned {self.vcf.shape[0]}/{pre_len} records", file=sys.stderr)
         return None
     
     def __len__(self):
-        return len(self.vcf)
+        return self.vcf.shape[0]
     
     def __getitem__(self, idx):
-        record = self.vcf[idx]
+        record = self.vcf.iloc[idx]
+        
+        ref = self.encode(record['ref'])
+        alt = self.encode(record['alt'])
         
         var_loc = record['pos'] - 1
         start   = var_loc - self.relative_end + 1
 
-        trail_start = var_loc + record['ref'].shape[1]
+        trail_start = var_loc + ref.shape[1]
         trail_end   = start + self.grab_size
 
-        len_dif = record['alt'].shape[1] - record['ref'].shape[1]
+        len_dif = alt.shape[1] - ref.shape[1]
         start_adjust = len_dif // 2
         end_adjust   = len_dif - start_adjust
 
@@ -363,13 +412,13 @@ class VcfDataset(Dataset):
             leader = contig[:, start:var_loc]
             trailer= contig[:, trail_start:trail_end]
             
-            ref_segments = [leader, record['ref'], trailer]
+            ref_segments = [leader, ref, trailer]
             
             # Collect alternate
             leader = contig[:, start+start_adjust:var_loc]
             trailer= contig[:, trail_start:trail_end-end_adjust]
             
-            alt_segments = [leader, record['alt'], trailer]
+            alt_segments = [leader, alt, trailer]
             
             # Combine segments
             ref = np.concatenate(ref_segments, axis=-1)
