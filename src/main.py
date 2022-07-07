@@ -18,10 +18,65 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 import boda
 from boda.common import utils
-from boda.common.utils import set_best, save_model, unpack_artifact, model_fn
+from boda.common.utils import unpack_artifact, model_fn
 
 import hypertune
 
+#####################
+# PTL Module saving #
+#####################
+
+def set_best(my_model, callbacks):
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        try:
+            best_path = callbacks['model_checkpoint'].best_model_path
+            get_epoch = re.search('epoch=(\d*)', best_path).group(1)
+            if 'gs://' in best_path:
+                subprocess.call(['gsutil','cp',best_path,tmpdirname])
+                best_path = os.path.join( tmpdirname, os.path.basename(best_path) )
+            print(f'Best model stashed at: {best_path}', file=sys.stderr)
+            print(f'Exists: {os.path.isfile(best_path)}', file=sys.stderr)
+            ckpt = torch.load( best_path )
+            my_model.load_state_dict( ckpt['state_dict'] )
+            print(f'Setting model from epoch: {get_epoch}', file=sys.stderr)
+        except KeyError:
+            print('Setting most recent model', file=sys.stderr)
+    return my_model
+
+def save_model(data_module, model_module, graph_module, 
+                model, trainer, args):
+    local_dir = args['pl.Trainer'].default_root_dir
+    save_dict = {
+        'data_module'  : data_module.__name__,
+        'data_hparams' : data_module.process_args(args),
+        'model_module' : model_module.__name__,
+        'model_hparams': model_module.process_args(args),
+        'graph_module' : graph_module.__name__,
+        'graph_hparams': graph_module.process_args(args),
+        'model_state_dict': model.state_dict(),
+        'timestamp'    : time.strftime("%Y%m%d_%H%M%S"),
+        'random_tag'   : random.randint(100000,999999)
+    }
+    torch.save(save_dict, os.path.join(local_dir,'torch_checkpoint.pt'))
+    
+    filename=f'model_artifacts__{save_dict["timestamp"]}__{save_dict["random_tag"]}.tar.gz'
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        with tarfile.open(os.path.join(tmpdirname,filename), 'w:gz') as tar:
+            tar.add(local_dir,arcname='artifacts')
+
+        if 'gs://' in args['Main args'].artifact_path:
+            clound_target = os.path.join(args['Main args'].artifact_path,filename)
+            subprocess.check_call(
+                ['gsutil', 'cp', os.path.join(tmpdirname,filename), clound_target]
+            )
+        else:
+            os.makedirs(args['Main args'].artifact_path, exist_ok=True)
+            shutil.copy(os.path.join(tmpdirname,filename), args['Main args'].artifact_path)
+
+#######################
+# Main and run blocks #
+#######################
+            
 def main(args):
     
     data_module = getattr(boda.data, args['Main args'].data_module)
