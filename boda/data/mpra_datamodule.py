@@ -60,7 +60,7 @@ class DNAActivityDataset(Dataset):
         return dna, activity
 
 class MPRA_DataModule(pl.LightningDataModule):
-    
+
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
@@ -126,7 +126,7 @@ class MPRA_DataModule(pl.LightningDataModule):
                  normalize=False,
                  duplication_cutoff=None,
                  use_reverse_complements=False,
-                 **kwargs):       
+                 **kwargs):
         """
         Takes a .txt file with a column cotaining DNA sequences,
         column(s) containing log2FC, and a chromosome column.
@@ -211,7 +211,6 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.use_reverse_complements = use_reverse_complements
         
         self.pad_column_name = 'padded_seq'
-        self.tensor_column_name = 'onehot_seq'
         self.activity_means = None
         self.activity_stds = None
         self.synth_chr_as_set = {synth_chr}
@@ -220,24 +219,19 @@ class MPRA_DataModule(pl.LightningDataModule):
                                   in_column_name=self.sequence_column,
                                   padded_seq_len=self.padded_seq_len
                                   )
-        self.tokenize_fn = partial(utils.row_dna2tensor,
-                                   in_column_name=self.pad_column_name
-                                   )
         self.chr_dataset_train = None
         self.chr_dataset_val = None
         self.chr_dataset_test = None
         self.synth_dataset_train = None
         self.synth_dataset_val = None
         self.synth_dataset_test = None
-                
-    def setup(self, stage='train'):
-        #--------- parse data from MPRA file ---------
+
+    def setup(self, stage = 'train'):
         columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column]
         temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns)
 
         temp_df = temp_df[temp_df[self.project_column].isin(self.data_project)].reset_index(drop=True)
-        
-        #--------- cut-off and standard score norm ---------
+
         means = temp_df[self.activity_columns].mean().to_numpy()
         stds  = temp_df[self.activity_columns].std().to_numpy()
         
@@ -254,9 +248,8 @@ class MPRA_DataModule(pl.LightningDataModule):
         if self.normalize:   
             temp_df[self.activity_columns] = (temp_df[self.activity_columns] - means) / stds
             self.activity_means = torch.Tensor(means)
-            self.activity_stds = torch.Tensor(stds)        
-        
-        #--------- print cut-off info ---------
+            self.activity_stds = torch.Tensor(stds)
+
         print('-'*50)
         print('')
         for idx, cell in enumerate(self.activity_columns):
@@ -274,48 +267,55 @@ class MPRA_DataModule(pl.LightningDataModule):
         print('')
         print('-'*50)
         print('')
-        
-        #--------- pad sequences, convert to one-hots ---------
-        print('Padding sequences...')
+
+        print('Padding sequences... \n')
         temp_df[self.pad_column_name] = temp_df.apply(self.padding_fn, axis=1)
-        print('Tokenizing sequences...')
-        
-        temp_df[self.tensor_column_name] = temp_df.apply(self.tokenize_fn, axis=1)
-        
-        #--------- split dataset in train/val/test sets ---------
-        print('Creating train/val/test datasets...')
+
+        print('Creating train/val/test datasets with tokenized sequences... \n')
         all_chrs = set(temp_df[self.chr_column])
         self.train_chrs = all_chrs - self.val_chrs - self.test_chrs - self.synth_chr_as_set - self.exclude_chr_train
-        
+
         if len(self.train_chrs) > 0:
-            sequences_train  = list(temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.train_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             activities_train = temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.activity_columns].to_numpy()
-            sequences_train  = torch.stack(sequences_train)
+            sequences_train  = torch.stack(list_tensor_seq)
             activities_train = torch.Tensor(activities_train)    
             self.chr_dataset_train = TensorDataset(sequences_train, activities_train)
             self.chr_dataset_train = DNAActivityDataset(sequences_train, activities_train, 
                                                         sort_tensor=torch.max(activities_train, dim=-1).values, 
                                                         duplication_cutoff=self.duplication_cutoff, 
                                                         use_reverse_complements=self.use_reverse_complements)
-        
+
         if len(self.val_chrs) > 0:
-            sequences_val  = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.val_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             activities_val = temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.activity_columns].to_numpy()
-            sequences_val  = torch.stack(sequences_val)
+            sequences_val  = torch.stack(list_tensor_seq)
             activities_val = torch.Tensor(activities_val)  
             self.chr_dataset_val = TensorDataset(sequences_val, activities_val)
         
         if len(self.test_chrs) > 0:
-            sequences_test    = list(temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.tensor_column_name])                      
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.test_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             activities_test   = temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.activity_columns].to_numpy()    
-            sequences_test    = torch.stack(sequences_test)        
+            sequences_test    = torch.stack(list_tensor_seq)        
             activities_test   = torch.Tensor(activities_test)
             self.chr_dataset_test = TensorDataset(sequences_test, activities_test)
              
         if self.synth_chr in all_chrs:
-            synth_sequences  = list(temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.synth_chr_as_set)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             synth_activities = temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.activity_columns].to_numpy()
-            synth_sequences  = torch.stack(synth_sequences)
+            synth_sequences  = torch.stack(list_tensor_seq)
             synth_activities = torch.Tensor(synth_activities)
             synth_dataset = TensorDataset(synth_sequences, synth_activities)
         
