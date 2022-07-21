@@ -155,7 +155,7 @@ def reorg_scheduler_args(sched_arg_dict):
         sched_arg_dict.pop('scheduler_mode')
     return sched_arg_dict
 
-def filter_state_dict(model, stashed_dict):
+def filter_state_dict(model, stashed_dict, fill_tensor=False):
     results_dict = { 
         'filtered_state_dict': {},
         'passed_keys'  : [],
@@ -176,6 +176,18 @@ def filter_state_dict(model, stashed_dict):
             else:
                 check_str = 'Size mismatch for key: {}, expected size {}, got {}' \
                               .format(m_key, old_dict[m_key].shape, stashed_dict[m_key].shape)
+                if fill_tensor:
+                    check_str = check_str + f" \n Filling key: {m_key}"
+                    weight_size = [old_dict[m_key].size(dim=0)-stashed_dict[m_key].size(dim=0), \
+                                   old_dict[m_key].size(dim=1),old_dict[m_key].size(dim=2)]
+                    if 'weight' in m_key:
+                        extra = torch.normal(torch.zeros(weight_size), \
+                                             torch.ones(weight_size)*torch.tensor(2/weight_size[1]).sqrt())
+                    elif 'bias' in m_key:
+                        extra = torch.normal(torch.zeros(1,1,weight_size[-1]), \
+                                             torch.ones(1,1,weight_size[-1])*torch.tensor(2/weight_size[1]).sqrt())
+                    results_dict['filtered_state_dict'][m_key] = torch.cat([stashed_dict[m_key], extra], dim=0)
+                        
                 results_dict['removed_keys'].append(m_key)
                 print(check_str, file=sys.stderr)
                 
