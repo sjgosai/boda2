@@ -105,7 +105,6 @@ class FastaDataset(Dataset):
     def __init__(self, 
                  fasta_obj, window_size, step_size, 
                  reverse_complements=True,
-                 left_flank='', right_flank='', 
                  alphabet=constants.STANDARD_NT,
                  complement_dict=constants.DNA_COMPLEMENTS,
                  pad_final=False):
@@ -120,8 +119,6 @@ class FastaDataset(Dataset):
         
         self.reverse_complements = reverse_complements
         
-        self.left_flank = left_flank
-        self.right_flank= right_flank
         self.alphabet = alphabet
         self.complement_dict = complement_dict
         self.complement_matrix = self.parse_complements()
@@ -157,18 +154,6 @@ class FastaDataset(Dataset):
         
         return key_n_windows
         
-    def add_flanks(self, x):
-        
-        pieces = []
-        
-        pieces.append( self.left_flank )
-            
-        pieces.append( x )
-        
-        pieces.append( self.right_flank )
-            
-        return "".join(pieces)
-    
     def get_fasta_coords(self, idx):
         
         k_id = self.n_keys - sum(self.key_rolling_n > idx)
@@ -202,6 +187,9 @@ class FastaDataset(Dataset):
         if self.reverse_complements:
             strand = 1 if idx % 2 == 0 else -1
             u_idx = idx // 2
+        else:
+            u_idx = idx
+            strand = 1
         
         fasta_loc = self.get_fasta_coords(u_idx)
         k, start, end = [fasta_loc[x] for x in ['key', 'start', 'end']]
