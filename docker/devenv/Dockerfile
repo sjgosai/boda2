@@ -6,19 +6,20 @@ ENV SHELL=/bin/bash
 
 WORKDIR /usr/src
 
-# Container doesn't have UNZIP
+# Container doesn't have UNZIP or less
 RUN apt-get update
 RUN apt-get install unzip
-
-# Dumping contents of repo into container
-ADD . /home/ubuntu/boda2/
-WORKDIR /home/ubuntu/boda2/
+RUN apt-get install less
 
 # Installing requirements, including shipped submodules
+COPY requirements.txt /opt/app/requirements.txt
+WORKDIR /opt/app
 RUN pip install --upgrade pip==21.3.1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Installing BODA as a package
+ADD . /home/ubuntu/boda2/
+WORKDIR /home/ubuntu/boda2/
 RUN pip install -e .
 
 # Install MEME suite
