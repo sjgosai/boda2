@@ -1,11 +1,12 @@
+import subprocess
 import sys
 import os
 import shutil
 import gzip
 import csv
+import argparse
 import multiprocessing
 
-import h5py
 import tqdm
 
 import torch
@@ -16,6 +17,12 @@ import pandas as pd
 import boda
 from boda.common import constants
 from boda.common.utils import unpack_artifact, model_fn
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+install("h5py")
+import h5py
 
 class FlankBuilder(nn.Module):
     def __init__(self,
@@ -118,7 +125,7 @@ def main(args):
     #################
     ## Setup FASTA ##
     #################
-    fasta_dict = boda.data.Fasta(fasta_fn)
+    fasta_dict = boda.data.Fasta(args.fasta_file)
     n_tokens = len(fasta_dict.alphabet)
     
     fasta_data = boda.data.FastaDataset(
@@ -135,9 +142,11 @@ def main(args):
             subset_size = len(fasta_data) // args.n_jobs
         start_idx = subset_size*args.job_id
         stop_idx  = min(len(fasta_data), subset_size*(args.job_id+1))
-        fasta_data = torch.utils.data.Subset(fasta_data, np.arange(start_idx, stop_idx))
+        fasta_subset = torch.utils.data.Subset(fasta_data, np.arange(start_idx, stop_idx))
+    else:
+        fasta_subset = fasta_data
     
-    fasta_loader = torch.utils.data.DataLoader(fasta_data, batch_size=args.batch_size, shuffle=False)
+    fasta_loader = torch.utils.data.DataLoader(fasta_subset, batch_size=args.batch_size, shuffle=False)
     
     current_contig = ''
 
@@ -145,11 +154,20 @@ def main(args):
     h5_datasets = [ f.create_dataset(key, (fasta_data.key_lens[key], 4, 3), dtype=np.float16) for key in fasta_data.idx2key ]
     for dset in h5_datasets:
         dset.set_fill_value = np.nan
+        
+    first_chr, first_start, first_end, *first_extra  = list(fasta_subset[0][0])
+    last_chr, last_start, last_end, *last_extra      = list(fasta_subset[-1][0])
+    
+    process_span = [fasta_data.idx2key[first_chr], first_start, first_end, fasta_data.idx2key[last_chr], last_start, last_end]
+    print("Processing intervals {} {} {} to {} {} {}".format(*process_span), file=sys.stderr)
+    
     with torch.no_grad():
         with torch.autocast(device_type='cuda', dtype=torch.float16):
             for i, batch in enumerate(tqdm.tqdm(fasta_loader)):
                 
                 location, sequence = [ y.contiguous() for y in batch ]
+                
+                current_bsz = location.shape[0]
                 
                 mutated = mutagenizer(sequence)
                 forward = flank_builder(mutated)
@@ -157,14 +175,15 @@ def main(args):
                 
                 result = my_model(forward.cuda()).div(2.) + my_model(revcomp.cuda()).div(2.)
                 
-                result = result.unflatten(0,(args.batch_size, n_tokens, args.sequence_length)).mean(dim=2)
+                result = result.unflatten(0,(current_bsz, n_tokens, args.sequence_length)).mean(dim=2)
                 
                 for (chrom_idx, start, end, strand), position_activity in zip(location, result):
                     f[ fasta_data.idx2key[chrom_idx] ][start+args.sequence_length-1] = position_activity.cpu().half().numpy()
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="BODA trainer")
+    
+    parser = argparse.ArgumentParser(description="Saturation mutagenesis tool.")
     parser.add_argument('--artifact_path', type=str, required=True, help='Pre-trained model artifacts.')
     parser.add_argument('--fasta_file', type=str, required=True, help='FASTA reference file.')
     parser.add_argument('--output', type=str, required=True, help='Output HDF5 path.')
