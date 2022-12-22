@@ -3,11 +3,11 @@
 container_version=$1
 
 # install git
-apt-get update
-apt-get install git
+sudo apt-get update
+sudo apt-get install git
 
 # install docker
-apt-get install \
+sudo apt-get install \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -19,11 +19,12 @@ curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o 
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-apt-get install docker-ce docker-ce-cli containerd.io
+
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io
 
 # make docker available with general user privilege
-gpasswd -a $(whoami) docker
+sudo gpasswd -a $(whoami) docker
 
 # docker build, tag and push
 git clone https://github.com/sjgosai/boda2.git
