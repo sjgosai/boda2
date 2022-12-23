@@ -212,6 +212,8 @@ def main(args):
         results = batch_to_contributions(sequence, my_model, 
                                          model_output_len=3, 
                                          seq_len = args.sequence_length, 
+                                         num_steps=args.num_steps,
+                                         num_samples=args.num_samples,
                                          eval_batch_size=args.internal_batch_size)
         
         f['locations']          [h5_start:h5_start+current_bsz] = location
@@ -232,6 +234,8 @@ if __name__ == '__main__':
     parser.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:], help='Upstream padding.')
     parser.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200], help='Downstream padding.')
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
+    parser.add_argument('--num_steps', type=int, default=50, help='Number of steps between start and target distribution for integrated grads.')
+    parser.add_argument('--num_samples', type=int, default=20, help='Number of samples at each step during integrated grads.')
     parser.add_argument('--internal_batch_size', type=int, default=1040, help='Internal batch size for contribution scoring.')
     args = parser.parse_args()
     
