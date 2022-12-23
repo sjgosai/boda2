@@ -116,13 +116,18 @@ def isg_contributions(sequences,
 def batch_to_contributions(onehot_sequences,
                            model,
                            model_output_len=3,
-                           seq_len = 200,
+                           seq_len=200,
+                           num_steps=50,
+                           num_samples=20,
                            eval_batch_size=1040):
     
     extended_contributions = []
     for i in range(model_output_len):
         predictor = mpra_predictor(model=model, pred_idx=i, ini_in_len=seq_len).cuda()
-        extended_contributions.append(isg_contributions(onehot_sequences, predictor, eval_batch_size=eval_batch_size))
+        extended_contributions.append(isg_contributions(onehot_sequences, predictor,
+                                                        num_steps = num_steps,
+                                                        num_samples=num_samples,
+                                                        eval_batch_size=eval_batch_size))
         
     return torch.stack(extended_contributions, dim=-1)
 
