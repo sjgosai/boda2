@@ -94,7 +94,7 @@ def isg_contributions(sequences,
       
     all_salient_maps = []
     all_gradients = []
-    for local_batch in tqdm(temp_dataloader):
+    for local_batch in temp_dataloader:
         target_thetas = (theta_factor * local_batch[0].cuda()).requires_grad_()
         line_gradients = []
         for i in range(0, num_steps):
