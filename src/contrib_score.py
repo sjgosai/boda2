@@ -92,7 +92,6 @@ def isg_contributions(sequences,
     else:
         sample_ns = [max_samples for i in range(0, num_steps + 1)]       
       
-    all_salient_maps = []
     all_gradients = []
     for local_batch in temp_dataloader:
         target_thetas = (theta_factor * local_batch[0].cuda()).requires_grad_()
@@ -114,7 +113,6 @@ def isg_contributions(sequences,
             line_gradients.append(point_gradients)
             
         gradients = torch.stack(line_gradients).mean(dim=0).detach()
-        all_salient_maps.append(gradients * target_thetas.detach())
         all_gradients.append(gradients)
         
     return theta_factor * torch.cat(all_gradients).cpu()
@@ -220,17 +218,21 @@ def main(args):
         location, sequence = [ y.contiguous() for y in batch ]
 
         current_bsz = location.shape[0]
+        f['locations'][h5_start:h5_start+current_bsz] = location
         
-        results = batch_to_contributions(sequence, my_model, 
-                                         model_output_len=3, 
-                                         seq_len = args.sequence_length, 
-                                         num_steps=args.num_steps,
-                                         max_samples=args.max_samples,
-                                         eval_batch_size=args.internal_batch_size,
-                                         adaptive_sampling=args.adaptive_sampling)
+        gap_filter = np.arange(current_bsz)[sequence.sum(dim=[-2,-1]) > 0]
         
-        f['locations']          [h5_start:h5_start+current_bsz] = location
-        f['contribution_scores'][h5_start:h5_start+current_bsz] = results
+        if gap_filter.size >= 1:
+            results = batch_to_contributions(sequence[gap_filter], my_model, 
+                                             model_output_len=3, 
+                                             seq_len = args.sequence_length, 
+                                             num_steps=args.num_steps,
+                                             max_samples=args.max_samples,
+                                             eval_batch_size=args.internal_batch_size,
+                                             adaptive_sampling=args.adaptive_sampling)
+
+            placement = np.arange(h5_start, h5_start+current_bsz)[gap_filter]
+            f['contribution_scores'][placement] = results
 
         h5_start = h5_start+current_bsz
 
