@@ -31,76 +31,42 @@ import h5py
 from torch.utils.data import (random_split, DataLoader, TensorDataset, ConcatDataset)
 from torch.distributions.categorical import Categorical
 
-class mpra_predictor(nn.Module):
-    def __init__(self,
-                 model,
-                 pred_idx=0,
-                 ini_in_len=200,
-                 model_in_len=600,
-                 cat_axis=-1,
-                 dual_pred=False):
-        super().__init__()
-        self.model = model
-        self.pred_idx = pred_idx
-        self.ini_in_len = ini_in_len 
-        self.model_in_len = model_in_len
-        self.cat_axis = cat_axis  
-        self.dual_pred = dual_pred
-        
-        try: self.model.eval()
-        except: pass
-        
-        self.register_flanks()
-    
-    def forward(self, x):
-        pieces = [self.left_flank.repeat(x.shape[0], 1, 1), x, self.right_flank.repeat(x.shape[0], 1, 1)]
-        in_tensor = torch.cat( pieces, axis=self.cat_axis)
-        if self.dual_pred:
-            dual_tensor = utils.reverse_complement_onehot(in_tensor)
-            out_tensor = self.model(in_tensor)[:, self.pred_idx] + self.model(dual_tensor)[:, self.pred_idx]
-            out_tensor = out_tensor / 2.0
-        else:
-            out_tensor = self.model(in_tensor)[:, self.pred_idx]
-        return out_tensor
-    
-    def register_flanks(self):
-        missing_len = self.model_in_len - self.ini_in_len
-        left_idx = - missing_len//2 + missing_len%2
-        right_idx = missing_len//2 + missing_len%2
-        left_flank = utils.dna2tensor(constants.MPRA_UPSTREAM[left_idx:]).unsqueeze(0)
-        right_flank = utils.dna2tensor(constants.MPRA_DOWNSTREAM[:right_idx]).unsqueeze(0)         
-        self.register_buffer('left_flank', left_flank)
-        self.register_buffer('right_flank', right_flank) 
-        
-
 def isg_contributions(sequences,
                       predictor,
                       num_steps=50,
-                      num_samples=20,
+                      max_samples=20,
                       eval_batch_size=1024,
-                      theta_factor=15):
+                      theta_factor=15,
+                      adaptive_sampling=False
+                     ):
     
-    batch_size = eval_batch_size // num_samples
+    batch_size = eval_batch_size // (max_samples - 3)
     temp_dataset = TensorDataset(sequences)
     temp_dataloader = DataLoader(temp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
-
+    
+    slope_coefficients = [i / num_steps for i in range(1, num_steps + 1)]
+    if adaptive_sampling:
+        sneaky_exponent = np.log(max_samples - 3) / np.log(num_steps)
+        sample_ns = np.flip((np.arange(0, num_steps)**sneaky_exponent).astype(int)).clip(min=2)
+    else:
+        sample_ns = [max_samples for i in range(0, num_steps + 1)]       
+      
     all_salient_maps = []
     all_gradients = []
-    for local_batch in temp_dataloader:
+    for local_batch in tqdm(temp_dataloader):
         target_thetas = (theta_factor * local_batch[0].cuda()).requires_grad_()
         line_gradients = []
-        for i in range(0, num_steps + 1):
-            point_thetas = (i / num_steps * target_thetas)
+        for i in range(0, num_steps):
+            point_thetas = slope_coefficients[i] * target_thetas
+            num_samples = sample_ns[i]
             point_distributions = F.softmax(point_thetas, dim=-2)
-
             nucleotide_probs = Categorical(torch.transpose(point_distributions, -2, -1))
             sampled_idxs = nucleotide_probs.sample((num_samples, ))
             sampled_nucleotides_T = F.one_hot(sampled_idxs, num_classes=4)
             sampled_nucleotides = torch.transpose(sampled_nucleotides_T, -2, -1)
-            distribution_repeater = point_distributions.repeat(num_samples, *[1 for i in range(3)])
+            distribution_repeater = point_distributions.repeat(num_samples, *[1, 1, 1])
             sampled_nucleotides = sampled_nucleotides - distribution_repeater.detach() + distribution_repeater 
             samples = sampled_nucleotides.flatten(0,1)
-
             preds = predictor(samples)
             point_predictions = preds.unflatten(0, (num_samples, target_thetas.shape[0])).mean(dim=0)
             point_gradients = torch.autograd.grad(point_predictions.sum(), inputs=point_thetas, retain_graph=True)[0]
@@ -109,8 +75,8 @@ def isg_contributions(sequences,
         gradients = torch.stack(line_gradients).mean(dim=0).detach()
         all_salient_maps.append(gradients * target_thetas.detach())
         all_gradients.append(gradients)
+        
     return theta_factor * torch.cat(all_gradients).cpu()
-    # return torch.cat(all_salient_maps).cpu(), theta_factor * torch.cat(all_gradients).cpu()
 
 
 def batch_to_contributions(onehot_sequences,
@@ -118,16 +84,21 @@ def batch_to_contributions(onehot_sequences,
                            model_output_len=3,
                            seq_len=200,
                            num_steps=50,
-                           num_samples=20,
-                           eval_batch_size=1040):
+                           max_samples=20,
+                           theta_factor=15,
+                           eval_batch_size=1040,
+                           adaptive_sampling=False):
     
     extended_contributions = []
     for i in range(model_output_len):
         predictor = mpra_predictor(model=model, pred_idx=i, ini_in_len=seq_len).cuda()
         extended_contributions.append(isg_contributions(onehot_sequences, predictor,
                                                         num_steps = num_steps,
-                                                        num_samples=num_samples,
-                                                        eval_batch_size=eval_batch_size))
+                                                        max_samples=max_samples,
+                                                        theta_factor=theta_factor,
+                                                        eval_batch_size=eval_batch_size,
+                                                        adaptive_sampling=adaptive_sampling
+                                                       ))
         
     return torch.stack(extended_contributions, dim=-1)
 
@@ -213,8 +184,9 @@ def main(args):
                                          model_output_len=3, 
                                          seq_len = args.sequence_length, 
                                          num_steps=args.num_steps,
-                                         num_samples=args.num_samples,
-                                         eval_batch_size=args.internal_batch_size)
+                                         max_samples=args.max_samples,
+                                         eval_batch_size=args.internal_batch_size,
+                                         adaptive_sampling=args.adaptive_sampling)
         
         f['locations']          [h5_start:h5_start+current_bsz] = location
         f['contribution_scores'][h5_start:h5_start+current_bsz] = results
@@ -234,8 +206,9 @@ if __name__ == '__main__':
     parser.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:], help='Upstream padding.')
     parser.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200], help='Downstream padding.')
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
-    parser.add_argument('--num_steps', type=int, default=50, help='Number of steps between start and target distribution for integrated grads.')
-    parser.add_argument('--num_samples', type=int, default=20, help='Number of samples at each step during integrated grads.')
+    parser.add_argument('--num_steps', type=int, default=100, help='Number of steps between start and target distribution for integrated grads.')
+    parser.add_argument('--max_samples', type=int, default=20, help='Number of samples at each step during integrated grads.')
+    parser.add_argument('--adaptive_sampling', ,type=utils.str2bool, default=True, help='Apply adaptive sampling during integrated grads.')
     parser.add_argument('--internal_batch_size', type=int, default=1040, help='Internal batch size for contribution scoring.')
     args = parser.parse_args()
     
