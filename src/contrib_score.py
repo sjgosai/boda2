@@ -164,7 +164,7 @@ def prepare_hdf5_file(fa_dataset, h5_file, subset=None):
 
     
 def main(args):
-    
+    print(sys.argv)
     ##################
     ## Import Model ##
     ##################
