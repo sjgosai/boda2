@@ -31,6 +31,47 @@ import h5py
 from torch.utils.data import (random_split, DataLoader, TensorDataset, ConcatDataset)
 from torch.distributions.categorical import Categorical
 
+class mpra_predictor(nn.Module):
+    def __init__(self,
+                 model,
+                 pred_idx=0,
+                 ini_in_len=200,
+                 model_in_len=600,
+                 cat_axis=-1,
+                 dual_pred=False):
+        super().__init__()
+        self.model = model
+        self.pred_idx = pred_idx
+        self.ini_in_len = ini_in_len 
+        self.model_in_len = model_in_len
+        self.cat_axis = cat_axis  
+        self.dual_pred = dual_pred
+        
+        try: self.model.eval()
+        except: pass
+        
+        self.register_flanks()
+    
+    def forward(self, x):
+        pieces = [self.left_flank.repeat(x.shape[0], 1, 1), x, self.right_flank.repeat(x.shape[0], 1, 1)]
+        in_tensor = torch.cat( pieces, axis=self.cat_axis)
+        if self.dual_pred:
+            dual_tensor = utils.reverse_complement_onehot(in_tensor)
+            out_tensor = self.model(in_tensor)[:, self.pred_idx] + self.model(dual_tensor)[:, self.pred_idx]
+            out_tensor = out_tensor / 2.0
+        else:
+            out_tensor = self.model(in_tensor)[:, self.pred_idx]
+        return out_tensor
+    
+    def register_flanks(self):
+        missing_len = self.model_in_len - self.ini_in_len
+        left_idx = - missing_len//2 + missing_len%2
+        right_idx = missing_len//2 + missing_len%2
+        left_flank = utils.dna2tensor(constants.MPRA_UPSTREAM[left_idx:]).unsqueeze(0)
+        right_flank = utils.dna2tensor(constants.MPRA_DOWNSTREAM[:right_idx]).unsqueeze(0)         
+        self.register_buffer('left_flank', left_flank)
+        self.register_buffer('right_flank', right_flank) 
+
 def isg_contributions(sequences,
                       predictor,
                       num_steps=50,
@@ -208,7 +249,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
     parser.add_argument('--num_steps', type=int, default=100, help='Number of steps between start and target distribution for integrated grads.')
     parser.add_argument('--max_samples', type=int, default=20, help='Number of samples at each step during integrated grads.')
-    parser.add_argument('--adaptive_sampling', ,type=utils.str2bool, default=True, help='Apply adaptive sampling during integrated grads.')
+    parser.add_argument('--adaptive_sampling', type=utils.str2bool, default=True, help='Apply adaptive sampling during integrated grads.')
     parser.add_argument('--internal_batch_size', type=int, default=1040, help='Internal batch size for contribution scoring.')
     args = parser.parse_args()
     
