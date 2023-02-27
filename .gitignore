@@ -10,6 +10,25 @@ lightning_logs/
 # Compiled python modules.
 *.pyc
 
+# Data files, general
+*.tar.gz
+*.pt
+*.gz
+*.hdf5
+*.h5
+
+# Data files, genomics
+*.fasta
+*.fa
+*.fa.fai
+*.fasta.fai
+*.vcf
+*.bed
+*.bigBed
+*.wig
+*.bw
+*.bigWig
+
 # Setuptools distribution folder.
 /dist/
 
