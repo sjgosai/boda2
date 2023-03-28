@@ -49,6 +49,7 @@ class OneHotSlicer(nn.Module):
         return hook
 
 class Fasta:
+    
     def __init__(self, fasta_path, all_upper=True, 
                  alphabet=constants.STANDARD_NT):
         self.fasta_path = fasta_path
@@ -288,9 +289,10 @@ class VcfDataset(Dataset):
     def __init__(self, 
                  vcf_obj, fasta_obj, window_size, 
                  relative_start, relative_end,  
+                 step_size=1,
                  reverse_complements=True,
                  left_flank='', right_flank='', 
-                 all_upper=True, 
+                 all_upper=True, use_contigs=[],
                  alphabet=constants.STANDARD_NT,
                  complement_dict=constants.DNA_COMPLEMENTS):
         
@@ -303,16 +305,19 @@ class VcfDataset(Dataset):
         self.relative_end   = relative_end
         self.grab_size = self.window_size-self.relative_start+self.relative_end-1
         
+        self.step_size = step_size
         self.reverse_complements = reverse_complements
         
         self.left_flank = left_flank
         self.right_flank= right_flank
         self.all_upper = all_upper
+        self.use_contigs = use_contigs
         self.alphabet = alphabet
         self.complement_dict = complement_dict
         self.complement_matrix = torch.tensor( self.parse_complements() ).float()
         
         self.window_slicer = OneHotSlicer(len(alphabet), window_size)
+        
         self.filter_vcf()
 
     def parse_complements(self):
@@ -371,7 +376,17 @@ class VcfDataset(Dataset):
     
     def filter_vcf(self):
         pre_len = self.vcf.shape[0]
-        self.vcf = self.vcf.loc[ self.vcf['chrom'].isin(self.fasta.keys()) ]
+        
+        contig_filter = self.vcf['chrom'].isin(self.fasta.keys())
+        print(f"{contig_filter.sum()}/{pre_len} records have matching contig in FASTA", file=sys.stderr)
+        if len(self.use_contigs) > 0:
+            contig_filter = contig_filter & self.vcf['chrom'].isin(self.use_contigs)
+            print(f"removing {np.sum(~self.vcf['chrom'].isin(self.use_contigs))}/{pre_len} records based on contig blacklist", file=sys.stderr)
+            
+        if contig_filter.sum() < 1:
+            print('No contigs passed. Check filters.', file=sys.stderr)
+        
+        self.vcf = self.vcf.loc[ contig_filter ]
         print(f"returned {self.vcf.shape[0]}/{pre_len} records", file=sys.stderr)
         return None
     
@@ -415,8 +430,8 @@ class VcfDataset(Dataset):
             ref = torch.tensor(ref[np.newaxis].astype(np.float32))
             alt = torch.tensor(alt[np.newaxis].astype(np.float32))
 
-            ref_slices = self.window_slicer(ref)
-            alt_slices = self.window_slicer(alt)
+            ref_slices = self.window_slicer(ref)[::self.step_size]
+            alt_slices = self.window_slicer(alt)[::self.step_size]
 
 
             if self.reverse_complements:
