@@ -57,6 +57,10 @@ class VepTester(nn.Module):
 class reductions(object):
     
     @staticmethod
+    def mean(tensor, dim):
+        return tensor.mean(dim=dim)
+    
+    @staticmethod
     def sum(tensor, dim):
         return tensor.sum(dim=dim)
     
@@ -105,7 +109,6 @@ class reductions(object):
 def main(args):
     USE_CUDA = torch.cuda.device_count() >= 1
     print(sys.argv)
-    print(f"contig list len test: {len(args.use_contigs)}")
     ##################
     ## Import Model ##
     ##################
@@ -218,19 +221,19 @@ if __name__ == '__main__':
     parser.add_argument('--vcf_file', type=str, required=True, help='Variants to test in VCF format.')
     parser.add_argument('--fasta_file', type=str, required=True, help='FASTA reference file.')
     # Output info
-    parser.add_argument('--output', type=str, required=True, help='Output path. Simple VCF.')
-    parser.add_argument('--raw_predictions', type=utils.str2bool, default=False, help='Dump raw ref/alt predictions as tensors.')
+    parser.add_argument('--output', type=str, required=True, help='Output path. Simple VCF if not RAW_PREDICTIONS else PT pickle.')
+    parser.add_argument('--raw_predictions', type=utils.str2bool, default=False, help='Dump raw ref/alt predictions as tensors. Output will be a PT pickle.')
     # Data preprocessing
     parser.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:], help='Upstream padding.')
     parser.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200], help='Downstream padding.')
     parser.add_argument('--vcf_contig_prefix', type=str, default='', help='Prefix to append VCF contig IDs to match FASTA contig IDs.')
     # VEP testing conditions
-    parser.add_argument('--relative_start', type=int, default=0, help='Leftmost position where variant is tested.')
-    parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested.')
+    parser.add_argument('--relative_start', type=int, default=0, help='Leftmost position where variant is tested, 0-based inclusive.')
+    parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested, 1-based exclusive.')
     parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested.')
-    parser.add_argument('--reduction', type=str, default='mean', help='Specify reduction over testing conditions. Must be a reducing function in base torch.')
+    parser.add_argument('--reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
     # Throughput management
-    parser.add_argument('--use_contigs', type=list, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
+    parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
     parser.add_argument('--job_id', type=int, default=0, help='Job partition index for distributed computing.')
     parser.add_argument('--n_jobs', type=int, default=1, help='Total number of job partitions.')
