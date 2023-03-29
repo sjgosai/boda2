@@ -18,11 +18,62 @@ import boda
 from boda.common import constants, utils
 from boda.common.utils import unpack_artifact, model_fn
 
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+install("functorch")
+from functorch import combine_state_for_ensemble, vmap
+
+def load_model(artifact_path):
+    
+    USE_CUDA = torch.cuda.device_count() >= 1
+    if os.path.isdir('./artifacts'):
+        shutil.rmtree('./artifacts')
+
+    unpack_artifact(artifact_path)
+
+    model_dir = './artifacts'
+
+    my_model = model_fn(model_dir)
+    my_model.eval()
+    if USE_CUDA:
+        my_model.cuda()
+    
+    return my_model
+
+class ConsistentModelPool(nn.Module):
+    
+    def __init__(self,
+                 path_list
+                ):
+        super().__init__()
+        
+        models = [ load_model(model_path) for model_path in path_list ]
+        self.fmodel, self.params, self.buffers = combine_state_for_ensemble(models)
+            
+    def forward(self, batch):
+        
+        preds = vmap(self.fmodel, in_dims=(0, 0, None))(self.params, self.buffers, batch)
+        return preds.mean(dim=0)
+            
+class VariableModelPool(nn.Module):
+    
+    def __init__(self,
+                 path_list
+                ):
+        super().__init__()
+        
+        self.models = [ load_model(model_path) for model_path in path_list ]
+            
+    def forward(self, batch):
+        
+        return torch.stack([model(batch) for model in self.models]).mean(dim=0)
+            
 class VepTester(nn.Module):
     
     def __init__(self,
-                  model
-                 ):
+                 model
+                ):
         
         super().__init__()
         self.use_cuda = torch.cuda.device_count() >= 1
@@ -112,21 +163,16 @@ def main(args):
     ##################
     ## Import Model ##
     ##################
-    if os.path.isdir('./artifacts'):
-        shutil.rmtree('./artifacts')
-
-    unpack_artifact(args.artifact_path)
-
-    model_dir = './artifacts'
-
-    my_model = model_fn(model_dir)
-    my_model.eval()
-    if USE_CUDA:
-        my_model.cuda()
+    if len(args.artifact_path) == 1:
+        my_model = load_model(args.artifact_path[0])
+    elif len(args.artifact_path) > 1 and args.use_vmap:
+        my_model = ConsistentModelPool(args.artifact_path)
+    elif len(args.artifact_path) > 1:
+        my_model = VariableModelPool(args.artifact_path)
     
-    #################
-    ## Setup FASTA ##
-    #################
+    #########################
+    ## Setup FASTA and VCF ##
+    #########################
     fasta_data = boda.data.Fasta(args.fasta_file)
     
     vcf = boda.data.VCF(
@@ -144,6 +190,9 @@ def main(args):
         left_flank='', right_flank='', use_contigs=args.use_contigs,
     )
 
+    ########################
+    ## determine chunking ##
+    ########################
     if args.n_jobs > 1:
         extra_tasks = len(vcf_data) % args.n_jobs
         if extra_tasks > 0:
@@ -159,6 +208,9 @@ def main(args):
         vcf_table  = vcf_data.vcf
 
     
+    ###########################
+    ## prepare data pipeline ##
+    ###########################
     vcf_loader = torch.utils.data.DataLoader( vcf_subset, batch_size=args.batch_size*max(1,torch.cuda.device_count()) )
     
     left_flank = boda.common.utils.dna2tensor( 
@@ -182,6 +234,9 @@ def main(args):
     alt_preds = []
     skew_preds= []
 
+    ######################
+    ## run through data ##
+    ######################
     with torch.no_grad():
         for i, batch in enumerate(tqdm.tqdm(vcf_loader)):
             ref_allele, alt_allele = batch['ref'], batch['alt']
@@ -204,6 +259,9 @@ def main(args):
                 ref_preds.append(all_preds['ref'].cpu())
                 alt_preds.append(all_preds['alt'].cpu())
 
+    ##################
+    ## dump outputs ##
+    ##################
     if not args.raw_predictions:
         skew_preds = torch.cat(skew_preds, dim=0)     
         pd.concat([ vcf_table, pd.DataFrame(skew_preds.numpy()) ], axis=1) \
@@ -217,7 +275,8 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description="Contribution scoring tool.")
     # Input info
-    parser.add_argument('--artifact_path', type=str, required=True, help='Pre-trained model artifacts.')
+    parser.add_argument('--artifact_path', type=str, nargs='*', required=True, help='Pre-trained model artifacts. Supply multiple to ensemble.')
+    parser.add_argument('--use_vmap', type=utils.str2bool, default=False, help='If ensemble members have consistent architecture can speed up with functorch.vmap.')
     parser.add_argument('--vcf_file', type=str, required=True, help='Variants to test in VCF format.')
     parser.add_argument('--fasta_file', type=str, required=True, help='FASTA reference file.')
     # Output info
