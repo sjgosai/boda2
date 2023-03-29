@@ -54,7 +54,54 @@ class VepTester(nn.Module):
                 'alt': alt_preds, 
                 'skew': skew_preds}
     
-
+class reductions(object):
+    
+    @staticmethod
+    def sum(tensor, dim):
+        return tensor.sum(dim=dim)
+    
+    @staticmethod
+    def max(tensor, dim):
+        return tensor.amax(dim=dim)
+    
+    @staticmethod
+    def min(tensor, dim):
+        return tensor.amin(dim=dim)
+    
+    @staticmethod
+    def abs_max(tensor, dim):
+        n_dims = len(tensor.shape)
+        get_idx= tensor.abs().argmax(dim=dim)
+        slicer = []
+        for i in range(n_dims):
+            if i != dim:
+                viewer = [1] * n_dims
+                dim_size = tensor.shape[i]
+                viewer[i] = dim_size
+                viewer.pop(dim)
+                slicer.append( torch.arange(dim_size).view(*viewer).expand(*get_idx.shape) )
+            else:
+                slicer.append( get_idx )
+            
+        return tensor[slicer]
+    
+    @staticmethod
+    def abs_min(tensor, dim):
+        n_dims = len(tensor.shape)
+        get_idx= tensor.abs().argmin(dim=dim)
+        slicer = []
+        for i in range(n_dims):
+            if i != dim:
+                viewer = [1] * n_dims
+                dim_size = tensor.shape[i]
+                viewer[i] = dim_size
+                viewer.pop(dim)
+                slicer.append( torch.arange(dim_size).view(*viewer).expand(*get_idx.shape) )
+            else:
+                slicer.append( get_idx )
+            
+        return tensor[slicer]
+    
 def main(args):
     USE_CUDA = torch.cuda.device_count() >= 1
     print(sys.argv)
@@ -145,22 +192,24 @@ def main(args):
 
             all_preds = vep_tester(ref_allele, alt_allele)
 
-            ref_preds.append(all_preds['ref'].cpu())
-            alt_preds.append(all_preds['alt'].cpu())
-            skew_preds.append(all_preds['skew'].cpu())
-
-    ref_preds = torch.cat(ref_preds, dim=0)
-    alt_preds = torch.cat(alt_preds, dim=0)
-    skew_preds= torch.cat(skew_preds, dim=0)
+            if not args.raw_predictions:
+                skew_preds.append(
+                    getattr(reductions, args.reduction) \
+                    (all_preds['skew'].flatten(1,2), dim=1).cpu()
+                )
+            else:
+                ref_preds.append(all_preds['ref'].cpu())
+                alt_preds.append(all_preds['alt'].cpu())
 
     if not args.raw_predictions:
-        skew_preds =  getattr(torch, args.reduction)(skew_preds.flatten(1,2), dim=1)        
+        skew_preds = torch.cat(skew_preds, dim=0)     
         pd.concat([ vcf_table, pd.DataFrame(skew_preds.numpy()) ], axis=1) \
           .to_csv(args.output, sep='\t', index=False, header=True, quoting=csv.QUOTE_NONE)
     else:
+        ref_preds = torch.cat(ref_preds, dim=0)
+        alt_preds = torch.cat(alt_preds, dim=0)
         torch.save({'ref': ref_preds, 'alt': alt_preds, 'vcf': vcf_table}, args.output)
-    
-    
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description="Contribution scoring tool.")
