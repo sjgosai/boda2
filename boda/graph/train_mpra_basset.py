@@ -1,8 +1,8 @@
 import argparse
 import torch
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import LearningRateMonitor
-from pytorch_lightning.loggers import TensorBoardLogger
+import lightning.pytorch as pl
+from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.loggers import TensorBoardLogger
 
 import sys
 sys.path.insert(0, '/Users/castrr/Documents/GitHub/boda2/')    #edit path to boda2

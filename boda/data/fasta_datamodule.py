@@ -14,7 +14,7 @@ import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset, ConcatDataset, Dataset
 
 from ..common import constants, utils

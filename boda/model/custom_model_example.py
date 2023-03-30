@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchsummary import summary
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 '''
 Custom MPRA activity predictor

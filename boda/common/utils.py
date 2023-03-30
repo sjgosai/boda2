@@ -21,6 +21,9 @@ import torch.nn.functional as F
 from . import constants
 from .. import model as _model
 
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 def set_all_seeds(seed):
     """Fixes all random seeds
     

@@ -18,12 +18,6 @@ import boda
 from boda.common import constants, utils
 from boda.common.utils import unpack_artifact, model_fn
 
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-install("h5py")
-import h5py
-
 ###################################
 ## Contribution Scoreing helpers ##
 ###################################

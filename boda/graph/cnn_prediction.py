@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from pytorch_lightning.core import LightningModule
+from lightning.pytorch import LightningModule
 
 import hypertune
 

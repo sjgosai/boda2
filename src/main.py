@@ -11,10 +11,10 @@ import random
 import subprocess
 
 import torch
-from pytorch_lightning import Trainer
-from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch import Trainer
+from lightning.pytorch import loggers as pl_loggers
+from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 import boda
 from boda.common import utils

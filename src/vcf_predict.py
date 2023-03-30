@@ -12,17 +12,14 @@ import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from functorch import combine_state_for_ensemble, vmap
+
 import numpy as np
 import pandas as pd
 import boda
 from boda.common import constants, utils
 from boda.common.utils import unpack_artifact, model_fn
 
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-install("functorch")
-from functorch import combine_state_for_ensemble, vmap
 
 def load_model(artifact_path):
     
