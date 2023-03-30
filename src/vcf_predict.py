@@ -248,9 +248,17 @@ def main(args):
             all_preds = vep_tester(ref_allele, alt_allele)
 
             if not args.raw_predictions:
+                if args.ref_only:
+                    use_preds = all_preds['ref']
+                elif args.alt_only:
+                    use_preds = all_preds['alt']
+                elif args.skip_skew:
+                    use_preds = torch.cat([all_preds['ref'], all_preds['alt']], dim=1)
+                else:
+                    use_preds = all_preds['skew']
                 skew_preds.append(
                     getattr(reductions, args.reduction) \
-                    (all_preds['skew'].flatten(1,2), dim=1).cpu()
+                    (use_preds.flatten(1,2), dim=1).cpu()
                 )
             else:
                 ref_preds.append(all_preds['ref'].cpu())
@@ -288,6 +296,9 @@ if __name__ == '__main__':
     parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested, 1-based exclusive.')
     parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested.')
     parser.add_argument('--reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
+    parser.add_argument('--skip_skew', type=utils.str2bool, default=False, help='Contatenate alleles instead of calculating skew before reduction.')
+    parser.add_argument('--ref_only', type=utils.str2bool, default=False, help='Pass ref instead of calculating skew before reduction.')
+    parser.add_argument('--alt_only', type=utils.str2bool, default=False, help='Pass alt instead of calculating skew before reduction.')
     # Throughput management
     parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
