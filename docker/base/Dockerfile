@@ -1,4 +1,4 @@
-# Base Dockerfiles
+# Base Dockerfile
 # Available images: 
 # $ gcloud container images list --repository="gcr.io/deeplearning-platform-release"
 FROM gcr.io/deeplearning-platform-release/pytorch-gpu.1-13
@@ -18,10 +18,8 @@ WORKDIR /opt/app
 RUN pip install --upgrade pip==21.3.1
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Installing BODA as a package
-ADD . /home/ubuntu/boda2/
-WORKDIR /home/ubuntu/boda2/
-RUN pip install -e .
+# Remove torch XLA because we don't use TPUs
+RUN pip uninstall -y torch_xla
 
 # Install MEME suite
 RUN apt-get update && apt-get install -y \
