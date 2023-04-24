@@ -38,6 +38,21 @@ def load_model(artifact_path):
     
     return my_model
 
+def combine_ref_alt_skew_tensors(ref, alt, skew, ids=None):
+    
+    result = []
+    
+    for tag, data in zip(['ref', 'alt', 'skew'], [ref, alt, skew]):
+        hold = pd.DataFrame( data.numpy(), columns=ids )
+        for col in hold.columns:
+            hold[col] = f'{col}__{tag}=' + hold[col].astype(str)
+            
+        result.append( hold.agg(';'.join, axis=1) )
+        
+    result = pd.concat(result, axis=1)
+    
+    return result.agg(';'.join, axis=1)
+
 class ConsistentModelPool(nn.Module):
     
     def __init__(self,
@@ -177,7 +192,7 @@ def main(args):
         max_allele_size=20, max_indel_size=20,
     )
     
-    WINDOW_SIZE = 200
+    WINDOW_SIZE = args.window_size
     RELATIVE_START = args.relative_start
     RELATIVE_END = args.relative_end
     
@@ -248,18 +263,24 @@ def main(args):
             all_preds = vep_tester(ref_allele, alt_allele)
 
             if not args.raw_predictions:
-                if args.ref_only:
-                    use_preds = all_preds['ref']
-                elif args.alt_only:
-                    use_preds = all_preds['alt']
-                elif args.skip_skew:
-                    use_preds = torch.cat([all_preds['ref'], all_preds['alt']], dim=1)
-                else:
-                    use_preds = all_preds['skew']
-                skew_preds.append(
-                    getattr(reductions, args.reduction) \
-                    (use_preds.flatten(1,2), dim=1).cpu()
-                )
+                use_ref = getattr(reductions, args.strand_reduction) \
+                          (all_preds['ref'], dim=1)
+                use_ref = getattr(reductions, args.window_reduction) \
+                          (use_ref, dim=1)
+                ref_preds.append(use_ref.cpu())
+                
+                use_alt = getattr(reductions, args.strand_reduction) \
+                          (all_preds['alt'], dim=1)
+                use_alt = getattr(reductions, args.window_reduction) \
+                          (use_alt, dim=1)
+                alt_preds.append(use_alt.cpu())
+                
+                use_skew= getattr(reductions, args.strand_reduction) \
+                          (all_preds['skew'], dim=1)
+                use_skew= getattr(reductions, args.window_reduction) \
+                          (use_skew, dim=1)
+                skew_preds.append(use_skew.cpu())
+                
             else:
                 ref_preds.append(all_preds['ref'].cpu())
                 alt_preds.append(all_preds['alt'].cpu())
@@ -268,9 +289,13 @@ def main(args):
     ## dump outputs ##
     ##################
     if not args.raw_predictions:
-        skew_preds = torch.cat(skew_preds, dim=0)     
-        pd.concat([ vcf_table, pd.DataFrame(skew_preds.numpy()) ], axis=1) \
-          .to_csv(args.output, sep='\t', index=False, header=True, quoting=csv.QUOTE_NONE)
+        ref_preds = torch.cat(ref_preds, dim=0)
+        alt_preds = torch.cat(alt_preds, dim=0)
+        skew_preds= torch.cat(skew_preds, dim=0)
+        
+        full_results = combine_ref_alt_skew_tensors(ref_preds, alt_preds, skew_preds, args.feature_ids)
+        vcf_table['INFO'] = full_results
+        vcf_table.to_csv(args.output, sep='\t', index=False, header=True, quoting=csv.QUOTE_NONE)
     else:
         ref_preds = torch.cat(ref_preds, dim=0)
         alt_preds = torch.cat(alt_preds, dim=0)
@@ -286,8 +311,10 @@ if __name__ == '__main__':
     parser.add_argument('--fasta_file', type=str, required=True, help='FASTA reference file.')
     # Output info
     parser.add_argument('--output', type=str, required=True, help='Output path. Simple VCF if not RAW_PREDICTIONS else PT pickle.')
+    parser.add_argument('--feature_ids', type=str, nargs='*', help='Custom feature IDs for outputs in INFO column.')
     parser.add_argument('--raw_predictions', type=utils.str2bool, default=False, help='Dump raw ref/alt predictions as tensors. Output will be a PT pickle.')
     # Data preprocessing
+    parser.add_argument('--window_size', type=int, default=200, help='Window size to be extracted from the genome.')
     parser.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:], help='Upstream padding.')
     parser.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200], help='Downstream padding.')
     parser.add_argument('--vcf_contig_prefix', type=str, default='', help='Prefix to append VCF contig IDs to match FASTA contig IDs.')
@@ -295,10 +322,8 @@ if __name__ == '__main__':
     parser.add_argument('--relative_start', type=int, default=0, help='Leftmost position where variant is tested, 0-based inclusive.')
     parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested, 1-based exclusive.')
     parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested.')
-    parser.add_argument('--reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
-    parser.add_argument('--skip_skew', type=utils.str2bool, default=False, help='Contatenate alleles instead of calculating skew before reduction.')
-    parser.add_argument('--ref_only', type=utils.str2bool, default=False, help='Pass ref instead of calculating skew before reduction.')
-    parser.add_argument('--alt_only', type=utils.str2bool, default=False, help='Pass alt instead of calculating skew before reduction.')
+    parser.add_argument('--strand_reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
+    parser.add_argument('--window_reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
     # Throughput management
     parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
