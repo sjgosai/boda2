@@ -1,10 +1,15 @@
 import argparse
 import sys
+import copy
 
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+import numpy as np
+import pandas as pd
 
 from ..common import constants, utils
 
@@ -41,7 +46,7 @@ class FastSeqProp(nn.Module):
         try: self.energy_fn.eval()
         except: pass
     
-    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True):
+    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True, log_param_hist=False):
      
         if lr_scheduler: etaMin = 1e-6
         else: etaMin = learning_rate
@@ -50,25 +55,36 @@ class FastSeqProp(nn.Module):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_steps, eta_min=etaMin)  
         
         energy_hist = []
+        param_hist = [ ]
         pbar = tqdm(range(1, n_steps+1), desc='Steps', position=0, leave=True)
         for step in pbar:
             optimizer.zero_grad()
             sampled_nucleotides = self.params()
             energy = self.energy_fn(sampled_nucleotides)
-            energy = self.params.rebatch( energy ).mean()
+            energy = self.params.rebatch( energy )
+            energy_hist.append(energy.detach().cpu().numpy())
+            energy = energy.mean()
             energy.backward()
             optimizer.step()
             scheduler.step()
-            energy_hist.append(energy.item())
+            if log_param_hist:
+                param_hist.append(np.copy(self.params.theta.detach().cpu().numpy()))
             if step % step_print == 0:
                 pbar.set_postfix({'Loss': energy.item(), 'LR': scheduler.get_last_lr()[0]})
         
-        self.energy_hist = energy_hist
+        self.energy_hist = np.stack( energy_hist )
+        if log_param_hist:
+            self.param_hist = np.stack( param_hist )
+        else:
+            self.param_hist = None
         if create_plot:
-            plt.plot(self.energy_hist)
-            plt.xlabel('Steps')
-            vert_label = plt.ylabel('Energy')
-            vert_label.set_rotation(90)
+            bsz = self.params.theta.shape[0]
+            plot_data = pd.DataFrame({
+                'step': np.repeat(np.arange(n_steps), bsz),
+                'energy': np.stack(energy_hist).flatten()
+            })
+            fig, ax = plt.subplots()
+            sns.lineplot(data=plot_data, x='step',y='energy',ax=ax)
             plt.show()
             
     def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, 

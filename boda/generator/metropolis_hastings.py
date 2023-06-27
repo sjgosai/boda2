@@ -51,7 +51,7 @@ class MHBase(nn.Module):
 @torch.no_grad()
 def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
     
-    assert len(params.shape) == 3
+    assert len(params.theta.shape) == 3
     
     old_params = params.theta.detach().clone()
     old_seq    = params()
