@@ -139,6 +139,7 @@ class reductions(object):
     def abs_max(tensor, dim):
         n_dims = len(tensor.shape)
         get_idx= tensor.abs().argmax(dim=dim)
+        ##### Following can be replaced by torch.gather #####
         slicer = []
         for i in range(n_dims):
             if i != dim:
@@ -149,6 +150,7 @@ class reductions(object):
                 slicer.append( torch.arange(dim_size).view(*viewer).expand(*get_idx.shape) )
             else:
                 slicer.append( get_idx )
+        ##### Above can be replaced by torch.gather #####
             
         return tensor[slicer]
     
@@ -156,6 +158,7 @@ class reductions(object):
     def abs_min(tensor, dim):
         n_dims = len(tensor.shape)
         get_idx= tensor.abs().argmin(dim=dim)
+        ##### Following can be replaced by torch.gather #####
         slicer = []
         for i in range(n_dims):
             if i != dim:
@@ -166,8 +169,31 @@ class reductions(object):
                 slicer.append( torch.arange(dim_size).view(*viewer).expand(*get_idx.shape) )
             else:
                 slicer.append( get_idx )
+        ##### Above can be replaced by torch.gather #####
             
         return tensor[slicer]
+    
+    @staticmethod
+    def gather(tensor, dim, index):
+        return torch.gather(tensor, dim, index).squeeze(dim=dim)
+    
+class gatherings(object):
+    
+    @staticmethod
+    def max(tensor, dim):
+        return tensor.max(dim=dim, keepdim=True)[1]
+    
+    @staticmethod
+    def min(tensor, dim):
+        return tensor.min(dim=dim, keepdim=True)[1]
+    
+    @staticmethod
+    def abs_max(tensor, dim):
+        return tensor.abs().max(dim=dim, keepdim=True)[1]
+    
+    @staticmethod
+    def abs_min(tensor, dim):
+        return tensor.abs().min(dim=dim, keepdim=True)[1]
     
 def main(args):
     USE_CUDA = torch.cuda.device_count() >= 1
@@ -261,26 +287,42 @@ def main(args):
             alt_allele = flank_builder(alt_allele).contiguous()
 
             all_preds = vep_tester(ref_allele, alt_allele)
-
+            
             if not args.raw_predictions:
-                use_ref = getattr(reductions, args.strand_reduction) \
-                          (all_preds['ref'], dim=1)
-                use_ref = getattr(reductions, args.window_reduction) \
-                          (use_ref, dim=1)
-                ref_preds.append(use_ref.cpu())
                 
-                use_alt = getattr(reductions, args.strand_reduction) \
-                          (all_preds['alt'], dim=1)
-                use_alt = getattr(reductions, args.window_reduction) \
-                          (use_alt, dim=1)
-                alt_preds.append(use_alt.cpu())
+                if args.strand_reduction == 'gather':
+                    strand_index = getattr(gatherings, args.strand_gathering) \
+                                   (all_preds[args.gather_source], dim=1)
+                    strand_kwargs= {'index': strand_index}
+                else:
+                    strand_kwargs= {}
                 
-                use_skew= getattr(reductions, args.strand_reduction) \
-                          (all_preds['skew'], dim=1)
-                use_skew= getattr(reductions, args.window_reduction) \
-                          (use_skew, dim=1)
-                skew_preds.append(use_skew.cpu())
+                proc_preds = {}
+                proc_preds['ref'] = getattr(reductions, args.strand_reduction) \
+                                    (all_preds['ref'], dim=1, **strand_kwargs)
+                proc_preds['alt'] = getattr(reductions, args.strand_reduction) \
+                                    (all_preds['alt'], dim=1, **strand_kwargs)
+                proc_preds['skew']= getattr(reductions, args.strand_reduction) \
+                                    (all_preds['skew'], dim=1, **strand_kwargs)
                 
+                if args.window_reduction == 'gather':
+                    window_index = getattr(gatherings, args.window_gathering) \
+                                   (proc_preds[args.gather_source], dim=1)
+                    window_kwargs = {'index': window_index}
+                else:
+                    window_kwargs = {}
+                    
+                proc_preds['ref'] = getattr(reductions, args.window_reduction) \
+                                    (proc_preds['ref'], dim=1, **window_kwargs)
+                proc_preds['alt'] = getattr(reductions, args.window_reduction) \
+                                    (proc_preds['alt'], dim=1, **window_kwargs)
+                proc_preds['skew']= getattr(reductions, args.window_reduction) \
+                                    (proc_preds['skew'], dim=1, **window_kwargs)
+                
+                ref_preds.append(proc_preds['ref'].cpu())
+                alt_preds.append(proc_preds['alt'].cpu())
+                skew_preds.append(proc_preds['skew'].cpu())
+            
             else:
                 ref_preds.append(all_preds['ref'].cpu())
                 alt_preds.append(all_preds['alt'].cpu())
@@ -322,8 +364,12 @@ if __name__ == '__main__':
     parser.add_argument('--relative_start', type=int, default=0, help='Leftmost position where variant is tested, 0-based inclusive.')
     parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested, 1-based exclusive.')
     parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested.')
-    parser.add_argument('--strand_reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
-    parser.add_argument('--window_reduction', type=str, default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min.')
+    parser.add_argument('--strand_reduction', type=str, choices=('mean', 'sum', 'max', 'min', 'abs_max', 'abs_min', 'gather'), default='mean', help='Specify reduction over strands. Options: mean, sum, max, min, abs_max, abs_min, gather')
+    parser.add_argument('--window_reduction', type=str, choices=('mean', 'sum', 'max', 'min', 'abs_max', 'abs_min', 'gather'), default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min, gather.')
+    # Conditional VEP testing args
+    parser.add_argument('--strand_gathering', type=str, choices=('max', 'min', 'abs_max', 'abs_min'), help='If using a gather reduction over strands, specify index sorting function.')
+    parser.add_argument('--window_gathering', type=str, choices=('max', 'min', 'abs_max', 'abs_min'), help='If using a gather reduction of testing windows, specify index sorting function.')
+    parser.add_argument('--gather_source', type=str, choices=('ref', 'alt', 'skew'), help='Variant prediction type to use for gathering. Choose from (ref, alt, skew)')
     # Throughput management
     parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
