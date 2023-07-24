@@ -28,7 +28,7 @@ class MPRAregressionModel(pl.LightningModule):
         parser.add_argument('--targetLen', type=int, default=1)
         
         #network params
-        parser.add_argument('--numChannles1', type=int, default=20)
+        parser.add_argument('--numChannels1', type=int, default=20)
         parser.add_argument('--kernelSize1', type=int, default=6)
         parser.add_argument('--stride1', type=int, default=3)
         parser.add_argument('--padding1', type=int, default=0)
@@ -37,7 +37,7 @@ class MPRAregressionModel(pl.LightningModule):
         parser.add_argument('--poolKernel1', type=int, default=4)
         parser.add_argument('--poolStride1', type=int, default=2)
         
-        parser.add_argument('--numChannles2', type=int, default=10)
+        parser.add_argument('--numChannels2', type=int, default=10)
         parser.add_argument('--kernelSize2', type=int, default=4)
         parser.add_argument('--stride2', type=int, default=2)
         parser.add_argument('--padding2', type=int, default=0)
@@ -63,14 +63,14 @@ class MPRAregressionModel(pl.LightningModule):
                  seqLen=600,
                  numFeatures=4,
                  targetLen=1,
-                 numChannles1=20,
+                 numChannels1=20,
                  kernelSize1=6,
                  stride1=3,
                  padding1=0,
                  dilation1=1,
                  poolKernel1=4,
                  poolStride1=2,
-                 numChannles2=10,
+                 numChannels2=10,
                  kernelSize2=4,
                  stride2=2,
                  padding2=0,
@@ -97,7 +97,7 @@ class MPRAregressionModel(pl.LightningModule):
         self.example_input_array = torch.rand(1, self.numFeatures, self.seqLen)
         
         #network params
-        self.numChannels1 = numChannles1
+        self.numChannels1 = numChannels1
         self.kernelSize1 = kernelSize1
         self.stride1 = stride1
         self.padding1 = padding1
@@ -114,7 +114,7 @@ class MPRAregressionModel(pl.LightningModule):
                                        kernel_size=self.poolKernel1,
                                        stride=self.poolStride1)
         
-        self.numChannels2 = numChannles2
+        self.numChannels2 = numChannels2
         self.kernelSize2 = kernelSize2
         self.stride2 = stride2
         self.padding2 = padding2
@@ -230,14 +230,14 @@ if __name__ == '__main__':
     #                             seqLen=600,
     #                             numFeatures=4,
     #                             targetLen=1,
-    #                             numChannles1=20,
+    #                             numChannels1=20,
     #                             kernelSize1=6,
     #                             stride1=3,
     #                             padding1=0,
     #                             dilation1=1,
     #                             poolKernel1=4,
     #                             poolStride1=2,
-    #                             numChannles2=10,
+    #                             numChannels2=10,
     #                             kernelSize2=4,
     #                             stride2=2,
     #                             padding2=0,

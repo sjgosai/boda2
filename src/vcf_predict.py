@@ -195,6 +195,44 @@ class gatherings(object):
     def abs_min(tensor, dim):
         return tensor.abs().min(dim=dim, keepdim=True)[1]
     
+class activity_filtering(object):
+    
+    @staticmethod
+    def max(preds, indexer, threshold, epsilon):
+        ref_filter = preds['ref'] > threshold
+        alt_filter = preds['alt'] > threshold
+        _filter = ref_filter | alt_filter
+        _mask   = 1. - _filter.type(torch.float32)
+        indexing_tensor = preds[indexer] + _mask.mul(-1/epsilon)
+        return indexing_tensor
+    
+    @staticmethod
+    def min(preds, indexer, threshold, epsilon):
+        ref_filter = preds['ref'] > threshold
+        alt_filter = preds['alt'] > threshold
+        _filter = ref_filter | alt_filter
+        _mask   = 1. - _filter.type(torch.float32)
+        indexing_tensor = preds[indexer] + _mask.mul( 1/epsilon)
+        return indexing_tensor
+    
+    @staticmethod
+    def abs_max(preds, indexer, threshold, epsilon):
+        ref_filter = preds['ref'] > threshold
+        alt_filter = preds['alt'] > threshold
+        _filter = ref_filter | alt_filter
+        _mask   = 1. - _filter.type(torch.float32)
+        indexing_tensor = preds[indexer] * _filter.add(epsilon)
+        return indexing_tensor
+    
+    @staticmethod
+    def abs_min(preds, indexer, threshold, epsilon):
+        ref_filter = preds['ref'] > threshold
+        alt_filter = preds['alt'] > threshold
+        _filter = ref_filter | alt_filter
+        _mask   = 1. - _filter.type(torch.float32)
+        indexing_tensor = preds[indexer] * _filter.add(_mask.mul(1/epsilon))
+        return indexing_tensor
+
 def main(args):
     USE_CUDA = torch.cuda.device_count() >= 1
     print(sys.argv)
@@ -306,8 +344,19 @@ def main(args):
                                     (all_preds['skew'], dim=1, **strand_kwargs)
                 
                 if args.window_reduction == 'gather':
+                    if args.activity_filter is not None:
+                        try:
+                            indexing_tensor = getattr(activity_filtering, args.window_gathering) \
+                                              (proc_preds, args.gather_source, args.activity_filter, args.epsilon)
+                        except AttributeError as e:
+                            errmsg = "activity_filter not implmented for selected "
+                            errmsg+= f"window_gathering: {args.window_gathering}"
+                            raise Exception(errmsg) from e
+                    else:
+                        indexing_tensor = proc_preds[args.gather_source]
+                        
                     window_index = getattr(gatherings, args.window_gathering) \
-                                   (proc_preds[args.gather_source], dim=1)
+                                   (indexing_tensor, dim=1)
                     window_kwargs = {'index': window_index}
                 else:
                     window_kwargs = {}
@@ -369,6 +418,8 @@ if __name__ == '__main__':
     # Conditional VEP testing args
     parser.add_argument('--strand_gathering', type=str, choices=('max', 'min', 'abs_max', 'abs_min'), help='If using a gather reduction over strands, specify index sorting function.')
     parser.add_argument('--window_gathering', type=str, choices=('max', 'min', 'abs_max', 'abs_min'), help='If using a gather reduction of testing windows, specify index sorting function.')
+    parser.add_argument('--activity_filter', type=float, help='Minimum activity theshold to consider variant (checks both ref and alt).')
+    parser.add_argument('--epsilon', type=float, default=1e-4, help='Small factor restore default behavior for variants where no orientation passes the activity_filter.')
     parser.add_argument('--gather_source', type=str, choices=('ref', 'alt', 'skew'), help='Variant prediction type to use for gathering. Choose from (ref, alt, skew)')
     # Throughput management
     parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
