@@ -199,8 +199,8 @@ class activity_filtering(object):
     
     @staticmethod
     def max(preds, indexer, threshold, epsilon):
-        ref_filter = preds['ref'] > threshold
-        alt_filter = preds['alt'] > threshold
+        ref_filter = preds['ref'].abs() > threshold
+        alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
         _mask   = 1. - _filter.type(torch.float32)
         indexing_tensor = preds[indexer] + _mask.mul(-1/epsilon)
@@ -208,8 +208,8 @@ class activity_filtering(object):
     
     @staticmethod
     def min(preds, indexer, threshold, epsilon):
-        ref_filter = preds['ref'] > threshold
-        alt_filter = preds['alt'] > threshold
+        ref_filter = preds['ref'].abs() > threshold
+        alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
         _mask   = 1. - _filter.type(torch.float32)
         indexing_tensor = preds[indexer] + _mask.mul( 1/epsilon)
@@ -217,8 +217,8 @@ class activity_filtering(object):
     
     @staticmethod
     def abs_max(preds, indexer, threshold, epsilon):
-        ref_filter = preds['ref'] > threshold
-        alt_filter = preds['alt'] > threshold
+        ref_filter = preds['ref'].abs() > threshold
+        alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
         _mask   = 1. - _filter.type(torch.float32)
         indexing_tensor = preds[indexer] * _filter.add(epsilon)
@@ -226,8 +226,8 @@ class activity_filtering(object):
     
     @staticmethod
     def abs_min(preds, indexer, threshold, epsilon):
-        ref_filter = preds['ref'] > threshold
-        alt_filter = preds['alt'] > threshold
+        ref_filter = preds['ref'].abs() > threshold
+        alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
         _mask   = 1. - _filter.type(torch.float32)
         indexing_tensor = preds[indexer] * _filter.add(_mask.mul(1/epsilon))
