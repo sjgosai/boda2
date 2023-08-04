@@ -283,7 +283,8 @@ def main(args):
         vcf_subset = vcf_data
         vcf_table  = vcf_data.vcf
 
-    
+    print(f"Dataset length: {len(vcf_subset)}, VCF length: {vcf_table.shape}")
+    assert len(vcf_subset) == vcf_table.shape[0], "size mismatch"
     ###########################
     ## prepare data pipeline ##
     ###########################
@@ -384,8 +385,12 @@ def main(args):
         alt_preds = torch.cat(alt_preds, dim=0)
         skew_preds= torch.cat(skew_preds, dim=0)
         
+        print(f"ref dims: {ref_preds.shape}, alt dims: {alt_preds.shape}, skew dims: {skew_preds.shape}")
+        
         full_results = combine_ref_alt_skew_tensors(ref_preds, alt_preds, skew_preds, args.feature_ids)
-        vcf_table['INFO'] = full_results
+        
+        print(f"results table shape: {full_results.shape}")
+        vcf_table = pd.concat([vcf_table.reset_index(drop=True), pd.DataFrame(full_results, columns=['INFO'])], axis=1)
         vcf_table.to_csv(args.output, sep='\t', index=False, header=True, quoting=csv.QUOTE_NONE)
     else:
         ref_preds = torch.cat(ref_preds, dim=0)
