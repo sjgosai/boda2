@@ -3,6 +3,15 @@ For legacy reasons, this repo is currently called boda2
 
 ## Contents
 
+- [Overview](##overview)
+- [System Requirements](##system-requirements)
+- [Installation Guide](##installation-guide)
+- [Interactive Docker Environments](##interactive-docker-environments)
+- [Interactive modeling and deployment](##interactive-modeling-and-deployment)
+- [Applications](##applications)
+- [Extending CODA](##extending-coda)
+- [Cloud Integrations](##cloud-integrations)
+
 ## Overview
 Here, we present a platform to engineer and validate synthetic CREs capable of driving gene expression
 with programmed cell type specificity. This library contains the resources needed to train DNNs on MPRA data and generate synthetic sequences from these models. Additionally, we include resources to apply these model to to inference tasks on common input data types (e.g., VCF, FASTA, etc.). Finally, we provide examples which deploy the Malinois model.
@@ -17,7 +26,7 @@ RAM: 85 GB
 GPU: 1x Tesla A100
 GPU-RAM: 40 GB HBM2
 
-### Software requirements
+### Software Requirements
 CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep Learning, ML & HPC
 
 OS: Ubuntu 20.04.2 LTS
@@ -41,9 +50,9 @@ bash boda2/src/run_docker_for_dev.sh gcr.io/sabeti-encode/boda devenv 0.2.0 8888
 Which connects `jupyter lab` to ports `8888` and `6006`.
 
 ## Interactive modeling and deployment
-CODA is an extension of pytorch and pytorch-lightning. Classes in CODA generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in `./boda2/boda/README.md`.
+CODA is an extension of pytorch and pytorch-lightning. Classes in CODA generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md).
 
-Example interactive deployment of Malinois can be found here: `./boda2/analysis/SG016__inference_package_dev/basic_load_model.ipynb`
+Example interactive deployment of Malinois can be found here: [`analysis/SG016__inference_package_dev/basic_load_model.ipynb`](analysis/SG016__inference_package_dev/basic_load_model.ipynb)
 
 ## Applications
 We have developed python applications to train models and generate sequences using software implmentations in this library.
@@ -110,7 +119,7 @@ UNDER CONSTRUCTION
 ## Extending CODA
 CODA is modular. If new modules fit the API requirements, they will work with the entire system, including deployment applications.
 
-## Cloud integrations
+## Cloud Integrations
 Containerized CODA applications can be used in combination with various GCP platforms.
 
 ### Training models on VertexAI
