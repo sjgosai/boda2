@@ -49,8 +49,10 @@ bash boda2/src/run_docker_for_dev.sh gcr.io/sabeti-encode/boda devenv 0.2.0 8888
 ```
 Which connects `jupyter lab` to ports `8888` and `6006`.
 
+More containers can be found at [`gcr.io/sabeti-encode/boda`](gcr.io/sabeti-encode/boda).
+
 # Interactive modeling and deployment
-CODA is an extension of pytorch and pytorch-lightning. Classes in CODA generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md).
+CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md). The documentation for this is in progress.
 
 Example interactive deployment of Malinois can be found here: [`analysis/SG016__inference_package_dev/basic_load_model.ipynb`](analysis/SG016__inference_package_dev/basic_load_model.ipynb)
 
@@ -117,7 +119,7 @@ python vcf_predict.py \
 UNDER CONSTRUCTION
 
 # Extending CODA
-CODA is modular. If new modules fit the API requirements, they will work with the entire system, including deployment applications.
+CODA is modular. If new modules fit the API requirements, they will work with the entire system, including deployment applications. Further documentation on API requirements are forthcoming.
 
 # Cloud Integrations
 Containerized CODA applications can be used in combination with various GCP platforms.
