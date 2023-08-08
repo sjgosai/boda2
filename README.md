@@ -51,7 +51,28 @@ We have developed python applications to train models and generate sequences usi
 ### Model training
 Deep learning models can be trained from the command line by invoking the DATA, MODEL, and GRAPH modules. For example:
 ```
-python main.py --data_module SOMETHING --model_module SOMETHING --graph_module SOMETHING ...
+python boda2/src/main.py \
+  --data_module MPRA_DataModule \
+    --datafile_path /home/ubuntu/MPRA_ALL_v3.txt --synth_seed 102202 --synth_val_pct 0.0 --synth_test_pct 99.98 \
+    --padded_seq_len 600 --use_reverse_complements True --num_workers 8 \
+    --batch_size 1076 --duplication_cutoff 0.5 \
+    --test_chrs 2 21 --val_chrs 10 13  \
+  --model_module BassetBranched \
+    --n_outputs 3 --n_linear_layers 1 --linear_channels 1000 \
+    --linear_dropout_p 0.11625456877954289 \
+    --n_branched_layers 3 --branched_channels 140 --branched_activation ReLU \
+    --branched_dropout_p 0.5757068086404574 \
+    --loss_criterion L1KLmixed --kl_scale 5.0 \
+  --graph_module CNNTransferLearning \
+    --parent_weights /home/ubuntu/my-model.epoch_5-step_19885.pkl \
+    --frozen_epochs 0 --optimizer Adam --amsgrad True \
+    --lr 0.0032658700881052086 --beta1 0.8661062881299633 --beta2 0.879223105336538 \
+    --weight_decay 0.0003438210249762151 \
+    --scheduler CosineAnnealingWarmRestarts \
+      --scheduler_interval step --checkpoint_monitor entropy_spearman \
+      --stopping_mode max --stopping_patience 30 --T_0 4096 \
+  --accelerator gpu --devices 1 --min_epochs 60 --max_epochs 200 --precision 16 \
+  --default_root_dir /tmp/output/artifacts --artifact_path /tmp/test_new_config
 ```
 
 ### Sequence design
