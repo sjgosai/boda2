@@ -49,7 +49,7 @@ bash boda2/src/run_docker_for_dev.sh gcr.io/sabeti-encode/boda devenv 0.2.0 8888
 ```
 Which connects `jupyter lab` to ports `8888` and `6006`.
 
-More containers can be found at [`gcr.io/sabeti-encode/boda`](gcr.io/sabeti-encode/boda).
+More containers can be found at `gcr.io/sabeti-encode/boda`.
 
 # Interactive modeling and deployment
 CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md). The documentation for this is in progress.
