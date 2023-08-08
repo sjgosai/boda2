@@ -270,7 +270,7 @@ class VCF:
         data = data.loc[size_filter]
         
         print('Done', file=sys.stderr)
-        return data
+        return data.reset_index(drop=True)
         
     def __call__(self, loc_idx=None, iloc_idx=None):
         

@@ -304,6 +304,7 @@ class MPRA_DataModule(pl.LightningDataModule):
             list_tensor_seq = []
             for index, row in split_temp_df.iterrows():
                 list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
+            self.chr_df_test  = temp_df[temp_df[self.chr_column].isin(self.test_chrs)]
             activities_test   = temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.activity_columns].to_numpy()    
             sequences_test    = torch.stack(list_tensor_seq)        
             activities_test   = torch.Tensor(activities_test)
