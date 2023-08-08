@@ -20,17 +20,17 @@ with programmed cell type specificity. This library contains the resources neede
 ## Hardware requirements
 CODA was extensively tested in Google Colab environments and GCP VMs with the following specs:
 
-Type: `a2-highgpu-1g`
-CPU: 12 vCPU
-RAM: 85 GB
-GPU: 1x Tesla A100
-GPU-RAM: 40 GB HBM2
+- Type: `a2-highgpu-1g`
+- CPU: 12 vCPU
+- RAM: 85 GB
+- GPU: 1x Tesla A100
+- GPU-RAM: 40 GB HBM2
 
 ## Software Requirements
 CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep Learning, ML & HPC
 
-OS: Ubuntu 20.04.2 LTS
-CUDA: 11.3
+- OS: Ubuntu 20.04.2 LTS
+- CUDA: 11.3
 
 # Installation Guide
 CODA can be installed from the latest version of the GITHUB repo.
@@ -57,7 +57,7 @@ CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to c
 Example interactive deployment of Malinois can be found here: [`analysis/SG016__inference_package_dev/basic_load_model.ipynb`](analysis/SG016__inference_package_dev/basic_load_model.ipynb)
 
 # Applications
-We have developed python applications to train models and generate sequences using software implmentations in this library.
+We have developed python applications to train models and generate sequences using this library.
 
 ## Model training
 Deep learning models can be trained from the command line by invoking the DATA, MODEL, and GRAPH modules. For example:
@@ -128,4 +128,4 @@ Containerized CODA applications can be used in combination with various GCP plat
 UNDER CONSTRUCTION
 
 ## Deploying inference with Life Sciences API
-UNDER CONSTRUCTION
+UNDER CONSTRUCTION. Note: GCP is deprecating this API in favor of Batch so expect further changes.
