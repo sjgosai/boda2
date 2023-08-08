@@ -3,14 +3,14 @@ For legacy reasons, this repo is currently called boda2
 
 ## Contents
 
-- [Overview](##overview)
-- [System Requirements](##system-requirements)
-- [Installation Guide](##installation-guide)
-- [Interactive Docker Environments](##interactive-docker-environments)
-- [Interactive modeling and deployment](##interactive-modeling-and-deployment)
-- [Applications](##applications)
-- [Extending CODA](##extending-coda)
-- [Cloud Integrations](##cloud-integrations)
+- [Overview](#overview)
+- [System Requirements](#system-requirements)
+- [Installation Guide](#installation-guide)
+- [Interactive Docker Environments](#interactive-docker-environments)
+- [Interactive modeling and deployment](#interactive-modeling-and-deployment)
+- [Applications](#applications)
+- [Extending CODA](#extending-coda)
+- [Cloud Integrations](#cloud-integrations)
 
 ## Overview
 Here, we present a platform to engineer and validate synthetic CREs capable of driving gene expression
