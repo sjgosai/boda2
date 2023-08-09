@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from torch.nn import L1Loss, MSELoss, CrossEntropyLoss, CTCLoss, NLLLoss, PoissonNLLLoss, GaussianNLLLoss, KLDivLoss, BCELoss, BCEWithLogitsLoss, MarginRankingLoss, HingeEmbeddingLoss, MultiLabelMarginLoss, HuberLoss, SmoothL1Loss, SoftMarginLoss, MultiLabelSoftMarginLoss, CosineEmbeddingLoss, MultiMarginLoss, TripletMarginLoss, TripletMarginWithDistanceLoss
 
-import pytorch_lightning as ptl
+import lightning.pytorch as ptl
 
 from ..common import utils 
 from .basset import get_padding, Conv1dNorm, LinearNorm

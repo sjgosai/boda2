@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import pytorch_lightning as ptl
+import lightning.pytorch as ptl
 
 import sys
 from ..common import utils 

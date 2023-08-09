@@ -2,7 +2,7 @@ import argparse
 import torch
 import torch.nn as nn
 from torchsummary import summary
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 import sys
 from .basset import Basset

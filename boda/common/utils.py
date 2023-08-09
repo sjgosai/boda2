@@ -21,6 +21,9 @@ import torch.nn.functional as F
 from . import constants
 from .. import model as _model
 
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
 def set_all_seeds(seed):
     """Fixes all random seeds
     
@@ -318,6 +321,44 @@ def align_to_alphabet(x, in_order=['A','C','G','T'], out_order=constants.STANDAR
     
     permutation = [ in_order.index(tk) for tk in out_order ]
     return x[..., permutation, :]
+
+###########
+# Modules #
+###########
+
+class FlankBuilder(nn.Module):
+    def __init__(self,
+                 left_flank=None,
+                 right_flank=None,
+                 batch_dim=0,
+                 cat_axis=-1
+                ):
+        
+        super().__init__()
+        
+        self.register_buffer('left_flank', left_flank.detach().clone())
+        self.register_buffer('right_flank', right_flank.detach().clone())
+        
+        self.batch_dim = batch_dim
+        self.cat_axis  = cat_axis
+        
+    def add_flanks(self, my_sample):
+        *batch_dims, channels, length = my_sample.shape
+        
+        pieces = []
+        
+        if self.left_flank is not None:
+            pieces.append( self.left_flank.expand(*batch_dims, -1, -1) )
+            
+        pieces.append( my_sample )
+        
+        if self.right_flank is not None:
+            pieces.append( self.right_flank.expand(*batch_dims, -1, -1) )
+            
+        return torch.cat( pieces, axis=self.cat_axis )
+    
+    def forward(self, my_sample):
+        return self.add_flanks(my_sample)
 
 ######################
 # PTL Module loading #

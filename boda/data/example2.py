@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import torch
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset
 import sys
 
