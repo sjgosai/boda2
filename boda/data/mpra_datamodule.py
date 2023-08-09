@@ -192,7 +192,9 @@ class MPRA_DataModule(pl.LightningDataModule):
                  duplication_cutoff=None,
                  use_reverse_complements=False,
                  **kwargs):
-        
+        """
+        Initializes the MPRA_DataModule with provided parameters.
+        """
         super().__init__()
         self.datafile_path = datafile_path
         self.data_project = data_project
@@ -233,6 +235,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.synth_dataset_test = None
 
     def setup(self, stage = 'train'):
+        """
+        Preprocesses and tokenizes the dataset based on provided parameters.
+        """
         columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column]
         temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns)
 
@@ -389,37 +394,64 @@ class MPRA_DataModule(pl.LightningDataModule):
         print('-'*50)    
                 
     def train_dataloader(self):
+        """
+        Returns a DataLoader for the training dataset.
+        """
         return DataLoader(self.dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def val_dataloader(self):
+        """
+        Returns a DataLoader for the validation dataset.
+        """
         return DataLoader(self.dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def test_dataloader(self):
+        """
+        Returns a DataLoader for the test dataset.
+        """
         return DataLoader(self.dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
     
     def synth_train_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic training dataset.
+        """
         return DataLoader(self.synth_dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def synth_val_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic validation dataset.
+        """
         return DataLoader(self.synth_dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def synth_test_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic test dataset.
+        """
         return DataLoader(self.synth_dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
     
     def chr_train_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based training dataset.
+        """
         return DataLoader(self.chr_dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def chr_val_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based validation dataset.
+        """
         return DataLoader(self.chr_dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def chr_test_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based test dataset.
+        """
         return DataLoader(self.chr_dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
