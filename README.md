@@ -1,29 +1,38 @@
 # Computational Optimization of DNA Activity (CODA)
 For legacy reasons, this repo is currently called boda2
 
-## Contents
+# Contents
 
-## Overview
+- [Overview](#overview)
+- [System Requirements](#system-requirements)
+- [Installation Guide](#installation-guide)
+- [Interactive Docker Environments](#interactive-docker-environments)
+- [Interactive modeling and deployment](#interactive-modeling-and-deployment)
+- [Applications](#applications)
+- [Extending CODA](#extending-coda)
+- [Cloud Integrations](#cloud-integrations)
+
+# Overview
 Here, we present a platform to engineer and validate synthetic CREs capable of driving gene expression
 with programmed cell type specificity. This library contains the resources needed to train DNNs on MPRA data and generate synthetic sequences from these models. Additionally, we include resources to apply these model to to inference tasks on common input data types (e.g., VCF, FASTA, etc.). Finally, we provide examples which deploy the Malinois model.
 
-## System requirements
-### Hardware requirements
+# System requirements
+## Hardware requirements
 CODA was extensively tested in Google Colab environments and GCP VMs with the following specs:
 
-Type: `a2-highgpu-1g`
-CPU: 12 vCPU
-RAM: 85 GB
-GPU: 1x Tesla A100
-GPU-RAM: 40 GB HBM2
+- Type: `a2-highgpu-1g`
+- CPU: 12 vCPU
+- RAM: 85 GB
+- GPU: 1x Tesla A100
+- GPU-RAM: 40 GB HBM2
 
-### Software requirements
+## Software Requirements
 CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep Learning, ML & HPC
 
-OS: Ubuntu 20.04.2 LTS
-CUDA: 11.3
+- OS: Ubuntu 20.04.2 LTS
+- CUDA: 11.3
 
-## Installation Guide
+# Installation Guide
 CODA can be installed from the latest version of the GITHUB repo.
 ```
 git clone https://github.com/sjgosai/boda2.git
@@ -31,7 +40,7 @@ cd boda2/
 pip install -e .
 ```
 
-## Interactive Docker Environments
+# Interactive Docker Environments
 CODA has been installed in docker containers which can be downloaded in attached for interactive use. This can be quickly deployed using helper scripts in the repo:
 ```
 cd /home/ubuntu
@@ -40,15 +49,17 @@ bash boda2/src/run_docker_for_dev.sh gcr.io/sabeti-encode/boda devenv 0.2.0 8888
 ```
 Which connects `jupyter lab` to ports `8888` and `6006`.
 
-## Interactive modeling and deployment
-CODA is an extension of pytorch and pytorch-lightning. Classes in CODA generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in `./boda2/boda/README.md`.
+More containers can be found at `gcr.io/sabeti-encode/boda`.
 
-Example interactive deployment of Malinois can be found here: `./boda2/analysis/SG016__inference_package_dev/basic_load_model.ipynb`
+# Interactive modeling and deployment
+CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md). The documentation for this is in progress.
 
-## Applications
-We have developed python applications to train models and generate sequences using software implmentations in this library.
+Example interactive deployment of Malinois can be found here: [`analysis/SG016__inference_package_dev/basic_load_model.ipynb`](analysis/SG016__inference_package_dev/basic_load_model.ipynb)
 
-### Model training
+# Applications
+We have developed python applications to train models and generate sequences using this library.
+
+## Model training
 Deep learning models can be trained from the command line by invoking the DATA, MODEL, and GRAPH modules. For example:
 ```
 python boda2/src/main.py \
@@ -75,7 +86,7 @@ python boda2/src/main.py \
   --default_root_dir /tmp/output/artifacts --artifact_path /tmp/test_new_config
 ```
 
-### Sequence design
+## Sequence design
 Trained models can be deployed to generate sequences using implemented algorithms:
 ```
 python generate.py \
@@ -90,7 +101,7 @@ python generate.py \
   --proposal_path gs://syrgoth/boda_library_design_202112/sg__k562__fsp__test
 ```
 
-### Variant effect prediction
+## Variant effect prediction
 Trained models can be deployed to infer the effect of non-coding variants in CREs
 ```
 python vcf_predict.py \
@@ -104,17 +115,17 @@ python vcf_predict.py \
   --batch_size 16
 ```
 
-### Saturation mutagenesis
+## Saturation mutagenesis
 UNDER CONSTRUCTION
 
-## Extending CODA
-CODA is modular. If new modules fit the API requirements, they will work with the entire system, including deployment applications.
+# Extending CODA
+CODA is modular. If new modules fit the API requirements, they will work with the entire system, including deployment applications. Further documentation on API requirements are forthcoming.
 
-## Cloud integrations
+# Cloud Integrations
 Containerized CODA applications can be used in combination with various GCP platforms.
 
-### Training models on VertexAI
+## Training models on VertexAI
 UNDER CONSTRUCTION
 
-### Deploying inference with Life Sciences API
-UNDER CONSTRUCTION
+## Deploying inference with Life Sciences API
+UNDER CONSTRUCTION. Note: GCP is deprecating this API in favor of Batch so expect further changes.

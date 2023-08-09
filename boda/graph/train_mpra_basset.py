@@ -15,13 +15,18 @@ def main(args):
     datamodule.setup()
     model = MPRA_Basset(**vars(args))
     logger = TensorBoardLogger('model_logs', name='MPRAbasset_logs', log_graph=True) 
+    if torch.cuda.is_available():
+        use_cuda = True
+        torch.backends.cudnn.benchmark = True
+        model.cuda()
+    
     if args.only_last_layer:
         print('Training only last layer')
         model.basset_net.freeze() 
     else:
         print('Training all layers')
         model.basset_net.unfreeze()
-        
+       
     num_gpus = torch.cuda.device_count()
     if model.scheduler:
         lr_monitor = LearningRateMonitor(logging_interval='step')

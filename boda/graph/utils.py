@@ -191,11 +191,11 @@ def filter_state_dict(model, stashed_dict):
             print(check_str, file=sys.stderr)
             
     return results_dict
-                     
+                   
 def pearson_correlation(x, y):
     vx = x - torch.mean(x, dim=0)
     vy = y - torch.mean(y, dim=0)
-    pearsons = torch.sum(vx * vy, dim=0) / (torch.sqrt(torch.sum(vx ** 2, dim=0)) * torch.sqrt(torch.sum(vy ** 2, dim=0)))
+    pearsons = torch.sum(vx * vy, dim=0) / (torch.sqrt(torch.sum(vx ** 2, dim=0)) * torch.sqrt(torch.sum(vy ** 2, dim=0)) + 1e-10)
     return pearsons, torch.mean(pearsons)
     
 def shannon_entropy(x):
