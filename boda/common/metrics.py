@@ -1,6 +1,19 @@
 import torch
 
 def jaccard_index(x, y, max_batch_size=1024, dtype=torch.float, device='cpu'):
+    """
+    Compute the Jaccard index (intersection over union) between two sets of vectors.
+
+    Args:
+        x (torch.Tensor): First set of vectors, shape (N, D).
+        y (torch.Tensor): Second set of vectors, shape (M, D).
+        max_batch_size (int): Maximum batch size for DataLoader (default: 1024).
+        dtype (torch.dtype): Data type for calculations (default: torch.float).
+        device (str): Device for calculations (default: 'cpu').
+
+    Returns:
+        torch.Tensor: Matrix of Jaccard indices between x and y, shape (N, M).
+    """
     assert len(x.shape) == 2, f"expected x as 2D tensor, instead got shape {x.shape}"
     assert len(y.shape) == 2, f"expected y as 2D tensor, instead got shape {y.shape}"
     matrix = []
@@ -19,6 +32,19 @@ def jaccard_index(x, y, max_batch_size=1024, dtype=torch.float, device='cpu'):
     return torch.cat(matrix,dim=0)
 
 def euclidean_distance(x, y, max_batch_size=1024, dtype=torch.float, device='cpu'):
+    """
+    Compute the Euclidean distance between two sets of vectors.
+
+    Args:
+        x (torch.Tensor): First set of vectors, shape (N, D).
+        y (torch.Tensor): Second set of vectors, shape (M, D).
+        max_batch_size (int): Maximum batch size for DataLoader (default: 1024).
+        dtype (torch.dtype): Data type for calculations (default: torch.float).
+        device (str): Device for calculations (default: 'cpu').
+
+    Returns:
+        torch.Tensor: Matrix of Euclidean distances between x and y, shape (N, M).
+    """
     assert len(x.shape) == 2, f"expected x as 2D tensor, instead got shape {x.shape}"
     assert len(y.shape) == 2, f"expected y as 2D tensor, instead got shape {y.shape}"
     matrix = []
