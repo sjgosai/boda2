@@ -572,14 +572,13 @@ class BassetEntropyVL(ptl.LightningModule):
         kl_scale (float): Scale factor for the KL loss.
 
     Methods:
-        forward(x):
-            Perform forward pass through the BassetEntropyVL model.
-        encode(x):
-            Encode input data through the convolutional layers.
-        decode(x):
-            Decode encoded data through the linear layers.
-        classify(x):
-            Generate model predictions from decoded data.
+        add_model_specific_args(parent_parser): Add model-specific arguments to the provided argparse ArgumentParser.
+        add_conditional_args(parser, known_args): Add conditional model-specific arguments based on known arguments.
+        process_args(grouped_args): Process grouped arguments and extract model-specific arguments.
+        forward(x): Perform forward pass through the BassetEntropyVL model.
+        encode(x): Encode input data through the convolutional layers.
+        decode(x): Decode encoded data through the linear layers.
+        classify(x): Generate model predictions from decoded data.
 
     Example:
         model = BassetEntropyVL(conv1_channels=300, conv1_kernel_size=19,
@@ -858,9 +857,6 @@ class BassetBranched(ptl.LightningModule):
         kl_scale (float): Scale factor for KL divergence loss component (default: 1.0).
         use_batch_norm (bool): Use batch normalization (default: True).
         use_weight_norm (bool): Use weight normalization (default: False).
-
-    Attributes:
-        ... (List attributes with descriptions)
 
     Methods:
         add_model_specific_args(parent_parser): Add model-specific arguments to the provided argparse ArgumentParser.
