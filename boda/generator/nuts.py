@@ -15,10 +15,37 @@ from torch.distributions.categorical import Categorical
 from tqdm import tqdm
 
 class LeapfrogBase(nn.Module):
+    """
+    Base class for implementing Leapfrog integration and related methods.
+
+    Methods:
+        calc_energy(T=1.0):
+            Calculate the energy of the system.
+        leapfrog(theta, r, epsilon, T=1.0):
+            Perform a single Leapfrog integration step.
+        init_eta(epsilon, inertia=1.):
+            Initialize step sizes for Leapfrog integration.
+        eval_samples(sample_tensor):
+            Evaluate the negative log-likelihood of samples.
+
+    """
+    
     def __init__(self):
+        """
+        Initialize the LeapfrogBase module.
+        """
         super().__init__()
         
     def calc_energy(self, T=1.0):
+        """
+        Calculate the energy of the system.
+
+        Args:
+            T (float, optional): Temperature parameter. Default is 1.0.
+
+        Returns:
+            torch.Tensor: Calculated energy values.
+        """
         energy = self.energy_fn(self.params()).div(T)
         energy = self.params.rebatch( energy )
         try:
@@ -30,7 +57,18 @@ class LeapfrogBase(nn.Module):
         return energy
     
     def leapfrog(self, theta, r, epsilon, T=1.0):
-        
+        """
+        Perform a single Leapfrog integration step.
+
+        Args:
+            theta (torch.Tensor): Current position.
+            r (torch.Tensor): Current momentum.
+            epsilon (torch.Tensor): Step size.
+            T (float, optional): Temperature parameter. Default is 1.0.
+
+        Returns:
+            tuple: Tuple containing updated position, momentum, energy, and gradient of the energy.
+        """
         #print(f'leap in params:\n{theta[0,:,100]}')
         #print(f'leap in momentum:\n{r[0,:,100]}')
         self.params.theta.data = theta
@@ -61,6 +99,16 @@ class LeapfrogBase(nn.Module):
         return theta, r, energy, grad_U
     
     def init_eta(self, epsilon, inertia=1.):
+        """
+        Initialize step sizes for Leapfrog integration.
+
+        Args:
+            epsilon (torch.Tensor): Initial step size.
+            inertia (float, optional): Inertia factor. Default is 1.
+
+        Returns:
+            torch.Tensor: Initialized step sizes.
+        """
         theta_0 = self.params.theta.data.clone().detach()
         energy_0= self.calc_energy()
         r_0     = torch.randn_like( theta_0 ).div(inertia)
@@ -82,6 +130,15 @@ class LeapfrogBase(nn.Module):
         return epsilon
 
     def eval_samples(self, sample_tensor):
+        """
+        Evaluate the negative log-likelihood of samples.
+
+        Args:
+            sample_tensor (torch.Tensor): Tensor containing samples.
+
+        Returns:
+            torch.Tensor: Negative log-likelihood values for the samples.
+        """
         with torch.no_grad():
             nlls = []
             for theta in sample_tensor:
@@ -93,17 +150,69 @@ class LeapfrogBase(nn.Module):
         return torch.stack(nlls, dim=0)
 
 class TemperatureScheduleBase(nn.Module):
+    """
+    Base class for implementing temperature schedules.
+
+    Methods:
+        step(inner=None, outer=None):
+            Perform a temperature schedule step.
+        forward():
+            Calculate the current temperature.
+
+    """
+    
     def __init__(self):
+        """
+        Initialize the TemperatureScheduleBase module.
+        """
         super().__init__()
         
     def step(inner=None, outer=None):
+        """
+        Perform a temperature schedule step.
+
+        Args:
+            inner (int, optional): Inner loop iteration count. Default is None.
+            outer (int, optional): Outer loop iteration count. Default is None.
+
+        Returns:
+            None
+        """
         return None
         
     def forward():
+        """
+        Calculate the current temperature.
+
+        Returns:
+            float: The current temperature.
+        """
         return 1.0    
 
 class CosineAnnealingSchedule(TemperatureScheduleBase):
+    """
+    Temperature schedule based on the cosine annealing strategy.
+
+    Args:
+        T_max (int): Maximum number of iterations in a cycle.
+        eta_max (float or torch.Tensor): Maximum temperature value.
+        eta_min (float or torch.Tensor, optional): Minimum temperature value. Defaults to None.
+
+    Methods:
+        step(value=None):
+            Perform a step in the temperature schedule.
+
+    """
+    
     def __init__(self, T_max, eta_max, eta_min=None):
+        """
+        Initialize the CosineAnnealingSchedule module.
+
+        Args:
+            T_max (int): Maximum number of iterations in a cycle.
+            eta_max (float or torch.Tensor): Maximum temperature value.
+            eta_min (float or torch.Tensor, optional): Minimum temperature value. Defaults to None.
+        """
         super().__init__()
         
         self.T_max = T_max
@@ -116,7 +225,15 @@ class CosineAnnealingSchedule(TemperatureScheduleBase):
         self._step = 0
         
     def step(self, value=None):
-        
+        """
+        Perform a step in the temperature schedule.
+
+        Args:
+            value (int, optional): Value to update the step counter. If None, the step counter is incremented by 1. Defaults to None.
+
+        Returns:
+            dict: Dictionary containing the updated '_step' value.
+        """
         if value is None:
             self._step += 1
         else:
@@ -125,27 +242,101 @@ class CosineAnnealingSchedule(TemperatureScheduleBase):
         return {'_step':self._step}
     
     def forward(self):
-        
+        """
+        Compute the temperature value based on the cosine annealing schedule.
+
+        Returns:
+            torch.Tensor: Computed temperature value.
+        """
         hook = torch.tensor( math.pi * self._step / self.T_max )
         hook = torch.cos( hook ) + 1
         hook = (self.eta_max - self.eta_min).mul(hook).div(2.)
         return hook + self.eta_min
         
 class LogCosineSchedule(CosineAnnealingSchedule):
+    """
+    Temperature schedule based on the logarithmically transformed cosine annealing strategy.
+
+    Args:
+        T_max (int): Maximum number of iterations in a cycle.
+        eta_max (float or torch.Tensor): Maximum temperature value.
+        eta_min (float or torch.Tensor, optional): Minimum temperature value. Defaults to None.
+
+    Methods:
+        step(value=None):
+            Perform a step in the temperature schedule.
+
+        forward():
+            Compute the temperature value based on the logarithmically transformed cosine annealing schedule.
+
+    """
+    
     def __init__(self, T_max, eta_max, eta_min=None):
+        """
+        Initialize the LogCosineSchedule module.
+
+        Args:
+            T_max (int): Maximum number of iterations in a cycle.
+            eta_max (float or torch.Tensor): Maximum temperature value.
+            eta_min (float or torch.Tensor, optional): Minimum temperature value. Defaults to None.
+        """
         super().__init__(T_max, eta_max, eta_min)
         
     def forward(self):
-        
+        """
+        Compute the temperature value based on the logarithmically transformed cosine annealing schedule.
+
+        Returns:
+            torch.Tensor: Computed temperature value after logarithmic transformation.
+        """
         hook = torch.tensor( math.pi * self._step / self.T_max )
         hook = torch.cos( hook ) + 1
         hook = (self.eta_max - self.eta_min).mul(hook).div(2.)
         return torch.exp( hook + self.eta_min )
             
 class WaveSchedule(TemperatureScheduleBase):
+    """
+    Temperature schedule based on the wave-like annealing strategy.
+
+    Args:
+        T_init (float, optional): Initial temperature value. Defaults to 1.0.
+        T_max (float, optional): Maximum temperature value. Defaults to None.
+        T_min (float, optional): Minimum temperature value. Defaults to None.
+        outer_warmup (int, optional): Number of outer warmup steps. Defaults to None.
+        outer_cooldown (int, optional): Number of outer cooldown steps. Defaults to None.
+        inner_warmup (int, optional): Number of inner warmup steps. Defaults to None.
+        inner_cooldown (int, optional): Number of inner cooldown steps. Defaults to None.
+
+    Methods:
+        step(inner=None, outer=None):
+            Perform a step in the temperature schedule.
+
+        get_inner_T():
+            Compute the inner temperature value based on the wave-like annealing schedule.
+
+        get_outer_T():
+            Compute the outer temperature value based on the wave-like annealing schedule.
+
+        forward():
+            Compute the temperature value based on the wave-like annealing schedule.
+
+    """
+    
     def __init__(self, T_init=1.0, T_max=None, T_min=None, 
                  outer_warmup=None, outer_cooldown=None, 
                  inner_warmup=None, inner_cooldown=None):
+        """
+        Initialize the WaveSchedule module.
+
+        Args:
+            T_init (float, optional): Initial temperature value. Defaults to 1.0.
+            T_max (float, optional): Maximum temperature value. Defaults to None.
+            T_min (float, optional): Minimum temperature value. Defaults to None.
+            outer_warmup (int, optional): Number of outer warmup steps. Defaults to None.
+            outer_cooldown (int, optional): Number of outer cooldown steps. Defaults to None.
+            inner_warmup (int, optional): Number of inner warmup steps. Defaults to None.
+            inner_cooldown (int, optional): Number of inner cooldown steps. Defaults to None.
+        """
         super().__init__()
         
         self.T_init = T_init
@@ -166,7 +357,16 @@ class WaveSchedule(TemperatureScheduleBase):
         self.T_hist = []
         
     def step(self, inner=None, outer=None):
-        
+        """
+        Perform a step in the temperature schedule.
+
+        Args:
+            inner (int, optional): Inner step count. Defaults to None.
+            outer (int, optional): Outer step count. Defaults to None.
+
+        Returns:
+            dict: Dictionary containing the updated step counts.
+        """
         if inner is not None:
             self.inner_step = inner
             
@@ -177,6 +377,12 @@ class WaveSchedule(TemperatureScheduleBase):
                 'inner_step':self.inner_step}
     
     def get_inner_T(self):
+        """
+        Compute the inner temperature value based on the wave-like annealing schedule.
+
+        Returns:
+            float: Computed inner temperature value.
+        """
         if self.inner_step < self.inner_warmup:
             hook = self.inner_step/self.inner_warmup
             hook = (self.T_max - self.T_init)*hook
@@ -192,6 +398,12 @@ class WaveSchedule(TemperatureScheduleBase):
         return hook
     
     def get_outer_T(self):
+        """
+        Compute the outer temperature value based on the wave-like annealing schedule.
+
+        Returns:
+            float: Computed outer temperature value.
+        """
         if self.outer_step < self.outer_warmup:
             hook = self.T_init + (self.outer_step/self.outer_warmup)
         elif self.outer_step < self.outer_warmup+self.outer_cooldown:
@@ -201,6 +413,12 @@ class WaveSchedule(TemperatureScheduleBase):
         return hook
     
     def forward(self):
+        """
+        Compute the temperature value based on the wave-like annealing schedule.
+
+        Returns:
+            float: Computed temperature value after wave-like annealing.
+        """
         if self.use_inner and not self.use_outer:
             hook = self.get_inner_T()
         elif self.use_outer and not self.use_inner:
@@ -218,16 +436,45 @@ class WaveSchedule(TemperatureScheduleBase):
         return hook
 
 class GDTest(LeapfrogBase):
+    """
+    Gradient Descent Test module using the Leapfrog integrator.
+
+    Args:
+        params: Parameter object representing the model's parameters.
+        energy_fn: Energy function that computes the energy given model parameters.
+
+    Methods:
+        collect_samples(epsilon, n_samples=1):
+            Collect samples using the Leapfrog integrator and gradient descent.
+
+    """
+    
     def __init__(self,
                  params,
                  energy_fn
                 ):
+        """
+        Initialize the GDTest module.
+
+        Args:
+            params: Parameter object representing the model's parameters.
+            energy_fn: Energy function that computes the energy given model parameters.
+        """
         super().__init__()
         self.params = params
         self.energy_fn = energy_fn
         
     def collect_samples(self, epsilon, n_samples=1):
-        
+        """
+        Collect samples using the Leapfrog integrator and gradient descent.
+
+        Args:
+            epsilon: Step size for the Leapfrog integration.
+            n_samples (int, optional): Number of samples to collect. Defaults to 1.
+
+        Returns:
+            dict: Dictionary containing the collected samples, energies, and gradients.
+        """
         samples = []
         theta_m = self.params.theta.clone().detach()
         
@@ -243,16 +490,51 @@ class GDTest(LeapfrogBase):
         return {'samples': samples}
     
 class HMC(LeapfrogBase):
+    """
+    Hamiltonian Monte Carlo (HMC) sampler using the Leapfrog integrator.
+
+    Args:
+        params: Parameter object representing the model's parameters.
+        energy_fn: Energy function that computes the energy given model parameters.
+
+    Methods:
+        sample_trajectory(theta, epsilon, L, inertia=1., alpha=1.):
+            Sample a trajectory using the Leapfrog integrator and HMC.
+        collect_samples(epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
+            Collect samples using the HMC sampler.
+
+    """
+    
     def __init__(self,
                  params,
                  energy_fn
                 ):
+        """
+        Initialize the HMC sampler.
+
+        Args:
+            params: Parameter object representing the model's parameters.
+            energy_fn: Energy function that computes the energy given model parameters.
+        """
         super().__init__()
         self.params = params
         self.energy_fn = energy_fn
         
         
     def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
+        """
+        Sample a trajectory using the Leapfrog integrator and Hamiltonian Monte Carlo (HMC).
+
+        Args:
+            theta: Initial parameter values.
+            epsilon: Step size for the Leapfrog integration.
+            L: Number of Leapfrog steps.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+
+        Returns:
+            tuple: Tuple containing the sampled parameters, energy, and acceptance information.
+        """
         theta_0 = theta
         self.params.theta.data = theta
         r = torch.randn_like( theta ).div(inertia)
@@ -293,6 +575,20 @@ class HMC(LeapfrogBase):
             return theta_p, U, accept
         
     def collect_samples(self, epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
+        """
+        Collect samples using the Hamiltonian Monte Carlo (HMC) sampler.
+
+        Args:
+            epsilon: Step size for the Leapfrog integration.
+            L: Number of Leapfrog steps.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+            n_samples (int, optional): Number of samples to collect. Defaults to 1.
+            n_burnin (int, optional): Number of burn-in samples. Defaults to 0.
+
+        Returns:
+            dict: Dictionary containing the collected samples and burn-in samples.
+        """
         burnin_history = min(n_burnin // 10, 50)
         
         samples = []
@@ -334,15 +630,52 @@ class HMC(LeapfrogBase):
         return {'samples': samples, 'burnin': burnin}
 
 class HMCDA(LeapfrogBase):
+    """
+    Hamiltonian Monte Carlo (HMC) sampler with Dual Averaging adaptation.
+
+    Args:
+        params: Parameter object representing the model's parameters.
+        energy_fn: Energy function that computes the energy given model parameters.
+
+    Methods:
+        sample_trajectory(theta, epsilon, L, inertia=1., alpha=1.):
+            Sample a trajectory using the Leapfrog integrator and HMC with Dual Averaging.
+        collect_samples(epsilon_base, inertia=1., alpha=1., n_samples=1, n_burnin=1, delta=0.65, lambd=1.0, gamma=0.05, kappa=0.75, t_0=10):
+            Collect samples using the HMC sampler with Dual Averaging adaptation.
+
+    """
+    
     def __init__(self,
                  params,
                  energy_fn
                 ):
+        """
+        Initialize the HMCDA sampler.
+
+        Args:
+            params: Parameter object representing the model's parameters.
+            energy_fn: Energy function that computes the energy given model parameters.
+        """
         super().__init__()
         self.params = params
         self.energy_fn = energy_fn
         
     def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
+        """
+        Sample a trajectory using the Leapfrog integrator and Hamiltonian Monte Carlo (HMC)
+        with Dual Averaging adaptation.
+
+        Args:
+            theta: Initial parameter values.
+            epsilon: Step size for the Leapfrog integration.
+            L: Number of Leapfrog steps.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+
+        Returns:
+            tuple: Tuple containing the sampled parameters, energy, acceptance information,
+                   and acceptance probabilities.
+        """
         theta_0 = theta
         self.params.theta.data = theta
         r = torch.randn_like( theta ).div(inertia)
@@ -396,7 +729,24 @@ class HMCDA(LeapfrogBase):
                         kappa=0.75, 
                         t_0=10
                        ):
+        """
+        Collect samples using the Hamiltonian Monte Carlo (HMC) sampler with Dual Averaging adaptation.
 
+        Args:
+            epsilon_base: Base step size for the Leapfrog integration.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+            n_samples (int, optional): Number of samples to collect. Defaults to 1.
+            n_burnin (int, optional): Number of burn-in samples. Defaults to 1.
+            delta (float, optional): Target acceptance probability. Defaults to 0.65.
+            lambd (float, optional): Scaling factor for Leapfrog step size. Defaults to 1.0.
+            gamma (float, optional): Scaling factor for the Dual Averaging adaptation. Defaults to 0.05.
+            kappa (float, optional): Scaling factor for Dual Averaging adaptation. Defaults to 0.75.
+            t_0 (int, optional): Tuning parameter for Dual Averaging adaptation. Defaults to 10.
+
+        Returns:
+            dict: Dictionary containing the collected samples and burn-in samples.
+        """
         epsilon = self.init_eta(epsilon_base, inertia=inertia)
         eps_bar = epsilon_base.to(epsilon.device)
         mu = epsilon.mul(10.).log()
@@ -447,17 +797,54 @@ class HMCDA(LeapfrogBase):
 
     
 class AnnealingHMC(LeapfrogBase):
+    """
+    Annealing Hamiltonian Monte Carlo (HMC) sampler with temperature schedule.
+
+    Args:
+        params: Parameter object representing the model's parameters.
+        energy_fn: Energy function that computes the energy given model parameters.
+        temperature_schedule: Temperature schedule for annealing.
+
+    Methods:
+        sample_trajectory(theta, epsilon, L, inertia=1., alpha=1.):
+            Sample a trajectory using the Leapfrog integrator and Annealing HMC.
+        collect_samples(epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
+            Collect samples using the Annealing HMC sampler.
+
+    """
+    
     def __init__(self,
                  params,
                  energy_fn,
                  temperature_schedule
                 ):
+        """
+        Initialize the AnnealingHMC sampler.
+
+        Args:
+            params: Parameter object representing the model's parameters.
+            energy_fn: Energy function that computes the energy given model parameters.
+            temperature_schedule: Temperature schedule for annealing.
+        """
         super().__init__()
         self.params = params
         self.energy_fn = energy_fn
         self.temperature_schedule = temperature_schedule
         
     def sample_trajectory(self, theta, epsilon, L, inertia=1., alpha=1.):
+        """
+        Sample a trajectory using the Leapfrog integrator and Annealing Hamiltonian Monte Carlo (HMC).
+
+        Args:
+            theta: Initial parameter values.
+            epsilon: Step size for the Leapfrog integration.
+            L: Number of Leapfrog steps.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+
+        Returns:
+            tuple: Tuple containing the sampled parameters, energy, and acceptance information.
+        """
         theta_0 = theta
         self.params.theta.data = theta
         r = torch.randn_like( theta ).div(inertia)
@@ -505,6 +892,20 @@ class AnnealingHMC(LeapfrogBase):
             return theta_p, U, accept
 
     def collect_samples(self, epsilon, L, inertia=1., alpha=1., n_samples=1, n_burnin=0):
+        """
+        Collect samples using the Annealing Hamiltonian Monte Carlo (HMC) sampler.
+
+        Args:
+            epsilon: Step size for the Leapfrog integration.
+            L: Number of Leapfrog steps.
+            inertia: Inertia for initializing momentum. Defaults to 1.
+            alpha: Scaling factor for momentum rescaling. Defaults to 1.
+            n_samples (int, optional): Number of samples to collect. Defaults to 1.
+            n_burnin (int, optional): Number of burn-in samples. Defaults to 0.
+
+        Returns:
+            dict: Dictionary containing the collected samples and burn-in samples.
+        """
         burnin_history = min(n_burnin // 10, 50)
         
         samples = []
@@ -547,12 +948,39 @@ class AnnealingHMC(LeapfrogBase):
         return {'samples': samples, 'burnin': burnin}
 
 class NUTS3(LeapfrogBase):
+    """
+    No-U-Turn Sampler (NUTS) with generalized tree doubling and shrinking criterion.
+
+    Args:
+        params: Parameter object representing the model's parameters.
+        energy_fn: Energy function that computes the energy given model parameters.
+        max_tree_depth: Maximum depth of the binary tree. Defaults to 10.
+
+    Methods:
+        buildtree(theta, r, u, v, j, epsilon):
+            Build a trajectory for the NUTS sampler.
+        init_trajectory(theta, inertia=1.0):
+            Initialize a trajectory for the NUTS sampler.
+        sample_trajectory(theta, epsilon, inertia):
+            Sample a trajectory using the NUTS sampler.
+        collect_samples(epsilon, inertia=1., n_samples=1, n_burnin=1):
+            Collect samples using the NUTS sampler.
+
+    """
+    
     def __init__(self,
                  params,
                  energy_fn,
                  max_tree_depth=10
                 ):
-        
+        """
+        Initialize the NUTS3 sampler.
+
+        Args:
+            params: Parameter object representing the model's parameters.
+            energy_fn: Energy function that computes the energy given model parameters.
+            max_tree_depth: Maximum depth of the binary tree. Defaults to 10.
+        """
         super().__init__()
         self.params = params
         self.energy_fn  = energy_fn
@@ -561,6 +989,20 @@ class NUTS3(LeapfrogBase):
         self.d_max = 1000.
         
     def buildtree(self, theta, r, u, v, j, epsilon):
+        """
+        Build a trajectory for the NUTS sampler.
+
+        Args:
+            theta: Current parameter values.
+            r: Current momentum values.
+            u: Random uniform values for sampling.
+            v: Direction of tree doubling.
+            j: Depth of the binary tree.
+            epsilon: Step size for the Leapfrog integration.
+
+        Returns:
+            tuple: Tuple containing the trajectory elements for the NUTS sampler.
+        """
         #print(f'current j: {j}')
         if j == 0:
             theta_p, r_p, energy_p, grad_p = self.leapfrog(theta, r, v*epsilon)
@@ -603,6 +1045,16 @@ class NUTS3(LeapfrogBase):
             return theta_r, r_r, theta_f, r_f, theta_p, n_p, s_p
         
     def init_trajectory(self, theta, inertia=1.0):
+        """
+        Initialize a trajectory for the NUTS sampler.
+
+        Args:
+            theta: Initial parameter values.
+            inertia: Inertia for initializing momentum. Defaults to 1.0.
+
+        Returns:
+            tuple: Tuple containing the initialized trajectory elements for the NUTS sampler.
+        """
         with torch.no_grad():
             r_0 = torch.randn_like( theta ).div(inertia)
             energy_0 = self.calc_energy()
@@ -619,6 +1071,17 @@ class NUTS3(LeapfrogBase):
         return u, theta_r, r_r, theta_f, r_f, j, theta_m, n, s
     
     def sample_trajectory(self, theta, epsilon, inertia):
+        """
+        Sample a trajectory using the NUTS sampler.
+
+        Args:
+            theta: Initial parameter values.
+            epsilon: Step size for the Leapfrog integration.
+            inertia: Inertia for initializing momentum.
+
+        Returns:
+            torch.Tensor: Sampled parameters using the NUTS sampler.
+        """
         u, theta_r, r_r, theta_f, r_f, j, theta_m, n, s = self.init_trajectory(theta, inertia)
         while (s.sum() >= 1) and (j < self.max_tree_depth):
             #print(f'on doubling {j}')
@@ -651,7 +1114,18 @@ class NUTS3(LeapfrogBase):
         return theta_m.detach().clone()
     
     def collect_samples(self, epsilon, inertia=1., n_samples=1, n_burnin=1):
-        
+        """
+        Collect samples using the NUTS sampler.
+
+        Args:
+            epsilon: Step size for the Leapfrog integration.
+            inertia: Inertia for initializing momentum. Defaults to 1.0.
+            n_samples: Number of samples to collect. Defaults to 1.
+            n_burnin: Number of burn-in samples. Defaults to 1.
+
+        Returns:
+            dict: Dictionary containing the collected samples and burn-in samples.
+        """
         samples = []
         burnin  = []
         theta_m = self.params.theta.clone().detach()
