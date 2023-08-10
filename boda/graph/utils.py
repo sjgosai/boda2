@@ -8,6 +8,19 @@ from torch import nn
 from ..common import utils as cutils
 
 def add_optimizer_specific_args(parser, optimizer_name):
+    """
+    Add optimizer-specific arguments to the argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The argument parser to which arguments will be added.
+        optimizer_name (str): Name of the optimizer. Supported values: ['Adadelta', 'Adagrad', 'Adam', 'AdamW', 'SparseAdam', 'Adamax', 'ASGD', 'RMSprop', 'Rprop', 'SGD'].
+
+    Returns:
+        argparse.ArgumentParser: The argument parser with added optimizer-specific arguments.
+
+    Raises:
+        RuntimeError: If the provided optimizer_name is not supported.
+    """
     group = parser.add_argument_group('Optimizer args')
     if optimizer_name == 'Adadelta':
         group.add_argument('--lr', type=float, default=1.0)
@@ -75,6 +88,19 @@ def add_optimizer_specific_args(parser, optimizer_name):
     return parser
 
 def add_scheduler_specific_args(parser, scheduler_name):
+    """
+    Add scheduler-specific arguments to the argument parser.
+
+    Args:
+        parser (argparse.ArgumentParser): The argument parser to which arguments will be added.
+        scheduler_name (str): Name of the scheduler. Supported values: ['StepLR', 'ExponentialLR', 'CosineAnnealingLR', 'ReduceLROnPlateau', 'CyclicLR', 'OneCycleLR', 'CosineAnnealingWarmRestarts'].
+
+    Returns:
+        argparse.ArgumentParser: The argument parser with added scheduler-specific arguments.
+
+    Raises:
+        RuntimeError: If the provided scheduler_name is not supported.
+    """
     if scheduler_name is not None:
         group = parser.add_argument_group('LR Scheduler args')
     if scheduler_name == 'StepLR':
@@ -135,6 +161,15 @@ def add_scheduler_specific_args(parser, scheduler_name):
     return parser
 
 def reorg_optimizer_args(optim_arg_dict):
+    """
+    Reorganize optimizer-specific argument names.
+
+    Args:
+        optim_arg_dict (dict): Dictionary containing optimizer-specific arguments.
+
+    Returns:
+        dict: Reorganized optimizer argument dictionary.
+    """
     if 'beta1' in optim_arg_dict.keys():
         optim_arg_dict['betas'] = [optim_arg_dict['beta1'], optim_arg_dict['beta2']]
         optim_arg_dict.pop('beta1')
@@ -150,12 +185,31 @@ def reorg_optimizer_args(optim_arg_dict):
     return optim_arg_dict
 
 def reorg_scheduler_args(sched_arg_dict):
+    """
+    Reorganize scheduler-specific argument names.
+
+    Args:
+        sched_arg_dict (dict): Dictionary containing scheduler-specific arguments.
+
+    Returns:
+        dict: Reorganized scheduler argument dictionary.
+    """
     if 'scheduler_mode' in sched_arg_dict.keys():
         sched_arg_dict['mode'] = sched_arg_dict['scheduler_mode']
         sched_arg_dict.pop('scheduler_mode')
     return sched_arg_dict
 
 def filter_state_dict(model, stashed_dict):
+    """
+    Filter and organize model state dictionary.
+
+    Args:
+        model (torch.nn.Module): The model for which the state dictionary is filtered.
+        stashed_dict (dict): Stashed model state dictionary.
+
+    Returns:
+        dict: Dictionary containing filtered state dictionary along with details of keys.
+    """
     results_dict = { 
         'filtered_state_dict': {},
         'passed_keys'  : [],
@@ -193,16 +247,45 @@ def filter_state_dict(model, stashed_dict):
     return results_dict
                    
 def pearson_correlation(x, y):
+    """
+    Calculate Pearson correlation coefficients between two tensors.
+
+    Args:
+        x (torch.Tensor): First input tensor.
+        y (torch.Tensor): Second input tensor.
+
+    Returns:
+        torch.Tensor: Pearson correlation coefficients.
+        torch.Tensor: Mean of Pearson correlation coefficients.
+    """
     vx = x - torch.mean(x, dim=0)
     vy = y - torch.mean(y, dim=0)
     pearsons = torch.sum(vx * vy, dim=0) / (torch.sqrt(torch.sum(vx ** 2, dim=0)) * torch.sqrt(torch.sum(vy ** 2, dim=0)) + 1e-10)
     return pearsons, torch.mean(pearsons)
     
 def shannon_entropy(x):
+    """
+    Calculate Shannon entropy of the input tensor.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+
+    Returns:
+        torch.Tensor: Shannon entropy values.
+    """
     p_c = nn.Softmax(dim=1)(x)    
     return torch.sum(- p_c * torch.log(p_c), axis=1)
 
 def _get_ranks(x):
+    """
+    Compute ranks of elements in the input tensor.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+
+    Returns:
+        torch.Tensor: Ranks of elements.
+    """
     tmp = x.argsort(dim=0)
     ranks = torch.zeros_like(tmp)
     if len(x.shape) > 1:
@@ -214,6 +297,17 @@ def _get_ranks(x):
     return ranks
 
 def spearman_correlation(x, y):
+    """
+    Calculate Spearman correlation coefficients between two tensors.
+
+    Args:
+        x (torch.Tensor): First input tensor.
+        y (torch.Tensor): Second input tensor.
+
+    Returns:
+        torch.Tensor: Spearman correlation coefficients.
+        torch.Tensor: Mean of Spearman correlation coefficients.
+    """
     x_rank = _get_ranks(x).float()
     y_rank = _get_ranks(y).float()
     return pearson_correlation(x_rank, y_rank)
