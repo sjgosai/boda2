@@ -22,20 +22,20 @@ from . import constants
 from .. import model as _model
 
 def install(package):
+    """
+    Install a Python package using pip.
+
+    Args:
+        package (str): Name of the package to install.
+    """
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 def set_all_seeds(seed):
-    """Fixes all random seeds
-    
-    Parameters
-    ----------
-    seed : TYPE
-        DESCRIPTION.
+    """
+    Set random seeds for various libraries to ensure reproducibility.
 
-    Returns
-    -------
-    None.
-
+    Args:
+        seed (int): Seed value.
     """
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -45,7 +45,18 @@ def set_all_seeds(seed):
 
 
 def str2bool(v):
-    """Pulled from https://stackoverflow.com/a/43357954
+    """
+    Convert a string to a boolean value.
+    Pulled from https://stackoverflow.com/a/43357954
+
+    Args:
+        v (str): String to be converted.
+
+    Returns:
+        bool: Converted boolean value.
+
+    Raises:
+        argparse.ArgumentTypeError: If the input string does not represent a valid boolean value.
     """
     if isinstance(v, bool):
         return v
@@ -57,8 +68,16 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
         
 class ExtendAction(argparse.Action):
-    """Pulled from https://bugs.python.org/issue16399#msg224964
-       an extend action with default override
+    """
+    Custom argparse action to extend a list attribute.
+    Pulled from https://bugs.python.org/issue16399#msg224964
+    an extend action with default override
+
+    This action allows the same option to be specified multiple times on the command line,
+    extending the list of values.
+
+    Args:
+        argparse.Action: The base action class.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -75,19 +94,14 @@ class ExtendAction(argparse.Action):
         
 def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
     """
-    
-    Parameters
-    ----------
-    sequence_str : str
-        A nucleotide letter sequence.
-    vocab_list : list, optional
-        Nucleotide vocabulary. The default is constants.STANDARD_NT.
+    Convert a DNA sequence to a one-hot encoded tensor.
 
-    Returns
-    -------
-    seq_tensor : torch tensor
-        Tokenized tensor.
-        
+    Args:
+        sequence_str (str): DNA sequence string.
+        vocab_list (list): List of DNA nucleotide characters.
+
+    Returns:
+        torch.Tensor: One-hot encoded tensor representation of the sequence.
     """
     seq_tensor = np.zeros((len(vocab_list), len(sequence_str)))
     for letterIdx, letter in enumerate(sequence_str):
@@ -98,27 +112,16 @@ def dna2tensor(sequence_str, vocab_list=constants.STANDARD_NT):
 
 def create_paddingTensors(num_sequences, padding_len, num_st_samples=1, for_multi_sampling=True):
     """
-    
-    Parameters
-    ----------
-    num_sequences : int
-        Number of sequences that will be padded.
-    padding_len : int
-        Total length of padding (maximally evenly distributed in up and down stream).
-    num_st_samples: int
-        Number of straight-through samples per sequence that will be padded.
-        The default is 1.
-    for_multi_sampling: bool
-        Whether or not the tensor will pad multi-sampled sequences.
-        The defaul is True.
+    Create padding tensors to append to sequences.
 
-    Returns
-    -------
-    upPad_logits : torch tensor
-        Tokenized tensor of correct length from up stream DNA.
-    downPad_logits : torch tensor
-        Tokenized tensor of correct length from down stream DNA.
-        
+    Args:
+        num_sequences (int): Number of sequences.
+        padding_len (int): Total length of padding (maximally evenly distributed in up and down stream).
+        num_st_samples (int, optional): Number of samples for stochastic tensor. Defaults to 1.
+        for_multi_sampling (bool, optional): Flag for multi-sampling. Defaults to True.
+
+    Returns:
+        torch.Tensor, torch.Tensor: Padding tensors for the upstream and downstream regions.
     """
     assert padding_len >= 0 and type(padding_len) == int, 'Padding must be a nonnegative integer'
     upPad_logits, downPad_logits = None, None  
@@ -138,18 +141,15 @@ def create_paddingTensors(num_sequences, padding_len, num_st_samples=1, for_mult
         
 
 def first_token_rewarder(sequences, pct=1.):
-    """Predictor for dummy examples
+    """
+    Calculate a reward based on the number of first tokens in sequences.
 
-    Parameters
-    ----------
-    sequences : torch tensor
-        Tokenized tensor.
+    Args:
+        sequences (torch.Tensor): Sequences tensor.
+        pct (float, optional): Desired percentage. Defaults to 1.
 
-    Returns
-    -------
-    rewards : 1-D tensor
-        Percentage of presence of first token.
-
+    Returns:
+        torch.Tensor: Reward tensor.
     """
     weights = torch.zeros_like(sequences)
     weights[:,0,:] = 1
@@ -159,16 +159,41 @@ def first_token_rewarder(sequences, pct=1.):
 
 
 def neg_reward_loss(x):
-    """Loss for dummy examples
-    For maximizing avg reward
+    """
+    Compute the negative reward loss.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+
+    Returns:
+        torch.Tensor: Negative reward loss.
     """
     return -torch.sum(x)
 
 def generate_all_kmers(k=4):
+    """
+    Generate all possible DNA k-mers.
+
+    Args:
+        k (int, optional): Length of k-mers. Defaults to 4.
+
+    Yields:
+        str: Generated k-mer.
+    """
     for i in range(4**k):
         yield "".join([ constants.STANDARD_NT[ (i // (4**j)) % 4 ] for j in range(k) ])            
 
 def organize_args(parser, args):
+    """
+    Organize parsed arguments into groups.
+
+    Args:
+        parser (argparse.ArgumentParser): Argument parser object.
+        args (argparse.Namespace): Parsed arguments.
+
+    Returns:
+        dict: Organized arguments grouped by category.
+    """
     arg_groups={}
     for group in parser._action_groups:
         group_dict={a.dest:getattr(args,a.dest,None) for a in group._group_actions}
@@ -176,6 +201,16 @@ def organize_args(parser, args):
     return arg_groups
 
 def parse_file(file_path, columns):
+    """
+    Parse a file and extract specified columns.
+
+    Args:
+        file_path (str): Path to the input file.
+        columns (list): List of column names to extract.
+
+    Returns:
+        pandas.DataFrame: Parsed data in a DataFrame.
+    """
     df = pd.read_csv(file_path, sep=" ", low_memory=False)
     sub_df = df[columns].dropna()
     return sub_df
@@ -185,6 +220,20 @@ def row_pad_sequence(row,
                      padded_seq_len=400,
                      upStreamSeq=constants.MPRA_UPSTREAM,
                      downStreamSeq=constants.MPRA_DOWNSTREAM):
+    """
+    Pad a sequence in a row to a specified length.
+
+    Args:
+        row (pandas.Series): Sequence row.
+        in_column_name (str, optional): Name of the input column. Defaults to 'nt_sequence'.
+        padded_seq_len (int, optional): Desired padded sequence length. Defaults to 400.
+        upStreamSeq (str, optional): Upstream sequence. Defaults to constants.MPRA_UPSTREAM.
+        downStreamSeq (str, optional): Downstream sequence. Defaults to constants.MPRA_DOWNSTREAM.
+
+    Returns:
+        str: Padded sequence.
+    """
+
     sequence = row[in_column_name]
     origSeqLen = len(sequence)
     paddingLen = padded_seq_len - origSeqLen
@@ -202,12 +251,33 @@ def row_pad_sequence(row,
         return sequence
 
 def row_dna2tensor(row, in_column_name='padded_seq' , vocab=constants.STANDARD_NT):
+    """
+    Convert a DNA sequence row to a one-hot encoded tensor.
+
+    Args:
+        row (pandas.Series): Sequence row.
+        in_column_name (str, optional): Name of the input column. Defaults to 'padded_seq'.
+        vocab (list, optional): List of DNA nucleotide characters. Defaults to constants.STANDARD_NT.
+
+    Returns:
+        torch.Tensor: One-hot encoded tensor representation of the sequence.
+    """
     sequence_str = row[in_column_name]
     seq_idxs = torch.tensor([vocab.index(letter) for letter in sequence_str])
     sequence_tensor = F.one_hot(seq_idxs, num_classes=4).transpose(1,0)
     return sequence_tensor.type(torch.float32)
 
 def generate_all_onehots(k=4, num_classes=4):
+    """
+    Generate all possible one-hot encoded k-mers.
+
+    Args:
+        k (int, optional): Length of k-mers. Defaults to 4.
+        num_classes (int, optional): Number of classes. Defaults to 4.
+
+    Returns:
+        torch.Tensor: One-hot encoded tensor of all k-mers.
+    """
     tokens = torch.tensor( 
         [ 
             [ 
@@ -222,6 +292,12 @@ def generate_all_onehots(k=4, num_classes=4):
     return onehots
 
 class KmerFilter(nn.Module):
+    """
+    K-mer filtering module.
+
+    Args:
+        k (int): Length of k-mers.
+    """
     def __init__(self, k):
         super().__init__()
         self.k = k
@@ -231,6 +307,16 @@ class KmerFilter(nn.Module):
         return F.conv1d(input_, self.weight).eq(self.k).float()
 
 def batch2list(batch, vocab_list=constants.STANDARD_NT):
+    """
+    Convert a batch of one-hot encoded sequences to a list of DNA sequences.
+
+    Args:
+        batch (torch.Tensor): Batch of one-hot encoded sequences.
+        vocab_list (list, optional): List of DNA nucleotide characters. Defaults to constants.STANDARD_NT.
+
+    Returns:
+        str: DNA sequence converted from one-hot encoding.
+    """
     assert len(batch.shape) == 3, "Expects 3D tensor [batch, channel, length]"
     assert batch.shape[1] == len(constants.STANDARD_NT), 'Channel dim size must equal length of vocab_list'
     
@@ -243,19 +329,17 @@ def batch2list(batch, vocab_list=constants.STANDARD_NT):
     
 def batch2fasta(batch, file_name):
     """
-    Converts a tensor of one-hot sequences into a Fasta file and saves it.
+    Convert a batch of one-hot encoded sequences to a FASTA file.
 
-    Parameters
-    ----------
-    batch : torch tensor
-        DESCRIPTION.
-    file_name : path and name for fasta file
-        DESCRIPTION.
+    Args:
+        batch (torch.Tensor): Batch of one-hot encoded sequences.
+        file_name (str): Name of the output FASTA file.
 
-    Returns
-    -------
-    None.
+    Writes:
+        Creates a FASTA file with the batch sequences.
 
+    Note:
+        The batch should have the shape (batch_size, sequence_length, num_nucleotides).
     """
     with open(file_name, 'w') as ofile:
         batch_size = batch.shape[0]
@@ -327,13 +411,51 @@ def align_to_alphabet(x, in_order=['A','C','G','T'], out_order=constants.STANDAR
 ###########
 
 class FlankBuilder(nn.Module):
+    """
+    A module that adds flanking sequences to input samples.
+
+    This module is designed to add left and right flanking sequences to input samples. The flanking sequences
+    can be specified during initialization. The module can be used as a part of a neural network architecture.
+
+    Args:
+        left_flank (torch.Tensor, optional): Left flanking sequence tensor. Default is None.
+        right_flank (torch.Tensor, optional): Right flanking sequence tensor. Default is None.
+        batch_dim (int, optional): Batch dimension for the input sample. Default is 0.
+        cat_axis (int, optional): Axis along which to concatenate the flanking sequences. Default is -1.
+
+    Attributes:
+        left_flank (torch.Tensor): Left flanking sequence tensor.
+        right_flank (torch.Tensor): Right flanking sequence tensor.
+        batch_dim (int): Batch dimension for the input sample.
+        cat_axis (int): Axis along which to concatenate the flanking sequences.
+
+    Methods:
+        add_flanks(my_sample): Adds the specified flanking sequences to the input sample.
+        forward(my_sample): Adds the flanking sequences to the input sample and returns the result.
+
+    Example:
+        left_flank = torch.zeros(1, 4, 10)  # Left flanking sequence tensor
+        right_flank = torch.ones(1, 4, 5)   # Right flanking sequence tensor
+        flanker = FlankBuilder(left_flank, right_flank, batch_dim=0, cat_axis=-1)
+        input_sample = torch.randn(1, 4, 20)  # Input sample tensor
+        output_sample = flanker(input_sample)  # Output sample with flanking sequences
+
+    """
     def __init__(self,
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
                  cat_axis=-1
                 ):
-        
+        """
+        Initialize the FlankBuilder module.
+
+        Args:
+            left_flank (torch.Tensor, optional): Left flanking sequence tensor. Default is None.
+            right_flank (torch.Tensor, optional): Right flanking sequence tensor. Default is None.
+            batch_dim (int, optional): Batch dimension for the input sample. Default is 0.
+            cat_axis (int, optional): Axis along which to concatenate the flanking sequences. Default is -1.
+        """
         super().__init__()
         
         self.register_buffer('left_flank', left_flank.detach().clone())
@@ -343,6 +465,15 @@ class FlankBuilder(nn.Module):
         self.cat_axis  = cat_axis
         
     def add_flanks(self, my_sample):
+        """
+        Adds the specified flanking sequences to the input sample.
+
+        Args:
+            my_sample (torch.Tensor): Input sample tensor.
+
+        Returns:
+            torch.Tensor: Output tensor with added flanking sequences.
+        """
         *batch_dims, channels, length = my_sample.shape
         
         pieces = []
@@ -358,6 +489,15 @@ class FlankBuilder(nn.Module):
         return torch.cat( pieces, axis=self.cat_axis )
     
     def forward(self, my_sample):
+        """
+        Adds the flanking sequences to the input sample and returns the result.
+
+        Args:
+            my_sample (torch.Tensor): Input sample tensor.
+
+        Returns:
+            torch.Tensor: Output tensor with added flanking sequences.
+        """
         return self.add_flanks(my_sample)
 
 ######################
@@ -365,6 +505,13 @@ class FlankBuilder(nn.Module):
 ######################
 
 def unpack_artifact(artifact_path,download_path='./'):
+    """
+    Unpack a tar archive artifact.
+
+    Args:
+        artifact_path (str): Path to the artifact.
+        download_path (str, optional): Path to extract the artifact. Defaults to './'.
+    """
     if 'gs' in artifact_path:
         subprocess.call(['gsutil','cp',artifact_path,download_path])
         if os.path.isdir(download_path):
@@ -381,6 +528,15 @@ def unpack_artifact(artifact_path,download_path='./'):
     print(f'archive unpacked in {download_path}', file=sys.stderr)
 
 def model_fn(model_dir):
+    """
+    Load a model from a directory.
+
+    Args:
+        model_dir (str): Path to the model directory.
+
+    Returns:
+        torch.nn.Module: Loaded model in evaluation mode.
+    """
     checkpoint = torch.load(os.path.join(model_dir,'torch_checkpoint.pt'))
     model_module = getattr(_model, checkpoint['model_module'])
     model        = model_module(**vars(checkpoint['model_hparams']))
