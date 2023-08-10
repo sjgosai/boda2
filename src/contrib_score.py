@@ -26,6 +26,7 @@ from torch.utils.data import (random_split, DataLoader, TensorDataset, ConcatDat
 from torch.distributions.categorical import Categorical
 
 class mpra_predictor(nn.Module):
+    
     def __init__(self,
                  model,
                  pred_idx=0,
@@ -33,6 +34,20 @@ class mpra_predictor(nn.Module):
                  model_in_len=600,
                  cat_axis=-1,
                  dual_pred=False):
+        """
+        Initialize an MPRA single-output predictor to calculate gradients over.
+
+        Args:
+            model (nn.Module): The model to be used for prediction.
+            pred_idx (int): Index of the prediction output to be used.
+            ini_in_len (int): Initial input length.
+            model_in_len (int): Model input length.
+            cat_axis (int): Axis along which tensors will be concatenated.
+            dual_pred (bool): Whether to average with full-reverse-complement prediction.
+
+        Returns:
+            None
+        """
         super().__init__()
         self.model = model
         self.pred_idx = pred_idx
@@ -47,6 +62,15 @@ class mpra_predictor(nn.Module):
         self.register_flanks()
     
     def forward(self, x):
+        """
+        Forward pass of the MPRA predictor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         pieces = [self.left_flank.repeat(x.shape[0], 1, 1), x, self.right_flank.repeat(x.shape[0], 1, 1)]
         in_tensor = torch.cat( pieces, axis=self.cat_axis)
         if self.dual_pred:
@@ -58,6 +82,12 @@ class mpra_predictor(nn.Module):
         return out_tensor
     
     def register_flanks(self):
+        """
+        Register flanks for the MPRA predictor.
+
+        Returns:
+            None
+        """
         missing_len = self.model_in_len - self.ini_in_len
         left_idx = - missing_len//2 + missing_len%2
         right_idx = missing_len//2 + missing_len%2
@@ -74,7 +104,21 @@ def isg_contributions(sequences,
                       theta_factor=15,
                       adaptive_sampling=False
                      ):
-    
+    """
+    Calculate Integrated Sampled Gradients (ISG) contributions scores for sequences.
+
+    Args:
+        sequences (torch.Tensor): Input sequences.
+        predictor (nn.Module): The predictor model.
+        num_steps (int): Number of steps for in integrated linear path.
+        max_samples (int): Maximum number of samples per step.
+        eval_batch_size (int): Evaluation batch size for model queries.
+        theta_factor (int): Theta factor to induce log probs.
+        adaptive_sampling (bool): Whether to adapt sampling along the path.
+
+    Returns:
+        torch.Tensor: ISG contributions scores.
+    """
     batch_size = eval_batch_size // (max_samples - 3)
     temp_dataset = TensorDataset(sequences)
     temp_dataloader = DataLoader(temp_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
@@ -121,7 +165,23 @@ def batch_to_contributions(onehot_sequences,
                            theta_factor=15,
                            eval_batch_size=1040,
                            adaptive_sampling=False):
-    
+    """
+    Calculate batch-level contributions scores.
+
+    Args:
+        onehot_sequences (torch.Tensor): One-hot encoded sequences.
+        model (nn.Module): The model to be used.
+        model_output_len (int): Length of model outputs.
+        seq_len (int): Sequence length.
+        num_steps (int): Number of steps for in integrated linear path.
+        max_samples (int): Maximum number of samples per step.
+        theta_factor (int): Theta factor to induce log probs.
+        eval_batch_size (int): Evaluation batch size for model queries.
+        adaptive_sampling (bool): Whether to adapt sampling along the path.
+
+    Returns:
+        torch.Tensor: Batch-level contributions.
+    """
     extended_contributions = []
     for i in range(model_output_len):
         predictor = mpra_predictor(model=model, pred_idx=i, ini_in_len=seq_len).cuda()
@@ -140,6 +200,17 @@ def batch_to_contributions(onehot_sequences,
 ########################
 
 def prepare_hdf5_file(fa_dataset, h5_file, subset=None):
+    """
+    Prepare an HDF5 file for storing contributions.
+
+    Args:
+        fa_dataset (boda.data.FastaDataset): Fasta dataset.
+        h5_file: HDF5 file object.
+        subset (int): Size of the subset.
+
+    Returns:
+        h5_file: Prepared HDF5 file object.
+    """
     strands = 2 if fa_dataset.reverse_complements else 1
     size = subset if subset is not None else len(fa_dataset)
     
@@ -156,6 +227,15 @@ def prepare_hdf5_file(fa_dataset, h5_file, subset=None):
 
     
 def main(args):
+    """
+    Main function for calculating ISG contributions.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+
+    Returns:
+        None
+    """
     print(sys.argv)
     ##################
     ## Import Model ##
