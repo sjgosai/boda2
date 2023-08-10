@@ -145,6 +145,15 @@ class Basset(ptl.LightningModule):
         use_batch_norm (bool): Whether to use batch normalization.
         use_weight_norm (bool): Whether to use weight normalization.
         loss_criterion (str): Loss criterion name.
+
+    Methods:
+        add_model_specific_args(parent_parser): Add model-specific arguments to the argument parser.
+        add_conditional_args(parser, known_args): Add conditional arguments based on known arguments.
+        process_args(grouped_args): Process grouped arguments and return model-specific arguments.
+        encode(x): Encode input through the Basset model's encoding layers.
+        decode(x): Decode encoded tensor through the Basset model's decoding layers.
+        classify(x): Classify decoded tensor using the Basset model's classification layer.
+        forward(x): Forward pass through the Basset model.
     """
     
     @staticmethod
@@ -377,6 +386,15 @@ class BassetVL(ptl.LightningModule):
         use_batch_norm (bool): Whether to use batch normalization.
         use_weight_norm (bool): Whether to use weight normalization.
         loss_criterion (str): Loss criterion name.
+
+    Methods:
+        add_model_specific_args(parent_parser): Add model-specific arguments to the argument parser.
+        add_conditional_args(parser, known_args): Add conditional arguments based on known arguments.
+        process_args(grouped_args): Process grouped arguments to extract model-specific arguments.
+        encode(x): Encode input through the BassetVL model's encoding layers.
+        decode(x): Decode encoded tensor through the BassetVL model's decoding layers.
+        classify(x): Classify decoded tensor using the BassetVL model's classification layer.
+        forward(x): Forward pass through the BassetVL model.
     """
     
     @staticmethod
