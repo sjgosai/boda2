@@ -9,9 +9,60 @@ from .basset import Basset
 from ..graph import utils
 
 class MPRA_Basset(pl.LightningModule):
-    
+    """
+    MPRA_Basset model architecture.
+
+    Args:
+        basset_weights_path (str): Path to Basset model weights.
+        target_width (int): Width (or length) of the target data.
+        learning_rate (float): Learning rate for optimization.
+        optimizer (str): Name of the optimizer.
+        scheduler (bool): Whether to implement cosine annealing LR scheduler.
+        weight_decay (float): Weight decay rate.
+        epochs (int): Number of epochs passed to the trainer (used by the scheduler).
+        extra_hidden_size (int): Size of the extra hidden layer.
+        criterion (str): Loss criterion name.
+        last_activation (str): Activation function name for the last layer.
+        sneaky_factor (float): Factor for adding the Shannon entropy loss.
+
+    Methods:
+        add_model_specific_args(parent_parser): Add model-specific arguments to the argument parser.
+        __init__(...): Initialize MPRA_Basset model.
+        forward(x): Forward pass through the MPRA_Basset model.
+        training_step(batch, batch_idx): Training step implementation.
+        validation_step(batch, batch_idx): Validation step implementation.
+        test_step(batch, batch_idx): Test step implementation.
+        validation_epoch_end(validation_step_outputs): Validation epoch end implementation.
+        configure_optimizers(): Configure optimizers and scheduler (if enabled).
+
+    Attributes:
+        basset_weights_path (str): Path to Basset model weights.
+        target_width (int): Width (or length) of the target data.
+        learning_rate (float): Learning rate for optimization.
+        optimizer (str): Name of the optimizer.
+        scheduler (bool): Whether to implement cosine annealing LR scheduler.
+        weight_decay (float): Weight decay rate.
+        epochs (int): Number of epochs passed to the trainer (used by the scheduler).
+        extra_hidden_size (int): Size of the extra hidden layer.
+        sneaky_factor (float): Factor for adding the Shannon entropy loss.
+        criterion (nn.Module): Loss criterion module.
+        last_activation (nn.Module): Activation function module for the last layer.
+        basset_net (Basset): Basset model instance.
+        basset_last_hidden_width (int): Width of the last hidden layer in the Basset model.
+        output_1, output_2, output_3 (nn.Sequential): Sequential output layers.
+        example_input_array (torch.Tensor): Example input array for model visualization.
+    """
     @staticmethod
     def add_model_specific_args(parent_parser):
+        """
+        Add model-specific arguments to the argument parser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added model-specific arguments.
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
          
         parser.add_argument('--target_width', type=int, default=3, 
@@ -42,39 +93,25 @@ class MPRA_Basset(pl.LightningModule):
                  sneaky_factor=1,
                  **kwargs):
         """
-        Parameters
-        ----------
-        basset_weights_path : TYPE, optional
-            DESCRIPTION. The default is None.
-        target_width : TYPE, optional
-            DESCRIPTION. The default is 3.
-        learning_rate : TYPE, optional
-            DESCRIPTION. The default is 1e-4.
-        optimizer : TYPE, optional
-            DESCRIPTION. The default is 'Adam'.
-        scheduler : TYPE, optional
-            DESCRIPTION. The default is False.
-        weight_decay : TYPE, optional
-            DESCRIPTION. The default is 1e-6.
-        epochs : TYPE, optional
-            DESCRIPTION. The default is 1.
-        extra_hidden_size : TYPE, optional
-            DESCRIPTION. The default is 100.
-        criterion : TYPE, optional
-            DESCRIPTION. The default is 'MSELoss'.
-        last_activation : TYPE, optional
-            DESCRIPTION. The default is 'Tanh'.
-        sneaky_factor : TYPE, optional
-            DESCRIPTION. The default is 1.
-        **kwargs : TYPE
-            DESCRIPTION.
+        Initialize MPRA_Basset model.
 
-        Returns
-        -------
-        None.
+        Args:
+            basset_weights_path (str): Path to Basset model weights.
+            target_width (int): Width (or length) of the target data.
+            learning_rate (float): Learning rate for optimization.
+            optimizer (str): Name of the optimizer.
+            scheduler (bool): Whether to implement cosine annealing LR scheduler.
+            weight_decay (float): Weight decay rate.
+            epochs (int): Number of epochs passed to the trainer (used by the scheduler).
+            extra_hidden_size (int): Size of the extra hidden layer.
+            criterion (str): Loss criterion name.
+            last_activation (str): Activation function name for the last layer.
+            sneaky_factor (float): Factor for adding the Shannon entropy loss.
+            **kwargs: Additional keyword arguments.
 
+        Returns:
+            None
         """
-
         super().__init__()
         self.basset_weights_path = basset_weights_path
         self.target_width = target_width
@@ -122,6 +159,15 @@ class MPRA_Basset(pl.LightningModule):
         self.example_input_array = torch.rand(1, 4, 600)
         
     def forward(self, x):
+        """
+        Forward pass through the MPRA_Basset model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Model's prediction tensor.
+        """
         basset_last_hidden = self.basset_net.decode(self.basset_net.encode(x))
         output_1 = self.output_1(basset_last_hidden)
         output_2 = self.output_2(basset_last_hidden)
@@ -130,6 +176,16 @@ class MPRA_Basset(pl.LightningModule):
         return mpra_pred
         
     def training_step(self, batch, batch_idx):
+        """
+        Training step implementation.
+
+        Args:
+            batch: Training batch.
+            batch_idx: Batch index.
+
+        Returns:
+            torch.Tensor: Loss value.
+        """
         x, y = batch
         y_pred = self(x)
         shannon_pred, shannon_target = utils.shannon_entropy(y_pred), utils.shannon_entropy(y)
@@ -138,6 +194,15 @@ class MPRA_Basset(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
+        """
+        Validation epoch end implementation.
+
+        Args:
+            validation_step_outputs: List of validation step outputs.
+
+        Returns:
+            None
+        """
         x, y = batch
         y_pred = self(x)
         loss = self.criterion(y_pred, y)
@@ -145,12 +210,31 @@ class MPRA_Basset(pl.LightningModule):
         return {'loss': loss, 'pred': y_pred, 'target': y}
         
     def test_step(self, batch, batch_idx):
+        """
+        Test step implementation.
+
+        Args:
+            batch: Test batch.
+            batch_idx: Batch index.
+
+        Returns:
+            None
+        """
         x, y = batch
         y_pred = self(x)
         loss = self.criterion(y_pred, y)
         self.log('test_loss', loss)
 
     def validation_epoch_end(self, validation_step_outputs):
+        """
+        Validation epoch end implementation.
+
+        Args:
+            validation_step_outputs: List of validation step outputs.
+
+        Returns:
+            None
+        """
         preds = torch.cat([out['pred'] for out in validation_step_outputs], dim=0)
         targets  = torch.cat([out['target'] for out in validation_step_outputs], dim=0)
         pearsons, mean_pearson = utils.pearson_correlation(preds, targets)
@@ -165,6 +249,12 @@ class MPRA_Basset(pl.LightningModule):
         print('-'*len(res_str))
         
     def configure_optimizers(self):
+        """
+        Configure optimizers and scheduler (if enabled).
+
+        Returns:
+            list: List of optimizers.
+        """
         optimizer = getattr(torch.optim, self.optimizer)(self.parameters(), lr=self.learning_rate,
                                                          weight_decay=self.weight_decay)  
         if self.scheduler:
