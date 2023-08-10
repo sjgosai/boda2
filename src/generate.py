@@ -20,6 +20,20 @@ from boda.common.utils import set_best, save_model, unpack_artifact, model_fn
 import hypertune
 
 def save_proposals(proposals, args):
+    """
+    Save the proposals and associated arguments to a file.
+
+    This function saves the generated proposals and the input arguments used for their generation
+    to a file. The file is named based on the current timestamp and a random tag. The saved file can
+    be placed in a local directory or on Google Cloud Storage if a 'gs://' path is provided in the arguments.
+
+    Args:
+        proposals (list): List of proposals.
+        args (dict): Dictionary of input arguments.
+
+    Returns:
+        None
+    """
     save_dict = {
         'proposals': proposals,
         'args'     : args,
@@ -42,6 +56,20 @@ def save_proposals(proposals, args):
     print(f'Proposals deposited at:\n\t{final_loc}', file=sys.stderr)
 
 def save_proposals(proposals, args):
+    """
+    Save the proposals and associated arguments to a file.
+
+    This function saves the generated proposals and the input arguments used for their generation
+    to a file. The file is named based on the current timestamp and a random tag. The saved file can
+    be placed in a local directory or on Google Cloud Storage if a 'gs://' path is provided in the arguments.
+
+    Args:
+        proposals (list): List of proposals.
+        args (dict): Dictionary of input arguments.
+
+    Returns:
+        None
+    """
     save_dict = {
         'proposals': proposals,
         'args'     : args,
@@ -63,7 +91,20 @@ def save_proposals(proposals, args):
 
 
 def main(args):
-    
+    """
+    Main function for generating and saving proposals.
+
+    This function orchestrates the generation of proposals using the specified modules and arguments.
+    It creates instances of the required modules, generates proposals, and saves them using the `save_proposals`
+    function.
+
+    Args:
+        args (dict): Dictionary of input arguments.
+
+    Returns:
+        tuple: A tuple containing instances of `params_module`, `energy_module`, `generator_module`, and
+               a list of generated proposals.
+    """
     args_copy = copy.deepcopy(args)
     
     params_module     = getattr(boda.generator.parameters, args['Main args'].params_module)
