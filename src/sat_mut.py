@@ -19,13 +19,47 @@ from boda.common import constants
 from boda.common.utils import unpack_artifact, model_fn
 
 class FlankBuilder(nn.Module):
+    """
+    A module for adding flanks to input samples.
+
+    Args:
+        left_flank (torch.Tensor, optional): Left flank tensor. Default is None.
+        right_flank (torch.Tensor, optional): Right flank tensor. Default is None.
+        batch_dim (int, optional): Batch dimension. Default is 0.
+        cat_axis (int, optional): Axis along which tensors will be concatenated. Default is -1.
+
+    Attributes:
+        left_flank (torch.Tensor): Left flank tensor.
+        right_flank (torch.Tensor): Right flank tensor.
+        batch_dim (int): Batch dimension.
+        cat_axis (int): Axis along which tensors will be concatenated.
+
+    Methods:
+        add_flanks(my_sample):
+            Adds flanks to a given input sample.
+
+        forward(my_sample):
+            Forward pass of the FlankBuilder module.
+    """
+    
     def __init__(self,
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
                  cat_axis=-1
                 ):
-        
+        """
+        Initialize a FlankBuilder module.
+
+        Args:
+            left_flank (torch.Tensor, optional): Left flank tensor. Default is None.
+            right_flank (torch.Tensor, optional): Right flank tensor. Default is None.
+            batch_dim (int, optional): Batch dimension. Default is 0.
+            cat_axis (int, optional): Axis along which tensors will be concatenated. Default is -1.
+
+        Returns:
+            None
+        """
         super().__init__()
         
         self.register_buffer('left_flank', left_flank.detach().clone())
@@ -35,6 +69,15 @@ class FlankBuilder(nn.Module):
         self.cat_axis  = cat_axis
         
     def add_flanks(self, my_sample):
+        """
+        Adds flanks to a given input sample.
+
+        Args:
+            my_sample (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Tensor with added flanks.
+        """
         *batch_dims, channels, length = my_sample.shape
         
         pieces = []
@@ -50,10 +93,46 @@ class FlankBuilder(nn.Module):
         return torch.cat( pieces, axis=self.cat_axis )
     
     def forward(self, my_sample):
+        """
+        Forward pass of the FlankBuilder module.
+
+        Args:
+            my_sample (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         return self.add_flanks(my_sample)
 
 class Mutagenizer(nn.Module):
+    """
+    A module for generating mutated sequences.
+
+    Args:
+        seq_len (int): Length of the input sequence.
+        alphabet (str or list of str, optional): Alphabet for the input sequence. Default is constants.STANDARD_NT.
+
+    Attributes:
+        n_tokens (int): Number of tokens in the alphabet.
+        clear_midpoint (torch.Tensor): Tensor for clearing the midpoint.
+        set_variants (torch.Tensor): Tensor for setting variants.
+        windower (boda.data.fasta_datamodule.OneHotSlicer): OneHotSlicer instance for sequence windowing.
+
+    Methods:
+        forward(input):
+            Forward pass of the Mutagenizer module.
+    """
     def __init__(self, seq_len, alphabet=constants.STANDARD_NT):
+        """
+        Initialize a Mutagenizer module.
+
+        Args:
+            seq_len (int): Length of the input sequence.
+            alphabet (str or list of str, optional): Alphabet for the input sequence. Default is constants.STANDARD_NT.
+
+        Returns:
+            None
+        """
         super().__init__()
         
         self.n_tokens = len(alphabet)
@@ -69,7 +148,15 @@ class Mutagenizer(nn.Module):
         self.windower = boda.data.fasta_datamodule.OneHotSlicer(self.n_tokens,seq_len)
         
     def forward(self, input):
-        
+        """
+        Forward pass of the Mutagenizer module.
+
+        Args:
+            input (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Mutated sequence tensor.
+        """
         hook = input.unsqueeze(-3)
         shape = list(hook.shape)
         shape[-3] = shape[-2]
@@ -81,6 +168,15 @@ class Mutagenizer(nn.Module):
 
 
 def main(args):
+    """
+    Execute the main functionality of the script.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments parsed by argparse.
+
+    Returns:
+        None
+    """
     
     ##################
     ## Import Model ##
