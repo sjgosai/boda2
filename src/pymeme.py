@@ -6,6 +6,16 @@ import re
 import numpy as np
 
 def extract_flags(arg_dict, flag_list):
+    """
+    Extracts and separates flags from a dictionary of arguments.
+
+    Args:
+        arg_dict (dict): Dictionary of arguments.
+        flag_list (list): List of flag names to be extracted.
+
+    Returns:
+        tuple: A tuple containing filtered dictionary without flags and a list of raised flags.
+    """
     raised_flags = []
     for flag in flag_list:
         try:
@@ -20,7 +30,16 @@ def extract_flags(arg_dict, flag_list):
     return filtered_dict, raised_flags
 
 def isint(x):
-    # https://stackoverflow.com/a/15357477
+    """
+    Checks if a given value can be converted to an integer.
+    https://stackoverflow.com/a/15357477
+
+    Args:
+        x: Value to be checked.
+
+    Returns:
+        bool: True if the value can be converted to an integer, False otherwise.
+    """
     try:
         a = float(x)
         b = int(a)
@@ -34,7 +53,19 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
            w=None, neval=None, nref=None, niter=None, thresh=None, evalue=None, patience=None, 
            nmotifs=None, time=None, totallength=None, hofract=None, seed=None, align=None, 
            desc=None, dfile=None):
-    
+    """
+    Run the STREME motif discovery tool with specified parameters.
+
+    Args:
+        p (str, list, dict): Input sequences for motif discovery. Can be a string, list of strings,
+                            or a dictionary of sequence names and strings.
+        n, order, kmer, bfile, objfun, dna, rna, protein, alph, minw, maxw, w, neval, nref, niter,
+        thresh, evalue, patience, nmotifs, time, totallength, hofract, seed, align, desc, dfile: 
+        Various optional parameters to configure STREME.
+
+    Returns:
+        dict: A dictionary containing the 'output' and 'error' produced by the STREME tool.
+    """
     tmp = tempfile.NamedTemporaryFile(delete=False)
     
     try:
@@ -108,6 +139,15 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
     return {'output':out, 'error':err}
 
 def parse_streme_output(streme_output):
+    """
+    Parse the output of the STREME motif discovery tool.
+
+    Args:
+        streme_output (bytes): Output of the STREME tool as bytes.
+
+    Returns:
+        dict: A dictionary containing metadata and motif results parsed from the STREME output.
+    """
     streme_text = streme_output.decode("utf-8")
 
     # Metadata
