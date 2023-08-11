@@ -22,7 +22,15 @@ from boda.common.utils import unpack_artifact, model_fn
 
 
 def load_model(artifact_path):
-    
+    """
+    Load a trained model from the specified artifact path.
+
+    Args:
+        artifact_path (str): Path to the model artifact.
+
+    Returns:
+        nn.Module: The loaded trained model.
+    """
     USE_CUDA = torch.cuda.device_count() >= 1
     if os.path.isdir('./artifacts'):
         shutil.rmtree('./artifacts')
@@ -39,7 +47,18 @@ def load_model(artifact_path):
     return my_model
 
 def combine_ref_alt_skew_tensors(ref, alt, skew, ids=None):
-    
+    """
+    Combine reference, alternative, and skew tensors into a single DataFrame.
+
+    Args:
+        ref (torch.Tensor): Reference tensor.
+        alt (torch.Tensor): Alternative tensor.
+        skew (torch.Tensor): Skew tensor.
+        ids (list): List of identifiers for each tensor element.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing combined information from the input tensors.
+    """
     result = []
     
     for tag, data in zip(['ref', 'alt', 'skew'], [ref, alt, skew]):
@@ -54,45 +73,123 @@ def combine_ref_alt_skew_tensors(ref, alt, skew, ids=None):
     return result.agg(';'.join, axis=1)
 
 class ConsistentModelPool(nn.Module):
+    """
+    Ensemble of consistent models.
+
+    This class creates an ensemble of consistent models from a list of model paths.
+    
+    Args:
+        path_list (list): List of paths to model artifacts.
+
+    Attributes:
+        fmodel (nn.Module): The ensemble forward model.
+        params (dict): Parameters shared across models.
+        buffers (dict): Buffers shared across models.
+    """
     
     def __init__(self,
                  path_list
                 ):
+        """
+        Initialize the ConsistentModelPool with a list of model paths.
+
+        Args:
+            path_list (list): List of paths to model artifacts.
+        """
         super().__init__()
         
         models = [ load_model(model_path) for model_path in path_list ]
         self.fmodel, self.params, self.buffers = combine_state_for_ensemble(models)
             
     def forward(self, batch):
-        
+        """
+        Forward pass through the ensemble.
+
+        Args:
+            batch (torch.Tensor): Input data batch.
+
+        Returns:
+            torch.Tensor: Predictions from the ensemble.
+        """
         preds = vmap(self.fmodel, in_dims=(0, 0, None))(self.params, self.buffers, batch)
         return preds.mean(dim=0)
             
 class VariableModelPool(nn.Module):
+    """
+    Ensemble of variable models.
+
+    This class creates an ensemble of variable models from a list of model paths.
+    
+    Args:
+        path_list (list): List of paths to model artifacts.
+
+    Attributes:
+        models (list): List of loaded models.
+    """
     
     def __init__(self,
                  path_list
                 ):
+        """
+        Initialize the VariableModelPool with a list of model paths.
+
+        Args:
+            path_list (list): List of paths to model artifacts.
+        """
         super().__init__()
         
         self.models = [ load_model(model_path) for model_path in path_list ]
             
     def forward(self, batch):
-        
+        """
+        Forward pass through the ensemble.
+
+        Args:
+            batch (torch.Tensor): Input data batch.
+
+        Returns:
+            torch.Tensor: Predictions from the ensemble.
+        """
         return torch.stack([model(batch) for model in self.models]).mean(dim=0)
             
 class VepTester(nn.Module):
+    """
+    Variant Effect Predictor Tester module.
+
+    This class tests the variant effect predictor model on reference and alternate batches of data.
+
+    Args:
+        model (nn.Module): A PyTorch model for variant effect prediction.
+
+    Attributes:
+        use_cuda (bool): Flag indicating whether CUDA is available.
+        model (nn.Module): The model to be tested.
+    """
     
     def __init__(self,
                  model
                 ):
-        
+        """
+        Initialize the VepTester with the variant effect predictor model.
+
+        Args:
+            model (nn.Module): A PyTorch model for variant effect prediction.
+        """
         super().__init__()
         self.use_cuda = torch.cuda.device_count() >= 1
         self.model = torch.nn.DataParallel(model) if torch.cuda.device_count() > 1 else model
         
     def forward(self, ref_batch, alt_batch):
-        
+        """
+        Perform a forward pass through the model with reference and alternate batches.
+
+        Args:
+            ref_batch (torch.Tensor): Reference data batch.
+            alt_batch (torch.Tensor): Alternate data batch.
+
+        Returns:
+            dict: A dictionary containing predictions for reference, alternate, and skew.
+        """
         ref_shape, alt_shape = ref_batch.shape, alt_batch.shape
         #(batch_size, n_windows, n_tokens, length)
         #n_windows = (2 if reverse_complments else 1) * (relative_end - relative_start) // step_size
@@ -118,25 +215,84 @@ class VepTester(nn.Module):
                 'skew': skew_preds}
     
 class reductions(object):
+    """
+    A collection of static methods for various tensor reduction operations.
+
+    These methods provide reduction operations on tensors such as mean, sum, max, min,
+    absolute maximum, absolute minimum, and gather.
+
+    Attributes:
+        None
+    """
     
     @staticmethod
     def mean(tensor, dim):
+        """
+        Compute the mean along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the mean.
+
+        Returns:
+            torch.Tensor: The mean values along the specified dimension.
+        """
         return tensor.mean(dim=dim)
     
     @staticmethod
     def sum(tensor, dim):
+        """
+        Compute the sum along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the sum.
+
+        Returns:
+            torch.Tensor: The sum values along the specified dimension.
+        """
         return tensor.sum(dim=dim)
     
     @staticmethod
     def max(tensor, dim):
+        """
+        Compute the maximum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the maximum values.
+
+        Returns:
+            torch.Tensor: The maximum values along the specified dimension.
+        """
         return tensor.amax(dim=dim)
     
     @staticmethod
     def min(tensor, dim):
+        """
+        Compute the minimum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the minimum values.
+
+        Returns:
+            torch.Tensor: The minimum values along the specified dimension.
+        """
         return tensor.amin(dim=dim)
     
     @staticmethod
     def abs_max(tensor, dim):
+        """
+        Compute the absolute maximum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the absolute maximum values.
+
+        Returns:
+            torch.Tensor: The absolute maximum values along the specified dimension.
+        """
         n_dims = len(tensor.shape)
         get_idx= tensor.abs().argmax(dim=dim)
         ##### Following can be replaced by torch.gather #####
@@ -156,6 +312,16 @@ class reductions(object):
     
     @staticmethod
     def abs_min(tensor, dim):
+        """
+        Compute the absolute minimum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to compute the absolute minimum values.
+
+        Returns:
+            torch.Tensor: The absolute minimum values along the specified dimension.
+        """
         n_dims = len(tensor.shape)
         get_idx= tensor.abs().argmin(dim=dim)
         ##### Following can be replaced by torch.gather #####
@@ -175,30 +341,111 @@ class reductions(object):
     
     @staticmethod
     def gather(tensor, dim, index):
+        """
+        Gather elements along a specified dimension of the input tensor using given indices.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to gather elements.
+            index (torch.Tensor): The indices along the specified dimension.
+
+        Returns:
+            torch.Tensor: Gathered elements from the input tensor.
+        """
         return torch.gather(tensor, dim, index).squeeze(dim=dim)
     
 class gatherings(object):
+    """
+    A collection of static methods for gathering indices corresponding to specific tensor operations.
+
+    These methods provide operations to gather indices of maximum, minimum, absolute maximum,
+    and absolute minimum values along specified dimensions of a tensor.
+
+    Attributes:
+        None
+    """
     
     @staticmethod
     def max(tensor, dim):
+        """
+        Gather indices of maximum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to gather indices of maximum values.
+
+        Returns:
+            torch.Tensor: Indices of maximum values along the specified dimension.
+        """
         return tensor.max(dim=dim, keepdim=True)[1]
     
     @staticmethod
     def min(tensor, dim):
+        """
+        Gather indices of minimum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to gather indices of minimum values.
+
+        Returns:
+            torch.Tensor: Indices of minimum values along the specified dimension.
+        """
         return tensor.min(dim=dim, keepdim=True)[1]
     
     @staticmethod
     def abs_max(tensor, dim):
+        """
+        Gather indices of absolute maximum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to gather indices of absolute maximum values.
+
+        Returns:
+            torch.Tensor: Indices of absolute maximum values along the specified dimension.
+        """
         return tensor.abs().max(dim=dim, keepdim=True)[1]
     
     @staticmethod
     def abs_min(tensor, dim):
+        """
+        Gather indices of absolute minimum values along the specified dimension of the input tensor.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to gather indices of absolute minimum values.
+
+        Returns:
+            torch.Tensor: Indices of absolute minimum values along the specified dimension.
+        """
         return tensor.abs().min(dim=dim, keepdim=True)[1]
     
 class activity_filtering(object):
+    """
+    A collection of static methods for filtering and adjusting tensor activity based on thresholds.
+
+    These methods provide operations to filter tensor activity based on maximum, minimum, absolute maximum,
+    and absolute minimum values, while applying adjustments using specified thresholds and epsilon values.
+
+    Attributes:
+        None
+    """
     
     @staticmethod
     def max(preds, indexer, threshold, epsilon):
+        """
+        Apply maximum value-based filtering to tensor activity and adjust values below the threshold.
+
+        Args:
+            preds (dict): Dictionary containing tensor activity data.
+            indexer (str): Key to select the tensor activity to be indexed.
+            threshold (float): Threshold for filtering values.
+            epsilon (float): Value added to the indexing tensor to adjust values below the threshold.
+
+        Returns:
+            torch.Tensor: Indexed tensor activity after applying filtering and adjustments.
+        """
         ref_filter = preds['ref'].abs() > threshold
         alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
@@ -208,6 +455,18 @@ class activity_filtering(object):
     
     @staticmethod
     def min(preds, indexer, threshold, epsilon):
+        """
+        Apply minimum value-based filtering to tensor activity and adjust values below the threshold.
+
+        Args:
+            preds (dict): Dictionary containing tensor activity data.
+            indexer (str): Key to select the tensor activity to be indexed.
+            threshold (float): Threshold for filtering values.
+            epsilon (float): Value added to the indexing tensor to adjust values below the threshold.
+
+        Returns:
+            torch.Tensor: Indexed tensor activity after applying filtering and adjustments.
+        """
         ref_filter = preds['ref'].abs() > threshold
         alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
@@ -217,6 +476,18 @@ class activity_filtering(object):
     
     @staticmethod
     def abs_max(preds, indexer, threshold, epsilon):
+        """
+        Apply absolute maximum value-based filtering to tensor activity and adjust values above the threshold.
+
+        Args:
+            preds (dict): Dictionary containing tensor activity data.
+            indexer (str): Key to select the tensor activity to be indexed.
+            threshold (float): Threshold for filtering values.
+            epsilon (float): Value added to the indexing tensor to adjust values above the threshold.
+
+        Returns:
+            torch.Tensor: Indexed tensor activity after applying filtering and adjustments.
+        """
         ref_filter = preds['ref'].abs() > threshold
         alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
@@ -226,6 +497,18 @@ class activity_filtering(object):
     
     @staticmethod
     def abs_min(preds, indexer, threshold, epsilon):
+        """
+        Apply absolute minimum value-based filtering to tensor activity and adjust values below the threshold.
+
+        Args:
+            preds (dict): Dictionary containing tensor activity data.
+            indexer (str): Key to select the tensor activity to be indexed.
+            threshold (float): Threshold for filtering values.
+            epsilon (float): Value added to the indexing tensor to adjust values below the threshold.
+
+        Returns:
+            torch.Tensor: Indexed tensor activity after applying filtering and adjustments.
+        """
         ref_filter = preds['ref'].abs() > threshold
         alt_filter = preds['alt'].abs() > threshold
         _filter = ref_filter | alt_filter
@@ -234,6 +517,18 @@ class activity_filtering(object):
         return indexing_tensor
 
 def main(args):
+    """
+    Run the main processing pipeline for the given command-line arguments.
+
+    This function executes the main processing pipeline, including loading models, processing input data from FASTA and VCF files,
+    and generating predictions. The resulting predictions are then post-processed based on specified reduction and filtering methods.
+
+    Args:
+        args (argparse.Namespace): Parsed command-line arguments.
+
+    Returns:
+        None
+    """
     USE_CUDA = torch.cuda.device_count() >= 1
     print(sys.argv)
     ##################
