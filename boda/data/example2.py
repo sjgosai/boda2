@@ -25,6 +25,7 @@ class MPRADataModule(pl.LightningDataModule):
         bathSize - Number of examples in each mini batch
         paddedSeqLen - Desired total sequence length after padding
     '''
+    
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
