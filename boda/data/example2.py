@@ -10,20 +10,21 @@ import boda
 from boda.common import constants           
 
 
-'''
-- Pytorch Lighting DataModule -
-Takes MPRA files (.fa and .out format).
-Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
-Arguments:
-    file_seqID - Path to the file containing IDs of DNA sequences
-    file_seqFunc - Path to the file containing a map of IDs to MPRA data
-    MPRA_column - The name of the column of the desired activity in file_seqFunc
-    ValSize_pct - Percentage of examples to form the validation set
-    TestSize_pct - Percentage of examples to form the test set
-    bathSize - Number of examples in each mini batch
-    paddedSeqLen - Desired total sequence length after padding
-'''
+
 class MPRADataModule(pl.LightningDataModule):
+    '''
+    - Pytorch Lighting DataModule -
+    Takes MPRA files (.fa and .out format).
+    Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
+    Arguments:
+        file_seqID - Path to the file containing IDs of DNA sequences
+        file_seqFunc - Path to the file containing a map of IDs to MPRA data
+        MPRA_column - The name of the column of the desired activity in file_seqFunc
+        ValSize_pct - Percentage of examples to form the validation set
+        TestSize_pct - Percentage of examples to form the test set
+        bathSize - Number of examples in each mini batch
+        paddedSeqLen - Desired total sequence length after padding
+    '''
     
     @staticmethod
     def add_data_specific_args(parent_parser):
