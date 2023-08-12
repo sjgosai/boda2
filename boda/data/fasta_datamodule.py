@@ -608,46 +608,6 @@ class VcfDataset(Dataset):
         my_allele = allele.upper() if self.all_upper else allele
         return alphabet_onehotizer(my_allele, self.alphabet)
         
-    '''
-    def read_vcf(self):
-        
-        f = self._open_vcf()
-        for i, line in tqdm.tqdm(f.iterrows(),total=f.shape[0]):
-            chrom, pos, tag, ref, alt, *others = line
-
-            ref = self.encode(ref)
-            alt = self.encode(alt)
-
-            if np.abs(ref.shape[1]-alt.shape[1]) > self.max_indel_size:
-                if self.verbose: print(f"skipping large indel at line {i}, id: {tag}", file=sys.stderr)
-                continue
-
-            if ref.shape[1] > self.max_allele_size or alt.shape[1] > self.max_allele_size:
-                if self.verbose: print(f"skipping large allele at line {i}, id: {tag}", file=sys.stderr)
-                continue
-
-            cat_alleles = np.concatenate([ref,alt],axis=1)
-
-            if cat_alleles.sum() == cat_alleles.shape[1]:                
-                self.vcf.append(
-                    {
-                        'chrom': self.chr_prefix + str(chrom),
-                        'pos': int(pos),
-                        'tag': tag,
-                        'ref': ref,
-                        'alt': alt,
-                        'additional': others,
-                    }
-                )
-            elif self.strict:
-                raise ValueError(f"malformed record at line {i}, id: {tag}\nExiting.")
-            else:
-                print(f"skipping malformed record at line {i}, id: {tag}", file=sys.stderr)
-                print(line, file=sys.stderr)
-                    
-        return None
-    '''
-    
     def filter_vcf(self):
         """
         Filter VCF records based on contigs and other criteria.
@@ -704,6 +664,7 @@ class VcfDataset(Dataset):
         try:
             # Collect reference
             contig = self.fasta[ record['chrom'] ]
+            assert var_loc < contig.shape[1], "Variant position outside of chromosome bounds. Check VCF/FASTA build version."
             leader = contig[:, start:var_loc]
             trailer= contig[:, trail_start:trail_end]
             
@@ -722,8 +683,16 @@ class VcfDataset(Dataset):
             ref = torch.tensor(ref[np.newaxis].astype(np.float32))
             alt = torch.tensor(alt[np.newaxis].astype(np.float32))
 
-            ref_slices = self.window_slicer(ref)[::self.step_size]
-            alt_slices = self.window_slicer(alt)[::self.step_size]
+            try:
+                ref_slices = self.window_slicer(ref)[::self.step_size]
+                alt_slices = self.window_slicer(alt)[::self.step_size]
+            except RuntimeError:
+                print(ref)
+                print(ref.shape)
+                print(alt)
+                print(alt.shape)
+                
+                raise RuntimeError
 
 
             if self.reverse_complements:

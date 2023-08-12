@@ -24,7 +24,7 @@ def get_padding(kernel_size):
     return [ max(0,x) for x in [left,right] ]
 
 class Conv1dNorm(nn.Module):
-     """
+    """
     Convolutional layer with optional normalization.
 
     Args:
