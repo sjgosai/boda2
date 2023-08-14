@@ -7,6 +7,16 @@ import types
 import numpy as np
 
 def extract_flags(arg_dict, flag_list):
+    """
+    Extract and remove flag arguments from the given argument dictionary.
+
+    Args:
+        arg_dict (dict): Dictionary of arguments.
+        flag_list (list): List of flag argument keys.
+
+    Returns:
+        tuple: A tuple containing the filtered argument dictionary and a list of raised flag arguments.
+    """
     raised_flags = []
     for flag in flag_list:
         try:
@@ -21,7 +31,16 @@ def extract_flags(arg_dict, flag_list):
     return filtered_dict, raised_flags
 
 def isint(x):
-    # https://stackoverflow.com/a/15357477
+    """
+    Check if a given value is an integer.
+    https://stackoverflow.com/a/15357477
+
+    Args:
+        x: Value to be checked.
+
+    Returns:
+        bool: True if the value is an integer, False otherwise.
+    """
     try:
         a = float(x)
         b = int(a)
@@ -35,7 +54,41 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
            w=None, neval=None, nref=None, niter=None, thresh=None, evalue=None, patience=None, 
            nmotifs=None, time=None, totallength=None, hofract=None, seed=None, align=None, 
            desc=None, dfile=None):
-    
+    """
+    Run the STREME motif discovery tool with specified parameters.
+
+    Args:
+        p: Input sequences in various formats (string, list, generator, or dict).
+        n (int): Number of motifs.
+        order (int): Order of the model.
+        kmer (int): Length of motifs.
+        bfile (str): Background file.
+        objfun (str): Objective function.
+        dna (bool): Use DNA alphabet.
+        rna (bool): Use RNA alphabet.
+        protein (bool): Use protein alphabet.
+        alph (str): Custom alphabet.
+        minw (int): Minimum width of motifs.
+        maxw (int): Maximum width of motifs.
+        w (int): Width of motifs.
+        neval (int): Number of motif evaluations.
+        nref (int): Number of motif refinement iterations.
+        niter (int): Number of iterations.
+        thresh (float): Threshold.
+        evalue (float): E-value threshold.
+        patience (int): Patience for motif refinement.
+        nmotifs (int): Number of motifs to output.
+        time (int): Time limit in seconds.
+        totallength (int): Total length of input sequences.
+        hofract (float): Hall of fame fraction.
+        seed (int): Random seed.
+        align (bool): Align sequences.
+        desc (str): Description of the run.
+        dfile (str): Dump file path.
+
+    Returns:
+        dict: Dictionary containing 'output' and 'error' from the STREME process.
+    """
     tmp = tempfile.NamedTemporaryFile(delete=False)
     
     try:
@@ -109,6 +162,16 @@ def streme(p, n=None, order=None, kmer=None, bfile=None, objfun=None,
     return {'output':out, 'error':err}
 
 def parse_streme_output(streme_output):
+    """
+    Parse the output of the STREME motif discovery tool.
+
+    Args:
+        streme_output: Output of the STREME process.
+
+    Returns:
+        dict: Dictionary containing metadata and motif results.
+    """
+
     streme_text = streme_output.decode("utf-8")
 
     # Metadata

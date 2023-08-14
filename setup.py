@@ -6,6 +6,6 @@ setup(name='boda',
       url='http://github.com/sjgosai/boda2',
       author='Sager Gosai, Rodrigo Castro',
       author_email='sgosai@g.harvard.edu, Rodrigo.Castro@jax.org',
-      license='MIT',
+      license='GNU',
       packages=['boda'],
       zip_safe=False)

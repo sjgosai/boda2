@@ -15,10 +15,45 @@ from tqdm import tqdm
 from ..common import utils
 
 class MHBase(nn.Module):
+    """
+    A base class for implementing Metropolis-Hastings (MH) sampling methods.
+
+    This class provides a base implementation for collecting samples using the Metropolis-Hastings (MH) algorithm.
+    Subclasses can inherit from this base class and override the `mh_engine` method to implement specific MH sampling
+    engines.
+
+    Methods:
+        collect_samples(n_steps=1, n_burnin=0, keep_burnin=False):
+            Collect samples using the MH algorithm.
+
+    Attributes:
+        mh_engine (callable): A callable method to perform MH sampling steps.
+        params: Model parameters used in the MH sampling.
+        energy_fn: Energy function used for evaluating the energy of states.
+        mh_kwargs (dict): Additional keyword arguments for the MH sampling engine.
+    """
+    
     def __init__(self):
+        """
+        Initialize the MHBase class.
+        """
         super().__init__()
         
     def collect_samples(self, n_steps=1, n_burnin=0, keep_burnin=False):
+        """
+        Collect samples using the Metropolis-Hastings (MH) algorithm.
+
+        Args:
+            n_steps (int): The number of MH sampling steps to perform.
+            n_burnin (int): The number of burn-in steps to perform before collecting samples.
+            keep_burnin (bool): Whether to keep the burn-in samples.
+
+        Returns:
+            dict: A dictionary containing collected samples and, optionally, burn-in samples.
+                  The dictionary has the keys 'burnin' and 'samples'.
+                  Each of these keys maps to a sub-dictionary with keys 'states', 'energies', and 'acceptances'.
+                  The values associated with these keys are torch tensors containing the collected data.
+        """
         burnin = None
         samples= None
         
@@ -50,8 +85,23 @@ class MHBase(nn.Module):
 
 @torch.no_grad()
 def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
-    
-    assert len(params.shape) == 3
+    """
+    Perform a single step of the Naive Metropolis-Hastings (MH) sampling algorithm.
+
+    Args:
+        params (nn.Module): The model parameters.
+        energy_fn (callable): The energy function used to evaluate the energy of states.
+        n_positions (int): The number of positions to propose updates for.
+        temperature (float): The temperature parameter for MH sampling.
+
+    Returns:
+        dict: A dictionary containing information about the MH sampling step.
+            The dictionary has the keys 'state', 'energy', and 'acceptance'.
+            'state': A tensor representing the proposed state after the MH step.
+            'energy': A tensor containing the energy of the proposed state.
+            'acceptance': A boolean tensor indicating whether the proposed state was accepted.
+    """
+    assert len(params.theta.shape) == 3
     
     old_params = params.theta.detach().clone()
     old_seq    = params()
@@ -87,12 +137,47 @@ def naive_mh_step(params, energy_fn, n_positions=1, temperature=1.0):
             'acceptance': accept.detach().clone().cpu()}
 
 class NaiveMH(MHBase):
+    """
+    Implementation of the Naive Metropolis-Hastings (MH) sampling algorithm.
+
+    Args:
+        energy_fn (callable): The energy function used to evaluate the energy of states.
+        params (nn.Module): The model parameters.
+        n_positions (int): The number of positions to propose updates for.
+        temperature (float): The temperature parameter for MH sampling.
+
+    Inherits from:
+        MHBase (nn.Module): Base class for Metropolis-Hastings samplers.
+
+    Attributes:
+        energy_fn (callable): The energy function used to evaluate the energy of states.
+        params (nn.Module): The model parameters.
+        n_positions (int): The number of positions to propose updates for.
+        temperature (float): The temperature parameter for MH sampling.
+        mh_kwargs (dict): Keyword arguments for the MH sampling engine.
+        mh_engine (function): The MH sampling engine (naive_mh_step function).
+
+    Methods:
+        collect_samples(n_steps=1, n_burnin=0, keep_burnin=False):
+            Collect samples using the Naive Metropolis-Hastings algorithm.
+
+    """
+    
     def __init__(self, 
                  energy_fn, 
                  params,
                  n_positions=1, 
                  temperature=1.0
                 ):
+        """
+        Initialize the NaiveMH class.
+
+        Args:
+            energy_fn (callable): The energy function used to evaluate the energy of states.
+            params (nn.Module): The model parameters.
+            n_positions (int): The number of positions to propose updates for.
+            temperature (float): The temperature parameter for MH sampling.
+        """
         super().__init__()
         self.energy_fn = energy_fn
         self.params = params
@@ -105,32 +190,103 @@ class NaiveMH(MHBase):
         self.mh_engine = naive_mh_step
         
 class PolynomialDecay:
+    """
+    Polynomial decay schedule.
+
+    Args:
+        a (float): Coefficient a in the polynomial decay equation.
+        b (float): Coefficient b in the polynomial decay equation.
+        gamma (float): Exponent gamma in the polynomial decay equation.
+
+    Methods:
+        __call__():
+            Calculate the current decay value based on the polynomial decay equation.
+        step():
+            Advance the decay step and return the updated decay value.
+        reset():
+            Reset the decay step to the initial state.
+
+    """
+    
     def __init__(self,
                  a = 1,
                  b = 1,
                  gamma = 1.,
                 ):
+        """
+        Initialize the PolynomialDecay schedule.
+
+        Args:
+            a (float): Coefficient a in the polynomial decay equation.
+            b (float): Coefficient b in the polynomial decay equation.
+            gamma (float): Exponent gamma in the polynomial decay equation.
+        """
         self.a = a
         self.b = b
         self.gamma = gamma
         self.t = 0
         
     def __call__(self):
+        """
+        Calculate the current decay value based on the polynomial decay equation.
+
+        Returns:
+            float: The current decay value.
+        """
         return self.a*((self.b+self.t)**-self.gamma)
     
     def step(self):
+        """
+        Advance the decay step and return the updated decay value.
+
+        Returns:
+            float: The updated decay value.
+        """
         val = self()
         self.t += 1
         return val
     
     def reset(self):
+        """
+        Reset the decay step to the initial state.
+
+        Returns:
+            None
+        """
         self.t = 0
         return None
 
 class SimulatedAnnealing(nn.Module):
+    """
+    Simulated Annealing generator using Metropolis-Hastings sampling.
+
+    Args:
+        params (nn.Module): The parameterized distribution to sample from.
+        energy_fn (callable): Energy function to calculate the energy of a sample.
+        n_positions (int, optional): Number of positions to update per step. Default is 1.
+        a (float, optional): Coefficient a in the polynomial decay equation. Default is 1.
+        b (float, optional): Coefficient b in the polynomial decay equation. Default is 1.
+        gamma (float, optional): Exponent gamma in the polynomial decay equation. Default is 1.
+
+    Methods:
+        collect_samples(n_steps=1, n_burnin=0, keep_burnin=False):
+            Collect Metropolis-Hastings samples using simulated annealing.
+        generate(n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, n_steps=1, n_burnin=0, keep_burnin=False):
+            Generate proposals using simulated annealing and Metropolis-Hastings sampling.
+
+    """
     
     @staticmethod
     def add_generator_specific_args(parent_parser):
+        """
+        Add generator-specific arguments to an existing argument parser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added generator-specific arguments.
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         
         group  = parser.add_argument_group('Generator Constructor args')
@@ -147,6 +303,15 @@ class SimulatedAnnealing(nn.Module):
 
     @staticmethod
     def process_args(grouped_args):
+        """
+        Process grouped arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            tuple: Tuple containing constructor arguments and runtime arguments.
+        """
         constructor_args = grouped_args['Generator Constructor args']
         runtime_args     = grouped_args['Generator Runtime args']
         
@@ -160,6 +325,17 @@ class SimulatedAnnealing(nn.Module):
                  b=1.,
                  gamma=1.,
                 ):
+        """
+        Initialize the SimulatedAnnealing generator.
+
+        Args:
+            params (nn.Module): The parameterized distribution to sample from.
+            energy_fn (callable): Energy function to calculate the energy of a sample.
+            n_positions (int, optional): Number of positions to update per step. Default is 1.
+            a (float, optional): Coefficient a in the polynomial decay equation. Default is 1.
+            b (float, optional): Coefficient b in the polynomial decay equation. Default is 1.
+            gamma (float, optional): Exponent gamma in the polynomial decay equation. Default is 1.
+        """
         super().__init__()
         self.params = params
         self.energy_fn = energy_fn
@@ -172,6 +348,17 @@ class SimulatedAnnealing(nn.Module):
         self.mh_engine = naive_mh_step
 
     def collect_samples(self, n_steps=1, n_burnin=0, keep_burnin=False):
+        """
+        Collect Metropolis-Hastings samples using simulated annealing.
+
+        Args:
+            n_steps (int, optional): Number of steps to collect samples. Default is 1.
+            n_burnin (int, optional): Number of burn-in steps. Default is 0.
+            keep_burnin (bool, optional): Whether to keep burn-in samples. Default is False.
+
+        Returns:
+            dict: Dictionary containing burn-in and sample trajectories.
+        """
         burnin = None
         samples= None
         
@@ -207,7 +394,20 @@ class SimulatedAnnealing(nn.Module):
 
     def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, 
                  n_steps=1, n_burnin=0, keep_burnin=False):
-        
+        """
+        Generate proposals using simulated annealing and Metropolis-Hastings sampling.
+
+        Args:
+            n_proposals (int, optional): Number of proposals to generate. Default is 1.
+            energy_threshold (float, optional): Energy threshold for proposal acceptance. Default is float("Inf").
+            max_attempts (int, optional): Maximum number of attempts to generate proposals. Default is 10000.
+            n_steps (int, optional): Number of steps for each proposal generation. Default is 1.
+            n_burnin (int, optional): Number of burn-in steps for each proposal generation. Default is 0.
+            keep_burnin (bool, optional): Whether to keep burn-in samples for each proposal. Default is False.
+
+        Returns:
+            dict: Dictionary containing generated proposals, energies, and acceptance rate.
+        """
         batch_size, *theta_shape = self.params.theta.shape
         proposals = torch.randn([0,*theta_shape])
         energies  = torch.randn([0])

@@ -7,12 +7,37 @@ import numpy as np
 import pandas as pd
 
 import torch
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from torch.utils.data import random_split, DataLoader, TensorDataset, ConcatDataset, Dataset
 
 from ..common import constants, utils
 
 class DNAActivityDataset(Dataset):
+    """
+    A PyTorch Dataset representing a collection of DNA sequences along with associated activity values.
+    
+    Args:
+        dna_tensor (torch.Tensor): A tensor containing DNA sequences represented in one-hot encoding.
+        activity_tensor (torch.Tensor): A tensor containing activity values associated with DNA sequences.
+        sort_tensor (torch.Tensor, optional): A tensor used for sorting the dataset based on activity values.
+        duplication_cutoff (float, optional): If provided, sequences with activity values greater than or equal
+            to this cutoff will be duplicated in the dataset to balance classes.
+        use_reverse_complements (bool, optional): If True, each DNA sequence is followed by its reverse complement
+            in the dataset, effectively doubling the dataset size.
+
+    Attributes:
+        dna_tensor (torch.Tensor): A tensor containing DNA sequences.
+        activity_tensor (torch.Tensor): A tensor containing activity values.
+        duplication_cutoff (float or None): The cutoff value for duplicating sequences.
+        use_reverse_complements (bool): Whether reverse complements are used.
+        n_examples (int): The total number of examples in the dataset.
+        n_duplicated (int): The number of duplicated examples due to class balancing.
+
+    Methods:
+        __len__(): Returns the effective length of the dataset, accounting for duplication and reverse complements.
+        __getitem__(idx): Retrieves the DNA sequence and activity value at the specified index,
+            considering reverse complements and duplicated sequences if applicable.
+    """
     
     def __init__(self, dna_tensor, activity_tensor, sort_tensor=None, 
                  duplication_cutoff=None, use_reverse_complements=False):
@@ -60,7 +85,47 @@ class DNAActivityDataset(Dataset):
         return dna, activity
 
 class MPRA_DataModule(pl.LightningDataModule):
-    
+    """
+    PyTorch Lightning DataModule for preprocessing, tokenizing, and creating Train/Val/Test dataloaders
+    for an MPRA (Massively Parallel Reporter Assay) dataset, with a column cotaining DNA sequences,
+    column(s) containing log2(Fold-Change), and a chromosome column.
+
+    Args:
+        datafile_path (str): Path to the .txt file containing the (space-separated) MPRA dataset.
+        data_project (list, optional): List of data project names. Default is ['BODA', 'UKBB', 'GTEX'].
+        project_column (str, optional): Name of the column containing data project information. Default is 'data_project'.
+        sequence_column (str, optional): Name of the column containing DNA sequences. Default is 'nt_sequence'.
+        activity_columns (list, optional): List of column names containing activity values. Default is ['K562_mean', 'HepG2_mean', 'SKNSH_mean'].
+        exclude_chr_train (list, optional): List of chromosomes to be excluded from training. Default is [''].
+        val_chrs (list, optional): List of chromosomes for validation. Default is ['19', '21', 'X'].
+        test_chrs (list, optional): List of chromosomes for testing. Default is ['7', '13'].
+        chr_column (str, optional): Name of the column containing chromosome numbers. Default is 'chr'.
+        std_multiple_cut (float, optional): Cut-off for extreme value filtering. Default is 6.0.
+        up_cutoff_move (float, optional): Cut-off shift for extreme value filtering. Default is 4.0.
+        synth_chr (str, optional): Synthetic chromosome identifier. Default is 'synth'.
+        synth_val_pct (float, optional): Percentage of synthetic data for validation. Default is 10.0.
+        synth_test_pct (float, optional): Percentage of synthetic data for testing. Default is 10.0.
+        synth_seed (int, optional): Seed for synthetic data selection. Default is 0.
+        batch_size (int, optional): Number of examples in each mini batch. Default is 32.
+        padded_seq_len (int, optional): Desired total sequence length after padding. Default is 600.
+        num_workers (int, optional): Number of workers for data loading. Default is 8.
+        normalize (bool, optional): Apply standard score normalization. Default is False.
+        duplication_cutoff (float, optional): Cutoff value for duplicating sequences during training. Default is None.
+        use_reverse_complements (bool, optional): Whether to use reverse complements for data augmentation. Default is False.
+
+    Methods:
+        setup(stage='train'): Preprocesses and tokenizes the dataset based on provided parameters.
+        train_dataloader(): Returns a DataLoader for the training dataset.
+        val_dataloader(): Returns a DataLoader for the validation dataset.
+        test_dataloader(): Returns a DataLoader for the test dataset.
+        synth_train_dataloader(): Returns a DataLoader for the synthetic training dataset.
+        synth_val_dataloader(): Returns a DataLoader for the synthetic validation dataset.
+        synth_test_dataloader(): Returns a DataLoader for the synthetic test dataset.
+        chr_train_dataloader(): Returns a DataLoader for the chromosome-based training dataset.
+        chr_val_dataloader(): Returns a DataLoader for the chromosome-based validation dataset.
+        chr_test_dataloader(): Returns a DataLoader for the chromosome-based test dataset.
+    """
+
     @staticmethod
     def add_data_specific_args(parent_parser):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
@@ -126,67 +191,10 @@ class MPRA_DataModule(pl.LightningDataModule):
                  normalize=False,
                  duplication_cutoff=None,
                  use_reverse_complements=False,
-                 **kwargs):       
+                 **kwargs):
         """
-        Takes a .txt file with a column cotaining DNA sequences,
-        column(s) containing log2FC, and a chromosome column.
-        Preprocesses, tokenizes, creates Train/Val/Test dataloaders.
-
-        Parameters
-        ----------
-        datafile_path : str
-            Path to the .txt file with the data (space-separated)..
-        data_project : str, optional
-            DESCRIPTION. The default is ['BODA', 'UKBB'].
-        project_column : str, optional
-            DESCRIPTION. The default is 'data_project'.
-        sequence_column : str, optional
-            Name of the column of the DNA sequences. The default is 'nt_sequence'.
-        activity_columns : list, optional
-            List of names of the columns with log2FC. The default is ['K562_mean', 'HepG2_mean', 'SKNSH_mean'].
-        exclude_chr_train : list, optional
-            List of chromosomes to be excluded from train. The default is [''].
-        val_chrs : list, optional
-            DESCRIPTION. The default is ['17','19','21','X'].
-        test_chrs : list, optional
-            DESCRIPTION. The default is ['7','13'].
-        chr_column : str, optional
-            Name of the column of the chromosome number. The default is 'chr'.
-        std_multiple_cut : float, optional
-            DESCRIPTION. The default is 6.0.
-        up_cutoff_move : float, optional
-            DESCRIPTION. The default is 3.0.
-        synth_chr : str, optional
-            DESCRIPTION. The default is 'synth'.
-        synth_val_pct : float, optional
-            DESCRIPTION. The default is 10.0.
-        synth_test_pct : float, optional
-            DESCRIPTION. The default is 10.0.
-        synth_seed : int, optional
-            DESCRIPTION. The default is 0.
-        batch_size : int, optional
-            Number of examples in each mini batch. The default is 32.
-        padded_seq_len : int, optional
-            Desired total sequence length after padding. The default is 600.
-        num_workers : int, optional
-            number of gpus or cpu cores to be used, right?. The default is 8.
-        normalize : bool, optional
-            DESCRIPTION. The default is False.
-        duplication_cutoff: float, optional
-            All sequences with max activity across cell types above this value will be
-            duplicated during training.
-        use_reverse_complements: bool, optional
-            If true, reverse complements of training sequences will be added to 
-            training set.
-        **kwargs : TYPE
-            DESCRIPTION.
-
-        Returns
-        -------
-        None.
-
+        Initializes the MPRA_DataModule with provided parameters.
         """
-        
         super().__init__()
         self.datafile_path = datafile_path
         self.data_project = data_project
@@ -211,7 +219,6 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.use_reverse_complements = use_reverse_complements
         
         self.pad_column_name = 'padded_seq'
-        self.tensor_column_name = 'onehot_seq'
         self.activity_means = None
         self.activity_stds = None
         self.synth_chr_as_set = {synth_chr}
@@ -220,24 +227,22 @@ class MPRA_DataModule(pl.LightningDataModule):
                                   in_column_name=self.sequence_column,
                                   padded_seq_len=self.padded_seq_len
                                   )
-        self.tokenize_fn = partial(utils.row_dna2tensor,
-                                   in_column_name=self.pad_column_name
-                                   )
         self.chr_dataset_train = None
         self.chr_dataset_val = None
         self.chr_dataset_test = None
         self.synth_dataset_train = None
         self.synth_dataset_val = None
         self.synth_dataset_test = None
-                
-    def setup(self, stage='train'):
-        #--------- parse data from MPRA file ---------
+
+    def setup(self, stage = 'train'):
+        """
+        Preprocesses and tokenizes the dataset based on provided parameters.
+        """
         columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column]
         temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns)
 
         temp_df = temp_df[temp_df[self.project_column].isin(self.data_project)].reset_index(drop=True)
-        
-        #--------- cut-off and standard score norm ---------
+
         means = temp_df[self.activity_columns].mean().to_numpy()
         stds  = temp_df[self.activity_columns].std().to_numpy()
         
@@ -254,9 +259,8 @@ class MPRA_DataModule(pl.LightningDataModule):
         if self.normalize:   
             temp_df[self.activity_columns] = (temp_df[self.activity_columns] - means) / stds
             self.activity_means = torch.Tensor(means)
-            self.activity_stds = torch.Tensor(stds)        
-        
-        #--------- print cut-off info ---------
+            self.activity_stds = torch.Tensor(stds)
+
         print('-'*50)
         print('')
         for idx, cell in enumerate(self.activity_columns):
@@ -274,48 +278,56 @@ class MPRA_DataModule(pl.LightningDataModule):
         print('')
         print('-'*50)
         print('')
-        
-        #--------- pad sequences, convert to one-hots ---------
-        print('Padding sequences...')
+
+        print('Padding sequences... \n')
         temp_df[self.pad_column_name] = temp_df.apply(self.padding_fn, axis=1)
-        print('Tokenizing sequences...')
-        
-        temp_df[self.tensor_column_name] = temp_df.apply(self.tokenize_fn, axis=1)
-        
-        #--------- split dataset in train/val/test sets ---------
-        print('Creating train/val/test datasets...')
+
+        print('Creating train/val/test datasets with tokenized sequences... \n')
         all_chrs = set(temp_df[self.chr_column])
         self.train_chrs = all_chrs - self.val_chrs - self.test_chrs - self.synth_chr_as_set - self.exclude_chr_train
-        
+
         if len(self.train_chrs) > 0:
-            sequences_train  = list(temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.train_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             activities_train = temp_df[temp_df[self.chr_column].isin(self.train_chrs)][self.activity_columns].to_numpy()
-            sequences_train  = torch.stack(sequences_train)
+            sequences_train  = torch.stack(list_tensor_seq)
             activities_train = torch.Tensor(activities_train)    
             self.chr_dataset_train = TensorDataset(sequences_train, activities_train)
             self.chr_dataset_train = DNAActivityDataset(sequences_train, activities_train, 
                                                         sort_tensor=torch.max(activities_train, dim=-1).values, 
                                                         duplication_cutoff=self.duplication_cutoff, 
                                                         use_reverse_complements=self.use_reverse_complements)
-        
+
         if len(self.val_chrs) > 0:
-            sequences_val  = list(temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.val_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             activities_val = temp_df[temp_df[self.chr_column].isin(self.val_chrs)][self.activity_columns].to_numpy()
-            sequences_val  = torch.stack(sequences_val)
+            sequences_val  = torch.stack(list_tensor_seq)
             activities_val = torch.Tensor(activities_val)  
             self.chr_dataset_val = TensorDataset(sequences_val, activities_val)
         
         if len(self.test_chrs) > 0:
-            sequences_test    = list(temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.tensor_column_name])                      
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.test_chrs)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
+            self.chr_df_test  = temp_df[temp_df[self.chr_column].isin(self.test_chrs)]
             activities_test   = temp_df[temp_df[self.chr_column].isin(self.test_chrs)][self.activity_columns].to_numpy()    
-            sequences_test    = torch.stack(sequences_test)        
+            sequences_test    = torch.stack(list_tensor_seq)        
             activities_test   = torch.Tensor(activities_test)
             self.chr_dataset_test = TensorDataset(sequences_test, activities_test)
              
         if self.synth_chr in all_chrs:
-            synth_sequences  = list(temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.tensor_column_name])
+            split_temp_df = temp_df.loc[temp_df[self.chr_column].isin(self.synth_chr_as_set)]
+            list_tensor_seq = []
+            for index, row in split_temp_df.iterrows():
+                list_tensor_seq.append(utils.row_dna2tensor(row, in_column_name=self.pad_column_name))
             synth_activities = temp_df[temp_df[self.chr_column].isin(self.synth_chr_as_set)][self.activity_columns].to_numpy()
-            synth_sequences  = torch.stack(synth_sequences)
+            synth_sequences  = torch.stack(list_tensor_seq)
             synth_activities = torch.Tensor(synth_activities)
             synth_dataset = TensorDataset(synth_sequences, synth_activities)
         
@@ -382,37 +394,64 @@ class MPRA_DataModule(pl.LightningDataModule):
         print('-'*50)    
                 
     def train_dataloader(self):
+        """
+        Returns a DataLoader for the training dataset.
+        """
         return DataLoader(self.dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def val_dataloader(self):
+        """
+        Returns a DataLoader for the validation dataset.
+        """
         return DataLoader(self.dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def test_dataloader(self):
+        """
+        Returns a DataLoader for the test dataset.
+        """
         return DataLoader(self.dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
     
     def synth_train_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic training dataset.
+        """
         return DataLoader(self.synth_dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def synth_val_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic validation dataset.
+        """
         return DataLoader(self.synth_dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def synth_test_dataloader(self):
+        """
+        Returns a DataLoader for the synthetic test dataset.
+        """
         return DataLoader(self.synth_dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
     
     def chr_train_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based training dataset.
+        """
         return DataLoader(self.chr_dataset_train, batch_size=self.batch_size,
                           shuffle=True, num_workers=self.num_workers)
     
     def chr_val_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based validation dataset.
+        """
         return DataLoader(self.chr_dataset_val, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)
 
     def chr_test_dataloader(self):
+        """
+        Returns a DataLoader for the chromosome-based test dataset.
+        """
         return DataLoader(self.chr_dataset_test, batch_size=self.batch_size,
                           shuffle=False, num_workers=self.num_workers)

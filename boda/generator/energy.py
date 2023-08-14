@@ -24,13 +24,44 @@ from boda.common.pymeme import streme, parse_streme_output
 ######################
 
 class BaseEnergy(torch.nn.Module):
+    """
+    BaseEnergy class for defining energy functions in sequence optimization.
+
+    This class serves as a base class for defining energy functions to be used in sequence optimization.
+    Subclasses should implement the `energy_calc` method to compute the energy of input sequences.
+
+    Methods:
+        __init__(): Initialize the BaseEnergy class.
+        forward(x_in): Compute the energy of input sequences and apply penalties if applicable.
+        energy_calc(x): Calculate the energy of input sequences.
+
+    Note:
+        - Subclasses must implement the `energy_calc` method to compute energy.
+
+    """
+    
     def __init__(self):
+        """
+        Initialize the BaseEnergy class.
+
+        Note:
+            This constructor initializes the model attribute to None.
+        """
         super().__init__()
 
         self.model = None
         
     def forward(self, x_in):
+        """
+        Compute the energy of input sequences and apply penalties if applicable.
 
+        Args:
+            x_in (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
         hook = self.energy_calc(x_in)
         
         try:
@@ -47,6 +78,19 @@ class BaseEnergy(torch.nn.Module):
         return hook
       
     def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Raises:
+            NotImplementedError: Raised when the method is not implemented.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
         raise NotImplementedError("Energy caclulation not implemented.")
         x_in = x.to(self.model.device)
         
@@ -56,9 +100,44 @@ class BaseEnergy(torch.nn.Module):
         return hook
       
 class OverMaxEnergy(BaseEnergy):
+    """
+    OverMaxEnergy class for defining energy functions based on OverMax (MinGap) values.
+
+    This class inherits from BaseEnergy and defines an energy function that calculates
+    the gap between the target (bias) cell activity and the maximum off-target (non-bias) cell
+    activity of a model's output for input sequences, with an optional value-bending factor.
+
+    Args:
+        model (torch.nn.Module): The neural network model used for energy calculation.
+        bias_cell (int, optional): Index of the target cell. Default is 0.
+        bias_alpha (float, optional): Scaling factor for the bias term. Default is 1.0.
+        bending_factor (float, optional): Bending factor applied to the model's output. Default is 0.0.
+        a_min (float, optional): Minimum value allowed after bending. Default is negative infinity.
+        a_max (float, optional): Maximum value allowed after bending. Default is positive infinity.
+
+    Methods:
+        add_energy_specific_args(parent_parser): Add energy-specific arguments to an argparse ArgumentParser.
+        process_args(grouped_args): Process grouped arguments and return energy-related arguments.
+        bend(x): Apply bending factor to the input tensor.
+        energy_calc(x): Calculate the energy of input sequences based on the maximum model outputs.
+
+    Note:
+        - The `model` provided must be a neural network model compatible with PyTorch.
+
+    """
     
     @staticmethod
     def add_energy_specific_args(parent_parser):
+        """
+        Add energy-specific arguments to an argparse ArgumentParser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added energy-specific arguments.
+
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Energy Module args')
         group.add_argument('--model_artifact', type=str)
@@ -71,6 +150,16 @@ class OverMaxEnergy(BaseEnergy):
 
     @staticmethod
     def process_args(grouped_args):
+        """
+        Process grouped arguments and return energy-related arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed energy-related arguments.
+
+        """
         energy_args = grouped_args['Energy Module args']
         
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -85,6 +174,18 @@ class OverMaxEnergy(BaseEnergy):
         return energy_args
 
     def __init__(self, model, bias_cell=0, bias_alpha=1., bending_factor=0., a_min=-math.inf, a_max=math.inf):
+        """
+        Initialize the OverMaxEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            bias_cell (int, optional): Index of the target cell. Default is 0.
+            bias_alpha (float, optional): Scaling factor for the bias term. Default is 1.0.
+            bending_factor (float, optional): Bending factor applied to the model's output. Default is 0.0.
+            a_min (float, optional): Minimum value allowed after bending. Default is negative infinity.
+            a_max (float, optional): Maximum value allowed after bending. Default is positive infinity.
+
+        """
         super().__init__()
         
         self.model = model
@@ -97,9 +198,29 @@ class OverMaxEnergy(BaseEnergy):
         self.a_max = a_max
 
     def bend(self, x):
+        """
+        Apply bending to the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Tensor with applied bending.
+
+        """
         return x - self.bending_factor * (torch.exp(-x) - 1)
         
     def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the maximum model outputs.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
         hook = x.to(self.model.device)
         
         hook = self.bend(self.model(hook).clamp(self.a_min,self.a_max))
@@ -108,9 +229,42 @@ class OverMaxEnergy(BaseEnergy):
         return energy
 
 class TargetEnergy(BaseEnergy):
+    """
+    TargetEnergy class for defining energy functions based on target values.
+
+    This class inherits from BaseEnergy and defines an energy function that calculates the sum of absolute
+    differences between the model's output and specified target values for input sequences.
+
+    Args:
+        model (torch.nn.Module): The neural network model used for energy calculation.
+        targets (list of float): List of target values to compare the model's output to.
+        lambd (float, optional): Lambda value for the soft shrinkage function. Default is 0.0.
+        a_min (float, optional): Minimum value allowed after clamping. Default is negative infinity.
+        a_max (float, optional): Maximum value allowed after clamping. Default is positive infinity.
+
+    Methods:
+        add_energy_specific_args(parent_parser): Add energy-specific arguments to an argparse ArgumentParser.
+        process_args(grouped_args): Process grouped arguments and return energy-related arguments.
+        energy_calc(x): Calculate the energy of input sequences based on the sum of absolute differences.
+
+    Note:
+        - The `model` provided must be a neural network model compatible with PyTorch.
+        - The energy calculation uses the soft shrinkage function and target values.
+
+    """
     
     @staticmethod
     def add_energy_specific_args(parent_parser):
+        """
+        Add energy-specific arguments to an argparse ArgumentParser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added energy-specific arguments.
+
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Energy Module args')
         group.add_argument('--model_artifact', type=str)
@@ -122,6 +276,16 @@ class TargetEnergy(BaseEnergy):
 
     @staticmethod
     def process_args(grouped_args):
+        """
+        Process grouped arguments and return energy-related arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed energy-related arguments.
+
+        """
         energy_args = grouped_args['Energy Module args']
         
         unpack_artifact(energy_args.model_artifact)
@@ -135,6 +299,17 @@ class TargetEnergy(BaseEnergy):
         return energy_args
 
     def __init__(self, model, targets, lambd=0.0, a_min=-math.inf, a_max=math.inf):
+        """
+        Initialize the TargetEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            targets (list of float): List of target values to compare the model's output to.
+            lambd (float, optional): Lambda value for the soft shrinkage function. Default is 0.0.
+            a_min (float, optional): Minimum value allowed after clamping. Default is negative infinity.
+            a_max (float, optional): Maximum value allowed after clamping. Default is positive infinity.
+
+        """
         super().__init__()
         
         self.model = model
@@ -151,6 +326,16 @@ class TargetEnergy(BaseEnergy):
         self.a_max = a_max
 
     def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the sum of absolute differences.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
         hook = x.to(self.model.device)
         
         energy = self.shrink( self.model(hook).clamp(self.a_min, self.a_max) - self.targets ).abs().sum(-1)
@@ -159,7 +344,36 @@ class TargetEnergy(BaseEnergy):
 
         
 class EntropyEnergy(BaseEnergy):
+    """
+    EntropyEnergy class for defining energy functions based on the entropy of model outputs.
+
+    This class inherits from BaseEnergy and defines an energy function that calculates the entropy of model
+    outputs for input sequences. Optionally, a bias term can be added to the energy calculation.
+
+    Args:
+        model (torch.nn.Module): The neural network model used for energy calculation.
+        bias_cell (int, optional): Index of the cell to apply bias to. Default is None.
+        bias_alpha (float, optional): Scaling factor for the bias term. Default is 1.0.
+
+    Methods:
+        energy_calc(x): Calculate the energy of input sequences based on the entropy of model outputs.
+
+    Note:
+        - The `model` provided must be a neural network model compatible with PyTorch.
+        - The energy calculation is based on the Shannon entropy of the model's output probabilities.
+
+    """
+    
     def __init__(self, model, bias_cell=None, bias_alpha=1.):
+        """
+        Initialize the EntropyEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            bias_cell (int, optional): Index of the cell to apply bias to. Default is None.
+            bias_alpha (float, optional): Scaling factor for the bias term. Default is 1.0.
+
+        """
         super().__init__()
         
         self.model = model
@@ -169,6 +383,16 @@ class EntropyEnergy(BaseEnergy):
         self.bias_alpha= bias_alpha
         
     def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the entropy of model outputs.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
         hook   = x.to(self.model.device)
         
         hook   = self.model(hook)
@@ -188,10 +412,44 @@ class EntropyEnergy(BaseEnergy):
 ####################
 
 class BasePenalty(torch.nn.Module):
+    """
+    BasePenalty class for defining penalty functions to be applied to input sequences.
+
+    This class serves as a base class for defining penalty functions that can be applied to input sequences
+    during energy calculations. Subclasses should implement the `penalty` method to customize the penalty
+    calculation.
+
+    Methods:
+        penalty(x): Calculate the penalty for input sequences.
+
+    Note:
+        - Subclasses should override the `penalty` method to define the specific penalty calculation.
+
+    """
     def __init__(self):
+        """
+        Initialize the BasePenalty class.
+
+        """
         super().__init__()
 
     def penalty(self, x):
+        """
+        Calculate the penalty for input sequences.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed penalty values.
+
+        Raises:
+            NotImplementedError: If the penalty method is not implemented in the subclass.
+
+        Note:
+            Subclasses should override this method to define the specific penalty calculation.
+
+        """
         raise NotImplementedError("Penalty not implemented")
         
         hook = x
@@ -199,7 +457,22 @@ class BasePenalty(torch.nn.Module):
         return hook
 
 def sync_width(tensor_1, tensor_2):
-    
+    """
+    Synchronize the width (length) of two tensors by zero-padding the shorter tensor.
+
+    This function pads the shorter tensor to match the width (length) of the longer tensor. It can be useful
+    when working with tensors that need to have the same dimensions for certain operations.
+
+    Args:
+        tensor_1 (torch.Tensor): The first input tensor.
+        tensor_2 (torch.Tensor): The second input tensor.
+
+    Returns:
+        tuple: A tuple containing the synchronized tensors. If the width of `tensor_1` is less than `tensor_2`,
+        `tensor_1` is padded with zeros. If the width of `tensor_2` is less than `tensor_1`, `tensor_2` is padded
+        with zeros. If both tensors have the same width, they are returned as-is.
+
+    """
     bs_1, nc_1, ln_1 = tensor_1.shape
     bs_2, nc_2, ln_2 = tensor_2.shape
     
@@ -217,8 +490,38 @@ def sync_width(tensor_1, tensor_2):
 
     
 class StremePenalty(BasePenalty):
+    """
+    A class representing a penalty term based on STREME motif enrichment analysis.
+
+    This class implements a penalty term based on motif analysis using a STREME output. It calculates
+    motif scores for proposed sequences and applies a penalty based on a pool of motifs and thresholds.
+
+    Args:
+        score_pct (float): The percentage of the maximum motif score used as the threshold for penalty application.
+
+    Attributes:
+        score_pct (float): The percentage of the maximum motif score used as the threshold for penalty application.
+
+    Methods:
+        register_penalty(x): Register the penalty filters for motif analysis.
+        register_threshold(x): Register the score thresholds for penalty application.
+        streme_penalty(streme_output): Calculate the penalty based on STREME motif analysis.
+        motif_penalty(x): Calculate the motif-based penalty for a given input.
+        penalty(x): Calculate and return the penalty based on the motif analysis.
+        update_penalty(proposal): Update the penalty filters and thresholds based on a new proposal.
+    """
+
     @staticmethod
     def add_penalty_specific_args(parent_parser):
+        """
+        Add STREME penalty specific arguments to an argument parser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): The parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: An argument parser with added STREME penalty specific arguments.
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Penalty Module args')
         group.add_argument('--score_pct', type=float, default=0.3)
@@ -226,28 +529,60 @@ class StremePenalty(BasePenalty):
 
     @staticmethod
     def process_args(grouped_args):
+        """
+        Process STREME penalty specific arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed STREME penalty specific arguments.
+        """
         penalty_args = grouped_args['Penalty Module args']
         return penalty_args
     
     def __init__(self, score_pct):
+        """
+        Initialize the STREME penalty.
+
+        Args:
+            score_pct (float): The percentage of the maximum motif score used as the threshold for penalty application.
+        """
         super().__init__()
         
         self.score_pct = score_pct
 
     def register_penalty(self, x):
+        """
+        Register the penalty filters (motif PWMs).
+
+        Args:
+            x (torch.Tensor): The penalty filters to be registered.
+        """
         try:
             self.penalty_filters = x.type_as(self.penalty_filters)
         except AttributeError:
             self.register_buffer('penalty_filters', x)
             
     def register_threshold(self, x):
+        """
+        Register the score thresholds for penalty application.
+
+        Args:
+            x (torch.Tensor): The score thresholds to be registered.
+        """
         try:
             self.score_thresholds = x.type_as(self.score_thresholds)
         except AttributeError:
             self.register_buffer('score_thresholds', x)
             
     def streme_penalty(self, streme_output):
-        
+        """
+        Calculate the penalty based on STREME motif enrichment analysis.
+
+        Args:
+            streme_output (dict): The output of the STREME motif analysis.
+        """
         try:
             penalty_weight = (self.penalty_filters.shape[0] // 2) + 1
         except AttributeError:
@@ -287,6 +622,15 @@ class StremePenalty(BasePenalty):
         self.register_threshold(score_thresholds)
                     
     def motif_penalty(self, x):
+        """
+        Calculate the motif-based penalty for a given input.
+
+        Args:
+            x (torch.Tensor): The input tensor for which the penalty is calculated.
+
+        Returns:
+            torch.Tensor: The calculated motif-based penalty.
+        """
         try:
             motif_scores = F.conv1d(x, self.penalty_filters)
             score_thresholds = torch.ones_like(motif_scores) * self.score_thresholds[None, :, None]
@@ -301,10 +645,28 @@ class StremePenalty(BasePenalty):
             return 0
 
     def penalty(self, x):
+        """
+        Calculate and return the penalty based on the motif analysis.
+
+        Args:
+            x (torch.Tensor): The input tensor for which the penalty is calculated.
+
+        Returns:
+            torch.Tensor: The calculated penalty based on motif analysis.
+        """
         hook = x.to(self.model.device)
         return self.motif_penalty(hook)
 
     def update_penalty(self, proposal):
+        """
+        Update the penalty filters and thresholds based on a new proposal.
+
+        Args:
+            proposal (dict): A proposal containing a new batch of sequences.
+
+        Returns:
+            dict: A summary of the update, including STREME output, filters, and score thresholds.
+        """
         proposals_list = common.utils.batch2list(proposal['proposals'])
         streme_results = streme(proposals_list)
         self.streme_penalty(streme_results)

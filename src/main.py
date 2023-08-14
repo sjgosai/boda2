@@ -11,10 +11,10 @@ import random
 import subprocess
 
 import torch
-from pytorch_lightning import Trainer
-from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch import Trainer
+from lightning.pytorch import loggers as pl_loggers
+from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 import boda
 from boda.common import utils
@@ -27,6 +27,19 @@ import hypertune
 #####################
 
 def set_best(my_model, callbacks):
+    """
+    Set the best model checkpoint for the provided model.
+
+    This function sets the state of the provided model to the state of the best checkpoint,
+    as determined by the `ModelCheckpoint` callback.
+
+    Args:
+        my_model (nn.Module): The model to be updated.
+        callbacks (dict): Dictionary of callbacks, including 'model_checkpoint'.
+
+    Returns:
+        nn.Module: The updated model.
+    """
     with tempfile.TemporaryDirectory() as tmpdirname:
         try:
             best_path = callbacks['model_checkpoint'].best_model_path
@@ -45,6 +58,23 @@ def set_best(my_model, callbacks):
 
 def save_model(data_module, model_module, graph_module, 
                 model, trainer, args):
+    """
+    Save the model and associated artifacts.
+
+    This function saves the model's state dictionary, along with information about the data, model, and graph modules,
+    to a checkpoint file. Additionally, it compresses the artifacts directory and saves it as a tar.gz file.
+
+    Args:
+        data_module (Module): Data module class.
+        model_module (Module): Model module class.
+        graph_module (Module): Graph module class.
+        model (nn.Module): The model to be saved.
+        trainer (lightning.pytorch.Trainer): The Trainer instance used for training.
+        args (dict): Dictionary of input arguments.
+
+    Returns:
+        None
+    """
     local_dir = args['pl.Trainer'].default_root_dir
     save_dict = {
         'data_module'  : data_module.__name__,
@@ -78,7 +108,19 @@ def save_model(data_module, model_module, graph_module,
 #######################
             
 def main(args):
-    
+    """
+    Main function for training a model using Pytorch Lightning.
+
+    This function orchestrates the training of a model using the specified data, model, and graph modules.
+    It sets up callbacks, creates the Trainer instance, fits the model, reports hypertuning metrics if applicable,
+    and saves the trained model and artifacts.
+
+    Args:
+        args (dict): Dictionary of input arguments.
+
+    Returns:
+        None
+    """
     data_module = getattr(boda.data, args['Main args'].data_module)
     model_module= getattr(boda.model, args['Main args'].model_module)
     graph_module= getattr(boda.graph, args['Main args'].graph_module)

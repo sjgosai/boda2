@@ -6,8 +6,63 @@ from tqdm import tqdm
 
 from boda.common import utils, constants
 
-# Adapted from https://github.com/samsinai/FLEXS/blob/master/flexs/baselines/explorers/adalead.py
+
 class AdaLead(nn.Module):
+    """
+    Adapt-with-the-Leader (AdaLead) module for sequence optimization.
+    Adapted from https://github.com/samsinai/FLEXS/blob/master/flexs/baselines/explorers/adalead.py
+
+    Args:
+        fitness_fn (callable): A function to evaluate the fitness of sequences.
+        measured_sequences (list[str]): List of initial sequences to start optimization from.
+        sequences_batch_size (int): Number of sequences in each batch during optimization.
+        model_queries_per_batch (int): Maximum number of fitness evaluations per batch.
+        seq_len (int): Length of each sequence.
+        padding_len (int): Length of padding added to each sequence for model queries.
+        vocab (str): The vocabulary of characters for sequences.
+        mu (float): Number of mutations per sequence during mutation step.
+        recomb_rate (float): Recombination rate for generating new sequences.
+        threshold (float): Threshold percentile for selecting top-performing sequences.
+        rho (int): Number of recombinations per generation.
+        eval_batch_size (int): Number of sequences to evaluate fitness concurrently.
+        **kwargs: Additional keyword arguments.
+
+    Attributes:
+        fitness_fn (callable): The fitness evaluation function.
+        measured_sequences (list[str]): Initial sequences for optimization.
+        sequences_batch_size (int): Batch size of sequences during optimization.
+        model_queries_per_batch (int): Maximum model queries per batch.
+        seq_len (int): Length of sequences.
+        padding_len (int): Length of padding added to sequences.
+        vocab (str): Vocabulary of characters for sequences.
+        mu (float): Number of mutations per sequence.
+        recomb_rate (float): Recombination rate for generating new sequences.
+        threshold (float): Threshold percentile for selecting top-performing sequences.
+        rho (int): Number of recombinations per generation.
+        eval_batch_size (int): Number of sequences to evaluate fitness concurrently.
+        vocab_len (int): Length of the vocabulary.
+        model_cost (int): Total cost of fitness evaluations.
+        upPad_logits (Tensor): Tensor for padding sequences upstream.
+        downPad_logits (Tensor): Tensor for padding sequences downstream.
+        device_reference_tensor (Tensor): Reference tensor for device information.
+        dflt_device (device): Default device for computations.
+
+    Methods:
+        get_fitness(sequence_list): Evaluate fitness of a list of sequences.
+        string_list_to_tensor(sequence_list): Convert list of sequences to tensor.
+        pad(tensor): Pad sequences with padding tensors.
+        start_from_random_sequences(num_sequences): Generate random initial sequences.
+        generate_random_mutant(sequence, mu, alphabet): Generate a random mutant sequence.
+        recombine_population(gen): Recombine sequences in a population.
+        propose_sequences(initial_sequences): Propose new sequences for optimization.
+        run(num_iterations, desc_str): Run the AdaLead optimization process.
+
+    Note:
+        - This class is designed for sequence optimization using the AdaLead algorithm.
+        - During optimization, it proposes new sequences based on fitness evaluations.
+
+    """
+    
     def __init__(self,
                  fitness_fn = None,
                  measured_sequences = None,
@@ -22,7 +77,24 @@ class AdaLead(nn.Module):
                  rho = 0,
                  eval_batch_size = 20,
                  **kwargs):
-        
+        """
+        Initialize the AdaLead optimizer.
+
+        Args:
+            fitness_fn (callable): A function to evaluate the fitness of sequences.
+            measured_sequences (list[str]): List of initial sequences to start optimization from.
+            sequences_batch_size (int): Number of sequences in each batch during optimization.
+            model_queries_per_batch (int): Maximum number of fitness evaluations per batch.
+            seq_len (int): Length of each sequence.
+            padding_len (int): Length of padding added to each sequence for model queries.
+            vocab (str): The vocabulary of characters for sequences.
+            mu (float): Number of mutations per sequence during mutation step.
+            recomb_rate (float): Recombination rate for generating new sequences.
+            threshold (float): Threshold percentile for selecting top-performing sequences.
+            rho (int): Number of recombinations per generation.
+            eval_batch_size (int): Number of sequences to evaluate fitness concurrently.
+            **kwargs: Additional keyword arguments.
+        """
         super().__init__()
         self.fitness_fn = fitness_fn
         self.measured_sequences = measured_sequences
@@ -52,6 +124,15 @@ class AdaLead(nn.Module):
         self.dflt_device = self.device_reference_tensor.device
         
     def get_fitness(self, sequence_list):
+        """
+        Evaluate the fitness of a list of sequences using the fitness function.
+
+        Args:
+            sequence_list (list[str]): List of sequences to evaluate.
+
+        Returns:
+            ndarray: Array of fitness values for the input sequences.
+        """
         self.model_cost += len(sequence_list)
         batch = self.string_list_to_tensor(sequence_list).to(self.dflt_device)
         batch = self.pad(batch)
@@ -59,9 +140,27 @@ class AdaLead(nn.Module):
         return fitnesses.squeeze().cpu().detach().numpy()
     
     def string_list_to_tensor(self, sequence_list):
+        """
+        Convert a list of sequences to a tensor representation.
+
+        Args:
+            sequence_list (list[str]): List of sequences.
+
+        Returns:
+            Tensor: Tensor containing the one-hot-encoded sequences.
+        """
         return torch.stack([utils.dna2tensor(sequence) for sequence in sequence_list])
              
     def pad(self, tensor):
+        """
+        Pad sequences with padding tensors.
+
+        Args:
+            tensor (Tensor): Input tensor of sequences.
+
+        Returns:
+            Tensor: Padded tensor containing sequences with padding.
+        """
         if self.padding_len > 0:
             batch_len = tensor.shape[0]
             upPad_logits, downPad_logits = self.upPad_logits.repeat(batch_len, 1, 1), \
@@ -71,6 +170,15 @@ class AdaLead(nn.Module):
             return tensor
     
     def start_from_random_sequences(self, num_sequences):
+        """
+        Generate random initial sequences.
+
+        Args:
+            num_sequences (int): Number of random sequences to generate.
+
+        Returns:
+            list[str]: List of randomly generated sequences.
+        """
         sequence_list = []
         for seq_idx in range(num_sequences):
             sequence_list.append( ''.join(random.choice(self.vocab) for i in range(self.seq_len)) )
@@ -78,6 +186,17 @@ class AdaLead(nn.Module):
     
     @staticmethod
     def generate_random_mutant(sequence: str, mu: float, alphabet: str):
+        """
+        Generate a random mutant sequence based on the given sequence.
+
+        Args:
+            sequence (str): Input sequence to mutate.
+            mu (float): Mutation rate for generating the mutant.
+            alphabet (str): Alphabet of characters for the sequence.
+
+        Returns:
+            str: Mutated sequence.
+        """
         mutant = []
         for s in sequence:
             if random.random() < mu:
@@ -87,6 +206,15 @@ class AdaLead(nn.Module):
         return "".join(mutant)
     
     def recombine_population(self, gen):
+        """
+        Recombine sequences in a population using crossover.
+
+        Args:
+            gen (list[str]): List of sequences in the population.
+
+        Returns:
+            list[str]: List of recombinant sequences.
+        """
         # If only one member of population, can't do any recombining
         if len(gen) == 1:
             return gen
@@ -110,8 +238,16 @@ class AdaLead(nn.Module):
             ret.append("".join(strB))
         return ret
     
-    def propose_sequences(self, initial_sequences): #from_last_checkpoint=False):              
-        """Propose top `sequences_batch_size` sequences for evaluation."""
+    def propose_sequences(self, initial_sequences): #from_last_checkpoint=False):     
+        """
+        Propose top sequences_batch_size sequences for evaluation.
+
+        Args:
+            initial_sequences (list[str]): Initial sequences to start optimization from.
+
+        Returns:
+            tuple: A tuple containing new sequences and their predicted fitness values.
+        """         
         measured_sequence_set = set(initial_sequences)
         measured_fitnesses = self.get_fitness(initial_sequences)
         
@@ -181,6 +317,16 @@ class AdaLead(nn.Module):
         return new_seqs[sorted_order], preds[sorted_order]
 
     def run(self, num_iterations=10, desc_str='Iterations'):
+        """
+        Run the AdaLead optimization process for a specified number of iterations.
+
+        Args:
+            num_iterations (int): Number of iterations to run.
+            desc_str (str): Description string for the progress bar.
+
+        Returns:
+            None
+        """
         self.dflt_device = self.device_reference_tensor.device    
         if self.measured_sequences is None:
             new_seqs = self.start_from_random_sequences(self.sequences_batch_size)

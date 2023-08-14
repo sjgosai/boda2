@@ -1,16 +1,48 @@
 import argparse
 import sys
+import copy
 
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import seaborn as sns
+
+import numpy as np
+import pandas as pd
 
 from ..common import constants, utils
 
 class FastSeqProp(nn.Module):
+    """
+    Fast SeqProp module for sequence optimization.
+
+    This class implements the sequence optimization algorithm Fast SeqProp
+
+    Methods:
+        add_generator_specific_args(parent_parser): Static method to add generator-specific arguments to a parser.
+        process_args(grouped_args): Static method to process grouped arguments.
+        __init__(energy_fn, params): Initialize the FastSeqProp optimizer.
+        run(n_steps, learning_rate, step_print, lr_scheduler, create_plot, log_param_hist): Run the optimization process.
+        generate(n_proposals, energy_threshold, max_attempts, n_steps, learning_rate, step_print,
+                 lr_scheduler, create_plot): Generate optimized sequences.
+
+    Note:
+        - This class is designed for sequence optimization using the FastSeqProp algorithm.
+
+    """
+    
     @staticmethod
     def add_generator_specific_args(parent_parser):
+        """
+        Static method to add generator-specific arguments to a parser.
+
+        Args:
+            parent_parser (ArgumentParser): Parent argument parser.
+
+        Returns:
+            ArgumentParser: Argument parser with added generator-specific arguments.
+        """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Generator Constructor args')
         # Empty
@@ -25,6 +57,15 @@ class FastSeqProp(nn.Module):
 
     @staticmethod
     def process_args(grouped_args):
+        """
+        Static method to process grouped arguments.
+
+        Args:
+            grouped_args (dict): Dictionary containing grouped arguments.
+
+        Returns:
+            tuple: A tuple containing constructor args and runtime args.
+        """
         constructor_args = grouped_args['Generator Constructor args']
         runtime_args     = grouped_args['Generator Runtime args']
         
@@ -34,6 +75,13 @@ class FastSeqProp(nn.Module):
                  energy_fn,
                  params
                 ):
+        """
+        Initialize the FastSeqProp optimizer.
+
+        Args:
+            energy_fn (callable): A function to evaluate the energy of sequences.
+            params (object): Object containing sequence parameters.
+        """
         super().__init__()
         self.energy_fn = energy_fn
         self.params = params                           
@@ -41,8 +89,21 @@ class FastSeqProp(nn.Module):
         try: self.energy_fn.eval()
         except: pass
     
-    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True):
-     
+    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True, log_param_hist=False):
+        """
+        Run the optimization process using FastSeqProp.
+
+        Args:
+            n_steps (int): Number of optimization steps.
+            learning_rate (float): Learning rate for optimization.
+            step_print (int): Print status after this many steps.
+            lr_scheduler (bool): Use learning rate scheduler.
+            create_plot (bool): Create an energy plot.
+            log_param_hist (bool): Log parameter history.
+
+        Returns:
+            None
+        """
         if lr_scheduler: etaMin = 1e-6
         else: etaMin = learning_rate
         
@@ -50,30 +111,56 @@ class FastSeqProp(nn.Module):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_steps, eta_min=etaMin)  
         
         energy_hist = []
+        param_hist = [ ]
         pbar = tqdm(range(1, n_steps+1), desc='Steps', position=0, leave=True)
         for step in pbar:
             optimizer.zero_grad()
             sampled_nucleotides = self.params()
             energy = self.energy_fn(sampled_nucleotides)
-            energy = self.params.rebatch( energy ).mean()
+            energy = self.params.rebatch( energy )
+            energy_hist.append(energy.detach().cpu().numpy())
+            energy = energy.mean()
             energy.backward()
             optimizer.step()
             scheduler.step()
-            energy_hist.append(energy.item())
+            if log_param_hist:
+                param_hist.append(np.copy(self.params.theta.detach().cpu().numpy()))
             if step % step_print == 0:
                 pbar.set_postfix({'Loss': energy.item(), 'LR': scheduler.get_last_lr()[0]})
         
-        self.energy_hist = energy_hist
+        self.energy_hist = np.stack( energy_hist )
+        if log_param_hist:
+            self.param_hist = np.stack( param_hist )
+        else:
+            self.param_hist = None
         if create_plot:
-            plt.plot(self.energy_hist)
-            plt.xlabel('Steps')
-            vert_label = plt.ylabel('Energy')
-            vert_label.set_rotation(90)
+            bsz = self.params.theta.shape[0]
+            plot_data = pd.DataFrame({
+                'step': np.repeat(np.arange(n_steps), bsz),
+                'energy': np.stack(energy_hist).flatten()
+            })
+            fig, ax = plt.subplots()
+            sns.lineplot(data=plot_data, x='step',y='energy',ax=ax)
             plt.show()
             
     def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, 
                  n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=False):
-        
+        """
+        Generate optimized sequences using FastSeqProp.
+
+        Args:
+            n_proposals (int): Number of proposals to generate.
+            energy_threshold (float): Energy threshold for acceptance.
+            max_attempts (int): Maximum attempts to generate proposals.
+            n_steps (int): Number of optimization steps for each attempt.
+            learning_rate (float): Learning rate for optimization.
+            step_print (int): Print status after this many steps.
+            lr_scheduler (bool): Use learning rate scheduler.
+            create_plot (bool): Create an energy plot.
+
+        Returns:
+            dict: Dictionary containing generated sequences, energies, and acceptance rate.
+        """
         batch_size, *theta_shape = self.params.theta.shape
         
         proposals = torch.randn([0,*theta_shape])
