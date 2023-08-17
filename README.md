@@ -1,5 +1,5 @@
 # Computational Optimization of DNA Activity (CODA)
-For legacy reasons, this repo is currently called boda2
+[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.08.552077v1). For legacy reasons, this repo is currently listed as boda2.
 
 # Contents
 
