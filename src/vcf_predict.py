@@ -354,6 +354,35 @@ class reductions(object):
         """
         return torch.gather(tensor, dim, index).squeeze(dim=dim)
     
+    @staticmethod
+    def pick_forward(tensor, dim):
+        """
+        Use with strand reduction to pick forward strand predictions.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to pick 0th indexed values.
+
+        Returns:
+            torch.Tensor: The 0th values along the specified dimension.
+        """
+        return tensor.index_select(dim=dim, index=torch.tensor(0)).squeeze(dim)
+        
+    @staticmethod
+    def pick_reverse(tensor, dim):
+        """
+        Use with strand reduction to pick reverse strand predictions.
+
+        Args:
+            tensor (torch.Tensor): Input tensor.
+            dim (int): The dimension along which to pick 1st indexed values.
+
+        Returns:
+            torch.Tensor: The 1st values along the specified dimension.
+        """
+        return tensor.index_select(dim=dim, index=torch.tensor(1)).squeeze(dim)
+        
+    
 class gatherings(object):
     """
     A collection of static methods for gathering indices corresponding to specific tensor operations.
@@ -712,8 +741,8 @@ if __name__ == '__main__':
     # VEP testing conditions
     parser.add_argument('--relative_start', type=int, default=0, help='Leftmost position where variant is tested, 0-based inclusive.')
     parser.add_argument('--relative_end', type=int, default=200, help='Rightmost position where variant is tested, 1-based exclusive.')
-    parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested.')
-    parser.add_argument('--strand_reduction', type=str, choices=('mean', 'sum', 'max', 'min', 'abs_max', 'abs_min', 'gather'), default='mean', help='Specify reduction over strands. Options: mean, sum, max, min, abs_max, abs_min, gather')
+    parser.add_argument('--step_size', type=int, default=1, help='Step size between positions where variants are tested. Validate tested variant indices using list(range(start, end))[::-step].')
+    parser.add_argument('--strand_reduction', type=str, choices=('mean', 'sum', 'max', 'min', 'abs_max', 'abs_min', 'gather', 'pick_forward', 'pick_reverse'), default='mean', help='Specify reduction over strands. Options: mean, sum, max, min, abs_max, abs_min, gather, pick_forward, pick_reverse')
     parser.add_argument('--window_reduction', type=str, choices=('mean', 'sum', 'max', 'min', 'abs_max', 'abs_min', 'gather'), default='mean', help='Specify reduction over testing windows. Options: mean, sum, max, min, abs_max, abs_min, gather.')
     # Conditional VEP testing args
     parser.add_argument('--strand_gathering', type=str, choices=('max', 'min', 'abs_max', 'abs_min'), help='If using a gather reduction over strands, specify index sorting function.')
