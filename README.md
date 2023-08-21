@@ -52,9 +52,9 @@ Which connects `jupyter lab` to ports `8888` and `6006`.
 More containers can be found at `gcr.io/sabeti-encode/boda`.
 
 # Interactive modeling and deployment
-CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`boda/README.md`](boda/README.md). The documentation for this is in progress.
+CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`tutorials/construct_new_model.ipynb`](tutorials/construct_new_model.ipynb). The documentation for this is in progress.
 
-Example interactive deployment of Malinois can be found here: [`analysis/SG016__inference_package_dev/basic_load_model.ipynb`](analysis/SG016__inference_package_dev/basic_load_model.ipynb)
+Example interactive deployment of Malinois can be found here: [`tutorials/load_malinois_model.ipynb`](tutorials/load_malinois_model.ipynb)
 
 # Applications
 We have developed python applications to train models and generate sequences using this library.
