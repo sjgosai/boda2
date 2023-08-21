@@ -93,7 +93,7 @@ python generate.py \
   --params_module StraightThroughParameters \
     --batch_size 512 --n_channels 4 --length 200 --n_samples 10 \
   --energy_module OverMaxEnergy \
-    --model_artifact gs://syrgoth/aip_ui_test/model_artifacts__20211113_021200__287348.tar.gz \
+    --model_artifact gs://tewhey-public-data/CODA_resources/malinois_model__20211113_021200__287348.tar.gz \
     --bias_cell 0 --bending_factor 1.0 --a_min -2.0 --a_max 6.0 \
   --generator_module FastSeqProp \
     --energy_threshold -2.0 --max_attempts 20 --n_steps 200 \
@@ -105,7 +105,7 @@ python generate.py \
 Trained models can be deployed to infer the effect of non-coding variants in CREs
 ```
 python vcf_predict.py \
-  --artifact_path gs://jax-tewhey-boda-project-data/common_data/model_artifacts__20211113_021200__287348.tar.gz \
+  --artifact_path gs://tewhey-public-data/CODA_resources/malinois_model__20211113_021200__287348.tar.gz \
   --vcf_file hepg2.ase.calls.fdr.05.vcf \
   --fasta_file GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta \
   --output test.vcf \
