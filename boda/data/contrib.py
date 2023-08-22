@@ -1,15 +1,20 @@
-### MAKING DATASET CLASS
 import torch
 import numpy as np
 from torch.utils.data import Dataset
 
+
 class InputSequences(Dataset):
-    def __init__(self, file_path):
+    def __init__(self, file_path, left_flank, right_flank):
         self.data = []
+        self.left_flank = left_flank
+        self.right_flank = right_flank
+        
         with open(file_path, 'r') as file:
             for line in file:
-                sequence, score = line.strip().split('\t')
-                self.data.append((sequence, float(score)))
+                parts = line.strip().split('\t')
+                sequence = parts[0]
+                score = list(map(float, parts[1:]))  # Convert all columns after the first one to floats
+                self.data.append((sequence, score))
 
         # Define a mapping for nucleotides to indices
         self.nucleotide_to_index = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
@@ -19,8 +24,12 @@ class InputSequences(Dataset):
 
     def __getitem__(self, index):
         sequence, score = self.data[index]
+        
+        # Add left and right flanks to the sequence
+        sequence_with_flanks = self.left_flank + sequence + self.right_flank
+        
         # Encode the sequence using one-hot encoding
-        sequence_tensor = self.encode_sequence(sequence)
+        sequence_tensor = self.encode_sequence(sequence_with_flanks)
 
         # Convert score to a torch tensor
         score_tensor = torch.tensor(score, dtype=torch.float32)
@@ -29,7 +38,7 @@ class InputSequences(Dataset):
 
     def encode_sequence(self, sequence):
         # Initialize an array of zeros with shape (4, sequence_length),
-        # where sequence_length is the length of the DNA sequence (in this case, 200)
+        # where sequence_length is the length of the DNA sequence (in this case, len(sequence))
         one_hot = np.zeros((4, len(sequence)))
 
         # Convert each nucleotide in the sequence to its one-hot representation
@@ -46,10 +55,8 @@ class InputSequences(Dataset):
 ### DATAMODULE
 import argparse
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning.core import LightningDataModule
 
 class SeqDataModule(LightningDataModule):
@@ -72,12 +79,14 @@ class SeqDataModule(LightningDataModule):
         self.val_file = val_file
         self.test_file = test_file
         self.batch_size = batch_size
-
+        self.left_flank = left_flank
+        self.right_flank = right_flank
+        
     def setup(self, stage=None):
         # Load the datasets from the files
-        self.train_dataset = InputSequences(self.train_file)
-        self.val_dataset = InputSequences(self.val_file)
-        self.test_dataset = InputSequences(self.test_file)
+        self.train_dataset = InputSequences(self.train_file, self.left_flank, self.right_flank)
+        self.val_dataset = InputSequences(self.val_file, self.left_flank, self.right_flank)
+        self.test_dataset = InputSequences(self.test_file, self.left_flank, self.right_flank)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
