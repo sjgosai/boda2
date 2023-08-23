@@ -50,7 +50,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import Dataset, DataLoader, random_split
-from pytorch_lightning.core import LightningDataModule
+from lightning.pytorch import LightningDataModule
 
 class SeqDataModule(LightningDataModule):
     @staticmethod
