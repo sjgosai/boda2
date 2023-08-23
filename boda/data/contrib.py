@@ -56,8 +56,8 @@ class InputSequences(Dataset):
 import argparse
 import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
-from pytorch_lightning.core import LightningDataModule
+from torch.utils.data import Dataset, DataLoader, random_split
+from lightning.pytorch import LightningDataModule
 
 class SeqDataModule(LightningDataModule):
     @staticmethod
