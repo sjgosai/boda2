@@ -179,7 +179,7 @@ class VepTester(nn.Module):
         self.use_cuda = torch.cuda.device_count() >= 1
         self.model = torch.nn.DataParallel(model) if torch.cuda.device_count() > 1 else model
         
-    def forward(self, ref_batch, alt_batch):
+    def forward(self, ref_batch, alt_batch, average_full_revcomp=False):
         """
         Perform a forward pass through the model with reference and alternate batches.
 
@@ -201,6 +201,16 @@ class VepTester(nn.Module):
         with torch.cuda.amp.autocast():
             ref_preds = self.model(ref_batch.contiguous())
             alt_preds = self.model(alt_batch.contiguous())
+            
+            if average_full_revcomp:
+                ref_preds = torch.stack([
+                    ref_preds,
+                    self.model(ref_batch.flip(dims=[1,2]).contiguous())
+                ], dim=0).mean(dim=0, keepdim=False)
+                alt_preds = torch.stack([
+                    alt_preds,
+                    self.model(alt_preds.flip(dims=[1,2]).contiguous())
+                ], dim=0).mean(dim=0, keepdim=False)
 
         ref_preds = ref_preds.unflatten(0, ref_shape[0:2])
         ref_preds = ref_preds.unflatten(1, (2, ref_shape[1]//2))
@@ -649,7 +659,10 @@ def main(args):
             ref_allele = flank_builder(ref_allele).contiguous()
             alt_allele = flank_builder(alt_allele).contiguous()
 
-            all_preds = vep_tester(ref_allele, alt_allele)
+            all_preds = vep_tester(
+                ref_allele, alt_allele, 
+                average_full_revcomp=args.average_full_revcomp
+            )
             
             if not args.raw_predictions:
                 
@@ -750,6 +763,7 @@ if __name__ == '__main__':
     parser.add_argument('--activity_filter', type=float, help='Minimum activity theshold to consider variant (checks both ref and alt).')
     parser.add_argument('--epsilon', type=float, default=1e-4, help='Small factor restore default behavior for variants where no orientation passes the activity_filter.')
     parser.add_argument('--gather_source', type=str, choices=('ref', 'alt', 'skew'), help='Variant prediction type to use for gathering. Choose from (ref, alt, skew)')
+    parser.add_argument('--average_full_revcomp', type=utils.str2bool, default=False, help='Compute and average over full reverse complmenents before applying strand reduction.')
     # Throughput management
     parser.add_argument('--use_contigs', type=str, nargs='*', default=[], help='Optional list of contigs (space seperated) to restrict testing to.')    
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size during sequence extraction from FASTA.')
