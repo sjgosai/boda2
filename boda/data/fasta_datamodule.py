@@ -25,7 +25,7 @@ def alphabet_onehotizer(seq, alphabet):
 
     Args:
         seq (str): The input sequence to be one-hot encoded.
-        alphabet (str): The alphabet of characters used for encoding.
+        alphabet (list): The alphabet of characters used for encoding.
 
     Returns:
         np.ndarray: A one-hot encoded array where each row corresponds to a character in 'seq'
