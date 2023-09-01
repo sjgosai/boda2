@@ -2,15 +2,20 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
+from ..common import constants, utils
+
 
 class InputSequences(Dataset):
-    def __init__(self, file_path, left_flank, right_flank, use_revcomp=False):
+    def __init__(self, file_path, left_flank, right_flank, use_revcomp=False, skip_header=False):
         self.data = []
         self.left_flank = left_flank
         self.right_flank = right_flank
         self.use_revcomp = use_revcomp
+        self.skip_header = skip_header
         
         with open(file_path, 'r') as file:
+            if self.skip_header:
+                file.readline()
             for line in file:
                 parts = line.strip().split('\t')
                 sequence = parts[0]
@@ -80,10 +85,11 @@ class SeqDataModule(LightningDataModule):
         group.add_argument('--batch_size', type=int, required=True)
         group.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:])
         group.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200])
-        group.add_argument('--use_revcomp', action='store_true', required=True)
+        group.add_argument('--use_revcomp', type=utils.str2bool, default=False)
+        group.add_argument('--skip_header', type=utils.str2bool, default=False)
         return parser
 
-    def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank=''):
+    def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank='', use_revcomp=False, skip_header=False):
         super().__init__()
         self.train_file = train_file
         self.val_file = val_file
@@ -92,12 +98,13 @@ class SeqDataModule(LightningDataModule):
         self.left_flank = left_flank
         self.right_flank = right_flank
         self.use_revcomp = use_revcomp
+        self.skip_header = skip_header
         
     def setup(self, stage=None):
         # Load the datasets from the files
-        self.train_dataset = InputSequences(self.train_file, self.left_flank, self.right_flank, self.use_revcomp)
-        self.val_dataset = InputSequences(self.val_file, self.left_flank, self.right_flank, self.use_revcomp)
-        self.test_dataset = InputSequences(self.test_file, self.left_flank, self.right_flank, self.use_revcomp)
+        self.train_dataset = InputSequences(self.train_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
+        self.val_dataset = InputSequences(self.val_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
+        self.test_dataset = InputSequences(self.test_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
