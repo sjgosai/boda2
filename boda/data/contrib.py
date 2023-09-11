@@ -80,7 +80,7 @@ class SeqDataModule(LightningDataModule):
         group.add_argument('--batch_size', type=int, required=True)
         group.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:])
         group.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200])
-        group.add_argument('--use_revcomp', action='store_true', required=True)
+        group.add_argument('--use_revcomp', action='store_true')
         return parser
 
     def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank=''):
