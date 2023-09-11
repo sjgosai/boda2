@@ -209,7 +209,7 @@ class VepTester(nn.Module):
                 ], dim=0).mean(dim=0, keepdim=False)
                 alt_preds = torch.stack([
                     alt_preds,
-                    self.model(alt_preds.flip(dims=[1,2]).contiguous())
+                    self.model(alt_batch.flip(dims=[1,2]).contiguous())
                 ], dim=0).mean(dim=0, keepdim=False)
 
         ref_preds = ref_preds.unflatten(0, ref_shape[0:2])
