@@ -431,6 +431,7 @@ class VCF:
         else:
             data = pd.read_csv(self.vcf_path, sep='\t', comment='#', header=None, usecols=[0,1,2,3,4])
         
+        print(f'loaded shape: {data.shape}', file=sys.stderr)
         data.columns = vcf_colnames[:data.shape[1]]
         data['chrom']= self.chr_prefix + data['chrom'].astype(str)
         
@@ -450,6 +451,7 @@ class VCF:
             total_filter = ~(ref_filter | alt_filter)
             data = data.loc[ total_filter ]
         
+        print(f'passed shape: {data.shape}', file=sys.stderr)
         # Length checks
         print('Allele length checks', file=sys.stderr)
         ref_lens = data['ref'].str.len()
@@ -461,6 +463,7 @@ class VCF:
         size_filter = (max_sizes < self.max_allele_size) & (indel_sizes < self.max_indel_size)
         data = data.loc[size_filter]
         
+        print(f'final shape: {data.shape}', file=sys.stderr)
         print('Done', file=sys.stderr)
         return data.reset_index(drop=True)
         
