@@ -461,7 +461,7 @@ class BasicParameters(ParamsBase):
 
 class StraightThroughParameters(ParamsBase):
     """
-    Parameters class that implements the Straight-Through Gumbel-Softmax estimator.
+    Parameters class that implements the Straight-Through estimator.
     
     Args:
         data (torch.Tensor): The initial parameter tensor.

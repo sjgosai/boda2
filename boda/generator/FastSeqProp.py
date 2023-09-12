@@ -13,6 +13,12 @@ import pandas as pd
 
 from ..common import constants, utils
 
+def mask_gradients(in_tensor, mask_tensor):
+    filter_tensor = 1 - mask_tensor
+    grad_pass  = in_tensor.mul(filter_tensor)
+    grad_block = in_tensor.detach().mul(mask_tensor)
+    return grad_pass + grad_block
+    
 class FastSeqProp(nn.Module):
     """
     Fast SeqProp module for sequence optimization.
@@ -89,7 +95,7 @@ class FastSeqProp(nn.Module):
         try: self.energy_fn.eval()
         except: pass
     
-    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=True, log_param_hist=False):
+    def run(self, n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, grad_mask=None, create_plot=True, log_param_hist=False):
         """
         Run the optimization process using FastSeqProp.
 
@@ -116,6 +122,8 @@ class FastSeqProp(nn.Module):
         for step in pbar:
             optimizer.zero_grad()
             sampled_nucleotides = self.params()
+            if grad_mask is not None:
+                sampled_nucleotides = mask_gradients(sampled_nucleotides, grad_mask)
             energy = self.energy_fn(sampled_nucleotides)
             energy = self.params.rebatch( energy )
             energy_hist.append(energy.detach().cpu().numpy())
@@ -142,8 +150,9 @@ class FastSeqProp(nn.Module):
             fig, ax = plt.subplots()
             sns.lineplot(data=plot_data, x='step',y='energy',ax=ax)
             plt.show()
+            return plot_data
             
-    def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, 
+    def generate(self, n_proposals=1, energy_threshold=float("Inf"), max_attempts=10000, grad_mask=None, 
                  n_steps=20, learning_rate=0.5, step_print=10, lr_scheduler=True, create_plot=False):
         """
         Generate optimized sequences using FastSeqProp.
@@ -177,7 +186,7 @@ class FastSeqProp(nn.Module):
         
             self.run(
                 n_steps=n_steps, learning_rate=learning_rate, step_print=step_print, 
-                lr_scheduler=lr_scheduler, create_plot=create_plot
+                lr_scheduler=lr_scheduler, grad_mask=grad_mask, create_plot=create_plot
             )
             
             with torch.no_grad():
