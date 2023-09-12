@@ -342,7 +342,169 @@ class TargetEnergy(BaseEnergy):
         
         return energy
 
+class PickEnergy(BaseEnergy):
+    
+    @staticmethod
+    def add_energy_specific_args(parent_parser):
+        """
+        Add energy-specific arguments to an argparse ArgumentParser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added energy-specific arguments.
+
+        """
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Energy Module args')
+        group.add_argument('--model_artifact', type=str)
+        group.add_argument('--target_feature', type=int)
+        group.add_argument('--a_min', type=float, default=-math.inf)
+        group.add_argument('--a_max', type=float, default=math.inf)
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Process grouped arguments and return energy-related arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed energy-related arguments.
+
+        """
+        energy_args = grouped_args['Energy Module args']
         
+        unpack_artifact(energy_args.model_artifact)
+        model = model_fn('./artifacts')
+        model.cuda()
+        model.eval()
+        energy_args.model = model
+
+        del energy_args.model_artifact
+        
+        return energy_args
+
+    def __init__(self, model, target_feature, a_min=-math.inf, a_max=math.inf):
+        """
+        Initialize the PickEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            target_feature (int): Index of model feature used to calculate energy.
+            a_min (float, optional): Minimum value allowed after clamping. Default is negative infinity.
+            a_max (float, optional): Maximum value allowed after clamping. Default is positive infinity.
+
+        """
+        super().__init__()
+        
+        self.model = model
+        self.model.eval()
+        
+        self.target_feature = target_feature
+        self.a_min = a_min
+        self.a_max = a_max
+
+    def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the sum of absolute differences.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
+        hook = x.to(self.model.device)
+        
+        energy = self.model(hook).clamp(self.a_min, self.a_max)[...,self.target_feature].mul(-1.)
+        
+        return energy
+
+class MinEnergy(BaseEnergy):
+    
+    @staticmethod
+    def add_energy_specific_args(parent_parser):
+        """
+        Add energy-specific arguments to an argparse ArgumentParser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added energy-specific arguments.
+
+        """
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Energy Module args')
+        group.add_argument('--model_artifact', type=str)
+        group.add_argument('--a_min', type=float, default=-math.inf)
+        group.add_argument('--a_max', type=float, default=math.inf)
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Process grouped arguments and return energy-related arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed energy-related arguments.
+
+        """
+        energy_args = grouped_args['Energy Module args']
+        
+        unpack_artifact(energy_args.model_artifact)
+        model = model_fn('./artifacts')
+        model.cuda()
+        model.eval()
+        energy_args.model = model
+
+        del energy_args.model_artifact
+        
+        return energy_args
+
+    def __init__(self, model, a_min=-math.inf, a_max=math.inf):
+        """
+        Initialize the PickEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            a_min (float, optional): Minimum value allowed after clamping. Default is negative infinity.
+            a_max (float, optional): Maximum value allowed after clamping. Default is positive infinity.
+
+        """
+        super().__init__()
+        
+        self.model = model
+        self.model.eval()
+        
+        self.a_min = a_min
+        self.a_max = a_max
+
+    def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the sum of absolute differences.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
+        hook = x.to(self.model.device)
+        
+        energy = self.model(hook).clamp(self.a_min, self.a_max).min(dim=-1).mul(-1.)
+        
+        return energy
+
 class EntropyEnergy(BaseEnergy):
     """
     EntropyEnergy class for defining energy functions based on the entropy of model outputs.
