@@ -501,7 +501,7 @@ class MinEnergy(BaseEnergy):
         """
         hook = x.to(self.model.device)
         
-        energy = self.model(hook).clamp(self.a_min, self.a_max).min(dim=-1).mul(-1.)
+        energy = self.model(hook).clamp(self.a_min, self.a_max).min(dim=-1).values.mul(-1.)
         
         return energy
 
