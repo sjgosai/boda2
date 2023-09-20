@@ -606,7 +606,7 @@ def main(args):
     if args.n_jobs > 1:
         extra_tasks = len(vcf_data) % args.n_jobs
         if extra_tasks > 0:
-            subset_size = (len(vcf_data)-extra_tasks) // (args.n_jobs-1)
+            subset_size = ((len(vcf_data) // args.n_jobs) + 1)
         else:
             subset_size = len(vcf_data) // args.n_jobs
         start_idx = subset_size*args.job_id
