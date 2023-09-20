@@ -83,11 +83,20 @@ class SeqDataModule(LightningDataModule):
         group.add_argument('--val_file', type=str, required=True)
         group.add_argument('--test_file', type=str, required=True)
         group.add_argument('--batch_size', type=int, required=True)
-        group.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:])
-        group.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200])
+        group.add_argument('--left_flank', type=str, default=constants.MPRA_UPSTREAM[-200:])
+        group.add_argument('--right_flank', type=str, default=constants.MPRA_DOWNSTREAM[:200])
         group.add_argument('--use_revcomp', type=utils.str2bool, default=False)
         group.add_argument('--skip_header', type=utils.str2bool, default=False)
         return parser
+
+    @staticmethod
+    def add_conditional_args(parser, known_args):
+        return parser
+    
+    @staticmethod
+    def process_args(grouped_args):
+        data_args    = grouped_args['Data Module args']
+        return data_args
 
     def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank='', use_revcomp=False, skip_header=False):
         super().__init__()
