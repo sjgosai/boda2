@@ -102,14 +102,16 @@ class Basset(ptl.LightningModule):
     @staticmethod
     def process_args(grouped_args):
         """
-        Add conditional arguments based on known arguments.
+        Perform any required processessing of command line args required 
+        before passing to the class constructor.
 
         Args:
-            parser (argparse.ArgumentParser): Argument parser.
-            known_args (Namespace): Namespace of known arguments.
+            grouped_args (Namespace): Namespace of known arguments with 
+            `'Model Module args'` key.
 
         Returns:
-            argparse.ArgumentParser: Argument parser with added conditional arguments.
+            Namespace: A modified namespace that can be passed to the 
+            associated class constructor.
         """
         model_args   = grouped_args['Model Module args']
         return model_args
