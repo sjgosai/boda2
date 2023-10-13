@@ -1,9 +1,5 @@
-from .basset import Basset, BassetVL
-from .mpra_basset import MPRA_Basset
-from .contrib import BassetEntropyVL, BassetBranched
+from .basset import Basset, BassetVL, BassetEntropyVL, BassetBranched
 
 __all__ = [
-    'Basset', 'BassetVL', 
-    'MPRA_Basset', 
-    'BassetEntropyVL', 'BassetBranched'
+    'Basset', 'BassetVL', 'BassetEntropyVL', 'BassetBranched',
 ]
