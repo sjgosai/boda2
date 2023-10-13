@@ -18,7 +18,11 @@ class ExampleModel(torch.nn.Module):
             An updated ArgumentParser
         """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--hiddel_dims', type=int)
+        group  = parser.add_argument_group('Model Module args')
+        group.add_argument('--hiddel_dims', type=int, default=8)
+        group.add_argument('--output_dims', type=int, default=1)
+        group.add_argument('--activation', type=str, default='ReLU')
+        
         return parser
         
     @staticmethod
@@ -35,6 +39,23 @@ class ExampleModel(torch.nn.Module):
                 by non-conditionally specified args.
         """
         return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Perform any required processessing of command line args required 
+        before passing to the class constructor.
+
+        Args:
+            grouped_args (Namespace): Namespace of known arguments with 
+            `'Model Module args'` key.
+
+        Returns:
+            Namespace: A modified namespace that can be passed to the 
+            associated class constructor.
+        """
+        model_args   = grouped_args['Model Module args']
+        return model_args
 
     def __init__(self, hidden_dims=8, output_dims=1, activation='ReLU', **kwargs):
         super().__init__()

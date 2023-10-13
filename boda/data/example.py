@@ -22,8 +22,9 @@ class ExampleData(torch.nn.Module):
             An updated ArgumentParser
         """
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument('--data_dir', type=str)
-        parser.add_argument('--batch_size', type=int)
+        group  = parser.add_argument_group('Data Module args')
+        group.add_argument('--data_dir', type=str)
+        group.add_argument('--batch_size', type=int)
         return parser
         
     @staticmethod
@@ -40,6 +41,23 @@ class ExampleData(torch.nn.Module):
                 by non-conditionally specified args.
         """
         return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Perform any required processessing of command line args required 
+        before passing to the class constructor.
+
+        Args:
+            grouped_args (Namespace): Namespace of known arguments with 
+            `'Data Module args'` key.
+
+        Returns:
+            Namespace: A modified namespace that can be passed to the 
+            associated class constructor.
+        """
+        model_args   = grouped_args['Data Module args']
+        return model_args
 
     def __init__(self, data_dir='/no/data_dir/specified', batch_size=8, **kwargs):
         super().__init__()
