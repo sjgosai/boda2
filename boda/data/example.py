@@ -46,7 +46,8 @@ class ExampleData(torch.nn.Module):
     def process_args(grouped_args):
         """
         Perform any required processessing of command line args required 
-        before passing to the class constructor.
+        before passing to the class constructor. A bridge between the parsed 
+        arguments and the class constructor.
 
         Args:
             grouped_args (Namespace): Namespace of known arguments with 

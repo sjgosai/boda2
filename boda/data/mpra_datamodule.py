@@ -149,7 +149,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         group.add_argument('--batch_size', type=int, default=32, 
                            help='Number of examples in each mini batch')         
         group.add_argument('--padded_seq_len', type=int, default=600, 
-                           help='Desired total sequence length after padding') 
+                           help='Desired total sequence length after padding')
+        group.add_argument('--left_flank', type=str, default=constants.MPRA_UPSTREAM)
+        group.add_argument('--right_flank', type=str, default=constants.MPRA_DOWNSTREAM)
         group.add_argument('--num_workers', type=int, default=8, 
                            help='number of gpus or cpu cores to be used') 
         group.add_argument('--normalize', type=utils.str2bool, default=False, 
@@ -187,6 +189,8 @@ class MPRA_DataModule(pl.LightningDataModule):
                  synth_seed=0,
                  batch_size=32,
                  padded_seq_len=600, 
+                 left_flank=constants.MPRA_UPSTREAM,
+                 right_flank=constants.MPRA_DOWNSTREAM,
                  num_workers=8,
                  normalize=False,
                  duplication_cutoff=None,
@@ -212,7 +216,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.synth_test_pct = synth_test_pct
         self.synth_seed = synth_seed
         self.batch_size = batch_size
-        self.padded_seq_len = padded_seq_len        
+        self.padded_seq_len = padded_seq_len  
+        self.left_flank = left_flank
+        self.right_flank = right_flank
         self.num_workers = num_workers
         self.normalize = normalize
         self.duplication_cutoff = duplication_cutoff
@@ -225,7 +231,9 @@ class MPRA_DataModule(pl.LightningDataModule):
         
         self.padding_fn = partial(utils.row_pad_sequence,
                                   in_column_name=self.sequence_column,
-                                  padded_seq_len=self.padded_seq_len
+                                  padded_seq_len=self.padded_seq_len,
+                                  upStreamSeq=self.left_flank,
+                                  downStreamSeq=self.right_flank
                                   )
         self.chr_dataset_train = None
         self.chr_dataset_val = None

@@ -471,7 +471,8 @@ class StraightThroughParameters(ParamsBase):
         token_dim (int, optional): Token dimension. Default is -2.
         cat_axis (int, optional): Axis along which to concatenate the flanks and the sample. Default is -1.
         n_samples (int, optional): Number of samples to draw. Default is 1.
-        use_affine (bool, optional): Whether to use affine transformation in InstanceNorm. Default is True.
+        use_norm (bool, optional): Whether to use InstanceNorm. Default is True.
+        use_affine (bool, optional): Whether to use affine transformation in InstanceNorm. Default is False.
     """
 
     @staticmethod
@@ -500,6 +501,7 @@ class StraightThroughParameters(ParamsBase):
         group.add_argument('--token_dim', type=int, default=-2)
         group.add_argument('--cat_axis', type=int, default=-1)
         group.add_argument('--n_samples', type=int, default=1)
+        group.add_argument('--use_norm', type=utils.str2bool, default=True)
         group.add_argument('--use_affine', type=utils.str2bool, default=False)
         
         return parser
@@ -561,7 +563,9 @@ class StraightThroughParameters(ParamsBase):
                  token_dim=-2,
                  cat_axis=-1,
                  n_samples=1,
-                 use_affine=True):
+                 use_norm=True,
+                 use_affine=False,
+                 logit_mask=None):
         """
         Initialize StraightThroughParameters.
         
@@ -573,6 +577,7 @@ class StraightThroughParameters(ParamsBase):
             token_dim (int, optional): Token dimension. Default is -2.
             cat_axis (int, optional): Axis along which to concatenate the flanks and the sample. Default is -1.
             n_samples (int, optional): Number of samples to draw. Default is 1.
+            use_norm (bool, optional): Whether to use InstanceNorm. Default is True.
             use_affine (bool, optional): Whether to use affine transformation in InstanceNorm. Default is True.
         """
         super().__init__()
@@ -585,14 +590,23 @@ class StraightThroughParameters(ParamsBase):
         self.batch_dim = batch_dim
         self.token_dim = token_dim
         self.n_samples = n_samples
+        self.use_norm  = use_norm
         self.use_affine = use_affine
+        if logit_mask is not None:
+            self.register_buffer('logit_mask', logit_mask.detach().clone())
+        else:
+            self.logit_mask = logit_mask
         
         self.num_classes= self.theta.shape[self.token_dim]
         self.n_dims     = len(self.theta.shape)
         self.repeater   = [ 1 for i in range(self.n_dims) ]
         self.batch_size = self.theta.shape[self.batch_dim]
 
-        self.instance_norm = nn.InstanceNorm1d(num_features=self.num_classes, affine=self.use_affine)
+        if self.use_norm:
+            self.norm = nn.InstanceNorm1d(num_features=self.num_classes, 
+                                          affine=self.use_affine)
+        else:
+            self.norm = nn.Identity()
         
     @property
     def shape(self):
@@ -611,10 +625,14 @@ class StraightThroughParameters(ParamsBase):
         Returns:
             torch.Tensor: Concatenated logits.
         """
-        my_attr = [ getattr(self, x) for x in ['left_flank', 'theta', 'right_flank'] ]
+        my_attr = [
+            getattr(self, 'left_flank').mul(10), 
+            getattr(self, 'theta'), 
+            getattr(self, 'right_flank').mul(10)
+        ]
         return torch.cat( [ x for x in my_attr if x is not None ], axis=self.cat_axis )
         
-    def get_probs(self, x=None):
+    def get_probs(self, x=None, tau=1.):
         """
         Get the probabilities using Gumbel-Softmax estimator.
 
@@ -626,10 +644,14 @@ class StraightThroughParameters(ParamsBase):
         """
         if x is None:
             x = self.theta
-        logits = self.instance_norm(x)
-        return F.softmax(logits, dim=self.token_dim)
+        logits = self.norm(x)
+        if self.logit_mask is not None:
+            masked_logits = logits.detach().mul( self.logit_mask )
+            free_logits   = logits.mul( 1 - self.logit_mask )
+            logits = free_logits + masked_logits
+        return F.softmax(logits / tau, dim=self.token_dim)
         
-    def get_sample(self, x=None):
+    def get_sample(self, x=None, tau=1.):
         """
         Get the sampled tensor using Straight-Through Gumbel-Softmax estimator.
 
@@ -639,7 +661,7 @@ class StraightThroughParameters(ParamsBase):
         Returns:
             torch.Tensor: Sampled tensor.
         """
-        probs = self.get_probs(x)
+        probs = self.get_probs(x, tau)
         probs_t = torch.transpose(probs, self.token_dim, self.cat_axis)
         sampled_idxs = Categorical( probs_t )
         samples = sampled_idxs.sample( (self.n_samples, ) )
@@ -671,7 +693,7 @@ class StraightThroughParameters(ParamsBase):
             
         return torch.cat( pieces, axis=self.cat_axis )
     
-    def forward(self, x=None):
+    def forward(self, x=None, tau=1.):
         """
         Forward pass through the StraightThroughParameters module.
 
@@ -681,7 +703,7 @@ class StraightThroughParameters(ParamsBase):
         Returns:
             torch.Tensor: Forward pass result.
         """
-        return self.add_flanks( self.get_sample(x) ).flatten(0,1)
+        return self.add_flanks( self.get_sample(x, tau) ).flatten(0,1)
                 
     def reset(self):
         """

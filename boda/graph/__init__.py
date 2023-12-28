@@ -1,4 +1,4 @@
-from .cnn_prediction import CNNBasicTraining, CNNTransferLearning, CNNTransferLearningActivityBias
+from .cnn_prediction_alt import CNNBasicTraining, CNNTransferLearning, CNNTransferLearningActivityBias
 
 __all__ = [
     'CNNBasicTraining', 'CNNTransferLearning', 'CNNTransferLearningActivityBias'
