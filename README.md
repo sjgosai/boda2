@@ -137,7 +137,7 @@ python /home/ubuntu/boda2/src/generate.py \
     --n_proposals 1000 \
     --proposal_path ./test__k562__fsp
 ```
-The target cell type can be changed by modifying `--target_feature` where if you're using Malinois, `{'K562': 0, 'HepG2': 1, 'SKNSH': 2}`.
+The target cell type can be changed by picking a different index for `--target_feature`. If you're using Malinois, `{'K562': 0, 'HepG2': 1, 'SKNSH': 2}`.
 
 
 This command will run Simulated Annealing with the same objective:
