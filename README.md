@@ -155,6 +155,8 @@ python /home/ubuntu/boda2/src/generate.py \
     --proposal_path ./test__k562__sa
 ```
 
+We have an example of back to back training and design using terminal commands in [run_training_and_design.ipynb](https://github.com/sjgosai/boda2/blob/main/tutorials/run_training_and_design.ipynb).
+
 ## Variant effect prediction
 Trained models can be deployed to infer the effect of non-coding variants in CREs
 ```
