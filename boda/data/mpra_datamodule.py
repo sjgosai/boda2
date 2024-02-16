@@ -91,7 +91,8 @@ class MPRA_DataModule(pl.LightningDataModule):
     column(s) containing log2(Fold-Change), and a chromosome column.
 
     Args:
-        datafile_path (str): Path to the .txt file containing the (space-separated) MPRA dataset.
+        datafile_path (str): Path to the .txt file containing the MPRA dataset.
+        sep (str, optional): Delimiter for data file. Default data file is space-delimited.
         data_project (list, optional): List of data project names. Default is ['BODA', 'UKBB', 'GTEX'].
         project_column (str, optional): Name of the column containing data project information. Default is 'data_project'.
         sequence_column (str, optional): Name of the column containing DNA sequences. Default is 'nt_sequence'.
@@ -131,28 +132,28 @@ class MPRA_DataModule(pl.LightningDataModule):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Data Module args')
         
-        group.add_argument('--datafile_path', type=str, required=True)
-        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma', " ", "\t", ","})
-        group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'])
-        group.add_argument('--project_column', type=str, default='data_project')
-        group.add_argument('--sequence_column', type=str, default='nt_sequence')
-        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'])
-        group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''])
-        group.add_argument('--val_chrs', type=str, nargs='+', default=['19','21','X'])
-        group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'])
-        group.add_argument('--chr_column', type=str, default='chr')
-        group.add_argument('--std_multiple_cut', type=float, default=6.0)
-        group.add_argument('--up_cutoff_move', type=float, default=3.0)
-        group.add_argument('--synth_chr', type=str, default='synth')
-        group.add_argument('--synth_val_pct', type=float, default=10.0)
-        group.add_argument('--synth_test_pct', type=float, default=10.0)
-        group.add_argument('--synth_seed', type=int, default=0)
+        group.add_argument('--datafile_path', type=str, required=True, help="Path to MPRA data in txt format.")
+        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma', " ", "\t", ","}, default=" ", help="Delimiter to parse data file.")
+        group.add_argument('--project_column', type=str, default='data_project', help="Header to match column that can be used to filter data file.")
+        group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'], help="Values which indicate examples to keep from data file.")
+        group.add_argument('--sequence_column', type=str, default='nt_sequence', help="Header to match column containing nucleotide sequences.")
+        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'], help="Header(s) to match columns containing features to model.")
+        group.add_argument('--chr_column', type=str, default='chr', help="Header to match column containing chromosome info for each example.")
+        group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''], help="Chromosomes to exclude from the data set.")
+        group.add_argument('--val_chrs', type=str, nargs='+', default=['19','21','X'], help="Chromosomes to reserve for model validation during fitting/HPO")
+        group.add_argument('--test_chrs', type=str, nargs='+', default=['7','13'], help="Chromosomes to reserve for final generalizability testing")
+        group.add_argument('--std_multiple_cut', type=float, default=6.0, help="Factor to multipy by standard deviation to define bounds for trusted measurements. Removes extreme outliers.")
+        group.add_argument('--up_cutoff_move', type=float, default=3.0, help="Shift factor for upper bound of outlier filter.")
+        group.add_argument('--synth_chr', type=str, default='synth', help="Value to identify non-mapped elements with no assigned chomosome.")
+        group.add_argument('--synth_val_pct', type=float, default=10.0, help="Percentage of non-mapped elements to reserve in validation set.")
+        group.add_argument('--synth_test_pct', type=float, default=10.0, help="Percentage of non-mapped elements to reserve in test set.")
+        group.add_argument('--synth_seed', type=int, default=0, help="Random seed to control splitting of non-mapped elements.")
         group.add_argument('--batch_size', type=int, default=32, 
                            help='Number of examples in each mini batch')         
         group.add_argument('--padded_seq_len', type=int, default=600, 
                            help='Desired total sequence length after padding')
-        group.add_argument('--left_flank', type=str, default=constants.MPRA_UPSTREAM)
-        group.add_argument('--right_flank', type=str, default=constants.MPRA_DOWNSTREAM)
+        group.add_argument('--left_flank', type=str, default=constants.MPRA_UPSTREAM, help="Flanking sequence to provide upstream padding for sequences.")
+        group.add_argument('--right_flank', type=str, default=constants.MPRA_DOWNSTREAM, help="Flanking sequence to provide upstream padding for sequences.")
         group.add_argument('--num_workers', type=int, default=8, 
                            help='number of gpus or cpu cores to be used') 
         group.add_argument('--normalize', type=utils.str2bool, default=False, 
