@@ -545,6 +545,23 @@ def model_fn(model_dir):
     model.eval()
     return model
 
+def load_model(artifact_path):
+    
+    USE_CUDA = torch.cuda.device_count() >= 1
+    if os.path.isdir('./artifacts'):
+        shutil.rmtree('./artifacts')
+
+    unpack_artifact(artifact_path)
+
+    model_dir = './artifacts'
+
+    my_model = model_fn(model_dir)
+    my_model.eval()
+    if USE_CUDA:
+        my_model.cuda()
+    
+    return my_model
+
 '''
 def reset_parameters(self) -> None:
     init.kaiming_uniform_(self.weight, a=math.sqrt(5))
