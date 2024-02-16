@@ -15,45 +15,9 @@ import torch
 
 import boda
 from boda.common import utils
-from boda.common.utils import set_best, save_model, unpack_artifact, model_fn
+from boda.common.utils import unpack_artifact, model_fn
 
 import hypertune
-
-def save_proposals(proposals, args):
-    """
-    Save the proposals and associated arguments to a file.
-
-    This function saves the generated proposals and the input arguments used for their generation
-    to a file. The file is named based on the current timestamp and a random tag. The saved file can
-    be placed in a local directory or on Google Cloud Storage if a 'gs://' path is provided in the arguments.
-
-    Args:
-        proposals (list): List of proposals.
-        args (dict): Dictionary of input arguments.
-
-    Returns:
-        None
-    """
-    save_dict = {
-        'proposals': proposals,
-        'args'     : args,
-        'timestamp'    : time.strftime("%Y%m%d_%H%M%S"),
-        'random_tag'   : random.randint(100000,999999)
-    }
-    filename = f'proposals__{save_dict["timestamp"]}__{save_dict["random_tag"]}.pt'
-    torch.save(save_dict, filename)
-        
-    if 'gs://' in args['Main args'].proposal_path:
-        clound_target = os.path.join(args['Main args'].proposal_path,filename)
-        subprocess.check_call(
-            ['gsutil', 'cp', filename, clound_target]
-        )
-    else:
-        os.makedirs(args['Main args'].proposal_path, exist_ok=True)
-        shutil.copy(filename, args['Main args'].proposal_path)
-    
-    final_loc = os.path.join(args['Main args'].proposal_path,filename)
-    print(f'Proposals deposited at:\n\t{final_loc}', file=sys.stderr)
 
 def save_proposals(proposals, args):
     """
@@ -83,8 +47,10 @@ def save_proposals(proposals, args):
         subprocess.check_call(
             ['gsutil', 'cp', os.path.basename(filename), filename]
         )
+        os.remove(os.path.basename(filename))
     else:
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        if os.path.dirname(filename) != '' and os.path.dirname(filename) != '.':
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
         torch.save(save_dict, filename)
     
     print(f'Proposals deposited at:\n\t{filename}', file=sys.stderr)
