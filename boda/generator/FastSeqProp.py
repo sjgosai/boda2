@@ -148,7 +148,7 @@ class FastSeqProp(nn.Module):
                 'energy': np.stack(energy_hist).flatten()
             })
             fig, ax = plt.subplots()
-            sns.lineplot(data=plot_data, x='step',y='energy',ax=ax)
+            sns.lineplot(data=plot_data, x='step',y='energy',errorbar="pi",ax=ax)
             plt.show()
             return plot_data
             
