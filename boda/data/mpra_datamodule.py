@@ -133,11 +133,13 @@ class MPRA_DataModule(pl.LightningDataModule):
         group  = parser.add_argument_group('Data Module args')
         
         group.add_argument('--datafile_path', type=str, required=True, help="Path to MPRA data in txt format.")
-        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma', " ", "\t", ","}, default=" ", help="Delimiter to parse data file.")
+        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma', " ", "\t", ","}, default="\t", help="Delimiter to parse data file.")
         group.add_argument('--project_column', type=str, default='data_project', help="Header to match column that can be used to filter data file.")
-        group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'], help="Values which indicate examples to keep from data file.")
-        group.add_argument('--sequence_column', type=str, default='nt_sequence', help="Header to match column containing nucleotide sequences.")
-        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_mean', 'HepG2_mean', 'SKNSH_mean'], help="Header(s) to match columns containing features to model.")
+        group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['UKBB','GTEX','CRE'], help="Values which indicate examples to keep from data file.")
+        group.add_argument('--sequence_column', type=str, default='sequence', help="Header to match column containing nucleotide sequences.")
+        group.add_argument('--activity_columns', type=str, nargs='+', default=['K562_log2FC', 'HepG2_log2FC', 'SKNSH_log2FC'], help="Header(s) to match columns containing features that will be modeled.")
+        group.add_argument('--stderr_columns', type=str, nargs='+', default=['K562_lfcSE', 'HepG2_lfcSE', 'SKNSH_lfcSE'], help="Header(s) to match columns containing stderr of features that will be modeled.")
+        group.add_argument('--stderr_threshold', type=float, default=1.0, help="Threshold for feature stderr of examples to be used for train/val/test.")
         group.add_argument('--chr_column', type=str, default='chr', help="Header to match column containing chromosome info for each example.")
         group.add_argument('--exclude_chr_train', type=str, nargs='+', default=[''], help="Chromosomes to exclude from the data set.")
         group.add_argument('--val_chrs', type=str, nargs='+', default=['19','21','X'], help="Chromosomes to reserve for model validation during fitting/HPO")
@@ -176,15 +178,17 @@ class MPRA_DataModule(pl.LightningDataModule):
 
     def __init__(self,
                  datafile_path,
-                 sep=" ",
-                 data_project=['BODA', 'UKBB', 'GTEX'],
+                 sep="\t",
+                 data_project=['UKBB', 'GTEX', 'CRE'],
                  project_column='data_project',
-                 sequence_column='nt_sequence',
-                 activity_columns=['K562_mean', 'HepG2_mean', 'SKNSH_mean'],
+                 sequence_column='sequence',
+                 activity_columns=['K562_log2FC', 'HepG2_log2FC', 'SKNSH_log2FC'],
+                 stderr_columns=['K562_lfcSE', 'HepG2_lfcSE', 'SKNSH_lfcSE'],
                  exclude_chr_train=[''],
                  val_chrs=['19','21','X'],
                  test_chrs=['7','13'],
                  chr_column='chr',
+                 stderr_threshold=1.0,
                  std_multiple_cut=6.0,
                  up_cutoff_move=4.0,
                  synth_chr='synth',
@@ -210,9 +214,11 @@ class MPRA_DataModule(pl.LightningDataModule):
         self.project_column = project_column
         self.sequence_column = sequence_column
         self.activity_columns = activity_columns
+        self.stderr_columns = stderr_columns
         self.exclude_chr_train = set(exclude_chr_train) - {''}
         self.val_chrs = set(val_chrs) - {''}
         self.test_chrs = set(test_chrs) - {''}
+        self.stderr_threshold = stderr_threshold
         self.chr_column = chr_column
         self.std_multiple_cut = std_multiple_cut
         self.up_cutoff_move = up_cutoff_move
@@ -251,10 +257,13 @@ class MPRA_DataModule(pl.LightningDataModule):
         """
         Preprocesses and tokenizes the dataset based on provided parameters.
         """
-        columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column]
+        columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column, *self.stderr_columns]
         temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns, sep=self.sep)
 
         temp_df = temp_df[temp_df[self.project_column].isin(self.data_project)].reset_index(drop=True)
+        
+        quality_filter = temp_df[self.stderr_columns].max(axis=1) < self.stderr_threshold
+        temp_df = temp_df[quality_filter].reset_index(drop=True)
 
         means = temp_df[self.activity_columns].mean().to_numpy()
         stds  = temp_df[self.activity_columns].std().to_numpy()
