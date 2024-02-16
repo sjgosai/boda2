@@ -65,12 +65,13 @@ The tutorials also include a notebook that describes how to mix models with the 
 We have developed python applications to train models and generate sequences using this library.
 
 ## Model training
-Deep learning models can be trained from the command line by invoking the DATA, MODEL, and GRAPH modules. For example:
+Deep learning models can be trained from the command line by invoking the DATA, MODEL, and GRAPH modules. For example (note: change `--artifact_path` arg at bottom):
 ```
 python /home/ubuntu/boda2/src/train.py \
   --data_module=MPRA_DataModule \
-    --datafile_path=gs://tewhey-public-data/CODA_resources/MPRA_ALL_HD_v2.txt \
-    --activity_columns K562_mean HepG2_mean SKNSH_mean \
+    --datafile_path=gs://tewhey-public-data/CODA_resources/Table_S2__MPRA_dataset.txt \
+    --sep tab --sequence_column sequence \
+    --activity_columns K562_log2FC HepG2_log2FC SKNSH_log2FC \
     --synth_val_pct=0.0 --synth_test_pct=99.98 \
     --batch_size=1076 --duplication_cutoff=0.5 --std_multiple_cut=6.0 \
     --val_chrs 7 13 --test_chrs 9 21 X \
@@ -90,7 +91,7 @@ python /home/ubuntu/boda2/src/train.py \
     --loss_criterion=L1KLmixed --beta=5.0 \
     --reduction=mean \
   --graph_module=CNNTransferLearning \
-    --parent_weights=gs://tewhey-public-data/my-model.epoch_5-step_19885.pkl \
+    --parent_weights=gs://tewhey-public-data/CODA_resources/my-model.epoch_5-step_19885.pkl \
     --frozen_epochs=0 \
     --optimizer=Adam --amsgrad=True \
     --lr=0.0032658700881052086 --eps=1e-08 --weight_decay=0.0003438210249762151 \
@@ -102,6 +103,8 @@ python /home/ubuntu/boda2/src/train.py \
     --precision=16 --default_root_dir=/tmp/output/artifacts \
     --artifact_path=gs://your/bucket/mpra_model/
 ```
+
+Update Feb. 16 2024: We found a problem with the training data in supplementary table 2 we deposited on bioRxiv. There's an updated version [here](https://storage.googleapis.com/tewhey-public-data/CODA_resources/Table_S2__MPRA_dataset.txt).
 
 ## Sequence design
 Trained models can be deployed to generate sequences using implemented algorithms. This command will run Fast SeqProp using the Malinois model to optimize K562 specific expression:

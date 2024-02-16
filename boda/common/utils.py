@@ -200,7 +200,7 @@ def organize_args(parser, args):
         arg_groups[group.title]=argparse.Namespace(**group_dict)
     return arg_groups
 
-def parse_file(file_path, columns):
+def parse_file(file_path, columns, sep=' '):
     """
     Parse a file and extract specified columns.
 
@@ -211,7 +211,7 @@ def parse_file(file_path, columns):
     Returns:
         pandas.DataFrame: Parsed data in a DataFrame.
     """
-    df = pd.read_csv(file_path, sep=" ", low_memory=False)
+    df = pd.read_csv(file_path, sep=sep, low_memory=False)
     sub_df = df[columns].dropna()
     return sub_df
 

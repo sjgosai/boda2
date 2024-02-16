@@ -132,6 +132,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group  = parser.add_argument_group('Data Module args')
         
         group.add_argument('--datafile_path', type=str, required=True)
+        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma'})
         group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'])
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
@@ -169,10 +170,12 @@ class MPRA_DataModule(pl.LightningDataModule):
     @staticmethod
     def process_args(grouped_args):
         data_args    = grouped_args['Data Module args']
+        data_args.sep = {'space':' ','tab':'\t','comma':','}[data_args.sep]
         return data_args
 
     def __init__(self,
                  datafile_path,
+                 sep=" ",
                  data_project=['BODA', 'UKBB', 'GTEX'],
                  project_column='data_project',
                  sequence_column='nt_sequence',
@@ -201,6 +204,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         """
         super().__init__()
         self.datafile_path = datafile_path
+        self.sep = sep
         self.data_project = data_project
         self.project_column = project_column
         self.sequence_column = sequence_column
@@ -247,7 +251,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         Preprocesses and tokenizes the dataset based on provided parameters.
         """
         columns = [self.sequence_column, *self.activity_columns, self.chr_column, self.project_column]
-        temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns)
+        temp_df = utils.parse_file(file_path=self.datafile_path, columns=columns, sep=self.sep)
 
         temp_df = temp_df[temp_df[self.project_column].isin(self.data_project)].reset_index(drop=True)
 
