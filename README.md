@@ -72,9 +72,11 @@ python /home/ubuntu/boda2/src/train.py \
     --datafile_path=gs://tewhey-public-data/CODA_resources/Table_S2__MPRA_dataset.txt \
     --sep tab --sequence_column sequence \
     --activity_columns K562_log2FC HepG2_log2FC SKNSH_log2FC \
-    --synth_val_pct=0.0 --synth_test_pct=99.98 \
-    --batch_size=1076 --duplication_cutoff=0.5 --std_multiple_cut=6.0 \
+    --stderr_columns K562_lfcSE HepG2_lfcSE SKNSH_lfcSE \
+    --stderr_threshold 1.0 --batch_size=1076 \
+    --duplication_cutoff=0.5 --std_multiple_cut=6.0 \
     --val_chrs 7 13 --test_chrs 9 21 X \
+    --synth_val_pct=0.0 --synth_test_pct=99.98 \
     --padded_seq_len=600 --use_reverse_complements=True --num_workers=8 \
   --model_module=BassetBranched \
     --input_len 600 \
