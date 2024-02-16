@@ -4,6 +4,7 @@
 # Contents
 
 - [Overview](#overview)
+    - [Tutorials](#tutorials)
 - [System Requirements](#system-requirements)
 - [Installation Guide](#installation-guide)
 - [Interactive Docker Environments](#interactive-docker-environments)
@@ -15,6 +16,9 @@
 # Overview
 Here, we present a platform to engineer and validate synthetic CREs capable of driving gene expression
 with programmed cell type specificity. This library contains the resources needed to train DNNs on MPRA data and generate synthetic sequences from these models. Additionally, we include resources to apply these model to to inference tasks on common input data types (e.g., VCF, FASTA, etc.). Finally, we provide examples which deploy the Malinois model.
+
+## Tutorials
+We have a number of end-to-end tested notebooks available as references for model training and sequence design in the [tutorials](https://github.com/sjgosai/boda2/tree/main/tutorials) subdirectory. Up to date as of Feb 16 2024.
 
 # System requirements
 ## Hardware requirements
