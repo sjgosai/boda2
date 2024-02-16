@@ -144,6 +144,7 @@ class PassThroughParameters(ParamsBase):
         group.add_argument('--right_flank', type=str, 
                            default=constants.MPRA_DOWNSTREAM[:200])
         group.add_argument('--batch_dim', type=int, default=0)
+        group.add_argument('--token_dim', type=int, default=-2)
         group.add_argument('--cat_axis', type=int, default=-1)
         
         return parser
@@ -202,6 +203,7 @@ class PassThroughParameters(ParamsBase):
                  left_flank=None,
                  right_flank=None,
                  batch_dim=0,
+                 token_dim=-2,
                  cat_axis=-1
                 ):
         """
@@ -221,6 +223,7 @@ class PassThroughParameters(ParamsBase):
         self.register_buffer('right_flank', right_flank.detach().clone())
         
         self.batch_dim = batch_dim
+        self.token_dim = token_dim
         self.cat_axis  = cat_axis
         
     def add_flanks(self, my_sample):
@@ -257,6 +260,18 @@ class PassThroughParameters(ParamsBase):
         """
         return self.add_flanks(my_sample)
     
+    def rebatch(self, input):
+        """
+        Rebatching function.
+        
+        Args:
+            input: Input data.
+            
+        Returns:
+            input: Rebatched data.
+        """
+        return input
+
 class BasicParameters(ParamsBase):
     """
     Class representing basic sequence parameters.
