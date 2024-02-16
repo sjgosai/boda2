@@ -49,8 +49,19 @@ CODA can be installed from the latest version of the GITHUB repo.
 ```
 git clone https://github.com/sjgosai/boda2.git
 cd boda2/
+
+pip install --upgrade pip==21.3.1
+pip install --no-cache-dir -r boda2/requirements.txt
 pip install -e .
 ```
+
+# Colab
+CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.google.com/marketplace/product/colab-marketplace-image-public/colab). We were successful using V100s, but not T4s (tested: Feb 16 2024). We partially reproduce two tutorials as examples:
+
+- [Load Malinois](https://colab.research.google.com/drive/1lgNlclsAstrD3uRxhG8swj9BuFDlT68z?usp=sharing)
+- [Train and Design](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing)
+
+For some reason, you need to restart the runtime before `import boda` will work
 
 # Interactive Docker Environments
 CODA has been installed in docker containers which can be downloaded in attached for interactive use. This can be quickly deployed using helper scripts in the repo:
