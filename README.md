@@ -5,6 +5,8 @@
 
 - [Overview](#overview)
     - [Tutorials](#tutorials)
+    - [Library Modules](#library-modules)
+    - [Scripts](#scripts)
 - [System Requirements](#system-requirements)
 - [Installation Guide](#installation-guide)
 - [Interactive Docker Environments](#interactive-docker-environments)
@@ -19,6 +21,12 @@ with programmed cell type specificity. This library contains the resources neede
 
 ## Tutorials
 We have a number of end-to-end tested notebooks available as references for model training and sequence design in the [tutorials](https://github.com/sjgosai/boda2/tree/main/tutorials) subdirectory. Updated: Feb 16 2024.
+
+## Library Modules
+The modules we develop to implement modeling and design are found in [boda](https://github.com/sjgosai/boda2/tree/main/boda)
+
+## Scripts
+We wrote scripts provide command line integration for the modules we implement which are found in [src](https://github.com/sjgosai/boda2/tree/main/src)
 
 # System requirements
 ## Hardware requirements
