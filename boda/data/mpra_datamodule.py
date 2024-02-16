@@ -132,7 +132,7 @@ class MPRA_DataModule(pl.LightningDataModule):
         group  = parser.add_argument_group('Data Module args')
         
         group.add_argument('--datafile_path', type=str, required=True)
-        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma'})
+        group.add_argument('--sep', type=str, choices={'space', 'tab', 'comma', " ", "\t", ","})
         group.add_argument('--data_project', nargs='+', action=utils.ExtendAction, default=['BODA','UKBB','GTEX'])
         group.add_argument('--project_column', type=str, default='data_project')
         group.add_argument('--sequence_column', type=str, default='nt_sequence')
@@ -170,7 +170,7 @@ class MPRA_DataModule(pl.LightningDataModule):
     @staticmethod
     def process_args(grouped_args):
         data_args    = grouped_args['Data Module args']
-        data_args.sep = {'space':' ','tab':'\t','comma':','}[data_args.sep]
+        data_args.sep = {'space':' ','tab':'\t','comma':',', ' ': ' ', '\t': '\t', ',': ','}[data_args.sep]
         return data_args
 
     def __init__(self,
