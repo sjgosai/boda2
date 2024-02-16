@@ -228,6 +228,136 @@ class OverMaxEnergy(BaseEnergy):
                  - hook[...,self.bias_cell].mul(self.bias_alpha)
         return energy
 
+class MinGapEnergy(BaseEnergy):
+    """
+    MinGapEnergy class for defining energy functions based on MinGap values. This is a replica
+    of OverMaxEnergy that better reflects the final terminology in the manuscript.
+
+    This class inherits from BaseEnergy and defines an energy function that calculates
+    the gap between the target (bias) cell activity and the maximum off-target (non-bias) cell
+    activity of a model's output for input sequences, with an optional value-bending factor.
+
+    Args:
+        model (torch.nn.Module): The neural network model used for energy calculation.
+        target_feature (int, optional): Index of the target feature prediction. Default is 0.
+        target_alpha (float, optional): Scaling factor for the bias term. Default is 1.0.
+        bending_factor (float, optional): Bending factor applied to the model's output. Default is 0.0.
+        a_min (float, optional): Minimum value allowed after bending. Default is negative infinity.
+        a_max (float, optional): Maximum value allowed after bending. Default is positive infinity.
+
+    Methods:
+        add_energy_specific_args(parent_parser): Add energy-specific arguments to an argparse ArgumentParser.
+        process_args(grouped_args): Process grouped arguments and return energy-related arguments.
+        bend(x): Apply bending factor to the input tensor.
+        energy_calc(x): Calculate the energy of input sequences based on the maximum model outputs.
+
+    Note:
+        - The `model` provided must be a neural network model compatible with PyTorch.
+
+    """
+    
+    @staticmethod
+    def add_energy_specific_args(parent_parser):
+        """
+        Add energy-specific arguments to an argparse ArgumentParser.
+
+        Args:
+            parent_parser (argparse.ArgumentParser): Parent argument parser.
+
+        Returns:
+            argparse.ArgumentParser: Argument parser with added energy-specific arguments.
+
+        """
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Energy Module args')
+        group.add_argument('--model_artifact', type=str)
+        group.add_argument('--target_feature', type=int, default=0)
+        group.add_argument('--target_alpha', type=float, default=1.)
+        group.add_argument('--bending_factor', type=float, default=0.)
+        group.add_argument('--a_min', type=float, default=-math.inf)
+        group.add_argument('--a_max', type=float, default=math.inf)
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Process grouped arguments and return energy-related arguments.
+
+        Args:
+            grouped_args (dict): Grouped arguments.
+
+        Returns:
+            dict: Processed energy-related arguments.
+
+        """
+        energy_args = grouped_args['Energy Module args']
+        
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            unpack_artifact(energy_args.model_artifact, tmpdirname)
+            model = model_fn(os.path.join(tmpdirname,'artifacts'))
+        model.cuda()
+        model.eval()
+        energy_args.model = model
+
+        del energy_args.model_artifact
+        
+        return energy_args
+
+    def __init__(self, model, target_feature=0, target_alpha=1., bending_factor=0., a_min=-math.inf, a_max=math.inf):
+        """
+        Initialize the MinGapEnergy class.
+
+        Args:
+            model (torch.nn.Module): The neural network model used for energy calculation.
+            target_feature (int, optional): Index of the target feature. Default is 0.
+            target_alpha (float, optional): Scaling factor for the target feature. Default is 1.0.
+            bending_factor (float, optional): Bending factor applied to the model's output. Default is 0.0.
+            a_min (float, optional): Minimum value allowed after bending. Default is negative infinity.
+            a_max (float, optional): Maximum value allowed after bending. Default is positive infinity.
+
+        """
+        super().__init__()
+        
+        self.model = model
+        self.model.eval()
+
+        self.target_feature = target_feature
+        self.target_alpha= target_alpha
+        self.bending_factor = bending_factor
+        self.a_min = a_min
+        self.a_max = a_max
+
+    def bend(self, x):
+        """
+        Apply bending to the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Tensor with applied bending.
+
+        """
+        return x - self.bending_factor * (torch.exp(-x) - 1)
+        
+    def energy_calc(self, x):
+        """
+        Calculate the energy of input sequences based on the maximum model outputs.
+
+        Args:
+            x (torch.Tensor): Input sequences.
+
+        Returns:
+            torch.Tensor: Computed energy values.
+
+        """
+        hook = x.to(self.model.device)
+        
+        hook = self.bend(self.model(hook).clamp(self.a_min,self.a_max))
+        energy = hook[...,[ x for x in range(hook.shape[-1]) if x != self.target_feature]].max(-1).values \
+                 - hook[...,self.target_feature].mul(self.target_alpha)
+        return energy
+
 class TargetEnergy(BaseEnergy):
     """
     TargetEnergy class for defining energy functions based on target values.
