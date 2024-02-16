@@ -7,7 +7,7 @@
 - [System Requirements](#system-requirements)
 - [Installation Guide](#installation-guide)
 - [Interactive Docker Environments](#interactive-docker-environments)
-- [Interactive modeling and deployment](#interactive-modeling-and-deployment)
+- [Interactive usage](#interactive-usage)
 - [Applications](#applications)
 - [Extending CODA](#extending-coda)
 - [Cloud Integrations](#cloud-integrations)
