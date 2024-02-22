@@ -10,13 +10,13 @@ from boda.common import utils, constants
 class AdaLead(nn.Module):
     
     def __init__(self,
-                 energy,
+                 energy_fn,
                  params,
                  ):
 
         super().__init__()
 
-        self.energy_fn = energy
+        self.energy_fn = energy_fn
         self.params = params
         self.model_cost = 0     
         self.vocab = boda.common.constants.STANDARD_NT
