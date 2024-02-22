@@ -92,18 +92,17 @@ class CNNBasicTraining(LightningModule):
             graph_args.scheduler_args = None
         return graph_args
 
-    ####################
-    # Standard methods #
-    ####################
+    #######################
+    # Dead __init__ block #
+    #######################
     
-    def __init__(self, model, optimizer='Adam', scheduler=None, 
+    def __init__(self, optimizer='Adam', scheduler=None, 
                  scheduler_monitor=None, scheduler_interval='epoch', 
                  optimizer_args=None, scheduler_args=None):
         """
         Initialize the CNNBasicTraining module.
 
         Args:
-            model (torch.nn.Module): A torch or lightning.pytorch Module.
             optimizer (str): Name of the optimizer. Default is 'Adam'.
             scheduler (str): Name of the learning rate scheduler. Default is None.
             scheduler_monitor (str): Metric to monitor for the scheduler. Default is None.
@@ -112,8 +111,6 @@ class CNNBasicTraining(LightningModule):
             scheduler_args (dict): Arguments for the scheduler. Default is None.
         """
         super().__init__()
-        self.model = model
-        self.criterion = model.criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.scheduler_monitor = scheduler_monitor
@@ -121,15 +118,6 @@ class CNNBasicTraining(LightningModule):
         self.optimizer_args = optimizer_args
         self.scheduler_args = scheduler_args
         
-    def forward(self, input):
-        """
-        Set forward call.
-        
-        Args:
-            input (tensor): Input tensor for model.
-        """
-        return self.model(input)
-
     ###################
     # Non-PTL methods #
     ###################
@@ -278,7 +266,7 @@ class CNNBasicTraining(LightningModule):
         y_pred = self(x)
         loss = self.criterion(y_pred, y)
         self.log('test_loss', loss)       
-
+        
 class CNNTransferLearning(CNNBasicTraining):
     """
     LightningModule for transfer learning with a CNN model.
@@ -311,18 +299,18 @@ class CNNTransferLearning(CNNBasicTraining):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Graph Module args')
         group.add_argument('--parent_weights', type=str, required=True)
-        group.add_argument('--frozen_epochs', type=int, default=0)
+        group.add_argument('--frozen_epochs', type=int, default=9999)
         group.add_argument('--optimizer', type=str, default='Adam')
         group.add_argument('--scheduler', type=str)
         group.add_argument('--scheduler_monitor', type=str)
         group.add_argument('--scheduler_interval', type=str, default='epoch')
         return parser
     
-    ####################
-    # Standard methods #
-    ####################
+    #######################
+    # Dead __init__ block #
+    #######################
     
-    def __init__(self, model, parent_weights, frozen_epochs=0, 
+    def __init__(self, parent_weights, unfreeze_epoch=9999, 
                  optimizer='Adam', scheduler=None, 
                  scheduler_monitor=None, scheduler_interval='epoch', 
                  optimizer_args=None, scheduler_args=None):
@@ -330,9 +318,8 @@ class CNNTransferLearning(CNNBasicTraining):
         Initialize the CNNTransferLearning module.
 
         Args:
-            model (torch.nn.Module): A torch or lightning.pytorch Module.
             parent_weights (str): Path to the pre-trained model weights.
-            frozen_epochs (int): Epoch at which layers are unfrozen. Default is 1.
+            unfreeze_epoch (int): Epoch at which layers are unfrozen. Default is 9999.
             optimizer (str): Name of the optimizer. Default is 'Adam'.
             scheduler (str): Name of the learning rate scheduler. Default is None.
             scheduler_monitor (str): Metric to monitor for the scheduler. Default is None.
@@ -340,7 +327,7 @@ class CNNTransferLearning(CNNBasicTraining):
             optimizer_args (dict): Arguments for the optimizer. Default is None.
             scheduler_args (dict): Arguments for the scheduler. Default is None.
         """
-        super().__init__(model, optimizer, scheduler, scheduler_monitor, 
+        super().__init__(optimizer, scheduler, scheduler_monitor, 
                          scheduler_interval, optimizer_args, scheduler_args)
 
         self.parent_weights = parent_weights
@@ -364,8 +351,8 @@ class CNNTransferLearning(CNNBasicTraining):
         if 'model_state_dict' in parent_state_dict.keys():
             parent_state_dict = parent_state_dict['model_state_dict']
             
-        mod_state_dict = filter_state_dict(self.model, parent_state_dict)
-        self.model.load_state_dict( mod_state_dict['filtered_state_dict'], strict=False )
+        mod_state_dict = filter_state_dict(self, parent_state_dict)
+        self.load_state_dict( mod_state_dict['filtered_state_dict'], strict=False )
         return mod_state_dict['passed_keys']
     
     #############
@@ -411,9 +398,8 @@ class CNNTransferLearningActivityBias(CNNTransferLearning):
     LightningModule for transfer learning with a CNN model and activity bias rebalancing.
 
     Args:
-        model (torch.nn.Module): A torch or lightning.pytorch Module.
         parent_weights (str): Path to the pre-trained model weights.
-        frozen_epochs (int): Epoch at which layers are unfrozen. Default is 1.
+        unfreeze_epoch (int): Epoch at which layers are unfrozen. Default is 9999.
         rebalance_quantile (float): Quantile value for activity rebalancing. Default is 0.5.
         optimizer (str): Name of the optimizer. Default is 'Adam'.
         scheduler (str): Name of the learning rate scheduler. Default is None.
@@ -441,7 +427,7 @@ class CNNTransferLearningActivityBias(CNNTransferLearning):
         parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
         group  = parser.add_argument_group('Graph Module args')
         group.add_argument('--parent_weights', type=str, required=True)
-        group.add_argument('--frozen_epochs', type=int, default=1)
+        group.add_argument('--frozen_epochs', type=int, default=9999)
         group.add_argument('--rebalance_quantile', type=float)
         group.add_argument('--optimizer', type=str, default='Adam')
         group.add_argument('--scheduler', type=str)
@@ -450,12 +436,12 @@ class CNNTransferLearningActivityBias(CNNTransferLearning):
         
         return parser
     
-    ####################
-    # Standard methods #
-    ####################
+    #######################
+    # Dead __init__ block #
+    #######################
     
-    def __init__(self, model, parent_weights, 
-                 rebalance_quantile=0.5, frozen_epochs=1,  
+    def __init__(self, parent_weights, unfreeze_epoch=9999, 
+                 rebalance_quantile=0.5, 
                  optimizer='Adam', scheduler=None, 
                  scheduler_monitor=None, scheduler_interval='epoch', 
                  optimizer_args=None, scheduler_args=None):
@@ -463,9 +449,8 @@ class CNNTransferLearningActivityBias(CNNTransferLearning):
         Initialize the CNNTransferLearningActivityBias module.
 
         Args:
-            model (torch.nn.Module): A torch or lightning.pytorch Module.
             parent_weights (str): Path to the pre-trained model weights.
-            frozen_epochs (int): Epoch at which layers are unfrozen. Default is 1.
+            unfreeze_epoch (int): Epoch at which layers are unfrozen. Default is 9999.
             rebalance_quantile (float): Quantile value for activity rebalancing. Default is 0.5.
             optimizer (str): Name of the optimizer. Default is 'Adam'.
             scheduler (str): Name of the learning rate scheduler. Default is None.
@@ -474,7 +459,7 @@ class CNNTransferLearningActivityBias(CNNTransferLearning):
             optimizer_args (dict): Arguments for the optimizer. Default is None.
             scheduler_args (dict): Arguments for the scheduler. Default is None.
         """
-        super().__init__(model, parent_weights, frozen_epochs, 
+        super().__init__(parent_weights, frozen_epochs, 
                          optimizer, scheduler, scheduler_monitor, 
                          scheduler_interval, optimizer_args, scheduler_args)
 
