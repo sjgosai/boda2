@@ -23,10 +23,10 @@ with programmed cell type specificity. This library contains the resources neede
 We have a number of end-to-end tested notebooks available as references for model training and sequence design in the [tutorials](https://github.com/sjgosai/boda2/tree/main/tutorials) subdirectory. Updated: Feb 16 2024.
 
 ## Library Modules
-The modules we develop to implement modeling and design are found in [boda](https://github.com/sjgosai/boda2/tree/main/boda)
+The modules we develop to implement modeling and design are found in [boda](https://github.com/sjgosai/boda2/tree/main/boda).
 
 ## Scripts
-We wrote scripts provide command line integration for the modules we implement which are found in [src](https://github.com/sjgosai/boda2/tree/main/src)
+We wrote scripts provide command line integration for the modules we implement which are found in [src](https://github.com/sjgosai/boda2/tree/main/src).
 
 # System requirements
 ## Hardware requirements
@@ -45,7 +45,7 @@ CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep 
 - CUDA: 11.3
 
 # Installation Guide
-CODA can be installed from the latest version of the GITHUB repo.
+First install `torch`, then CODA can be installed from the latest version of the GITHUB repo.
 ```
 git clone https://github.com/sjgosai/boda2.git
 cd boda2/
@@ -54,6 +54,8 @@ pip install --upgrade pip==21.3.1
 pip install --no-cache-dir -r boda2/requirements.txt
 pip install -e .
 ```
+
+Properly installing `torch` is highly variable system to system so it wasn't feesible to include in the `requirements.txt`.
 
 # Colab
 CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.google.com/marketplace/product/colab-marketplace-image-public/colab). We were successful using V100s, but not T4s (tested: Feb 16 2024). We partially reproduce two tutorials as examples:
@@ -79,7 +81,13 @@ More containers can be found at `gcr.io/sabeti-encode/boda`.
 CODA is an extension of pytorch and pytorch-lightning. Classes in CODA used to construct models generally inherit from `nn.Module` and `lightning.LightningModule` but need to be combined as described in [`tutorials/construct_new_model.ipynb`](tutorials/construct_new_model.ipynb). The documentation for this is in progress.
 
 ## Inference
-Example interactive deployment of Malinois for inference can be found here: [`tutorials/load_malinois_model.ipynb`](tutorials/load_malinois_model.ipynb)
+Example interactive deployment of Malinois for inference can be found here: [`tutorials/load_malinois_model.ipynb`](tutorials/load_malinois_model.ipynb).
+
+The models trained for the paper:
+- [Malinois](https://storage.googleapis.com/tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz)
+- [A549 retrain](https://storage.googleapis.com/tewhey-public-data/CODA_resources/A549_model_artifacts__20240103_155344__933732.tar)
+- [HCT116 retrain](https://storage.googleapis.com/tewhey-public-data/CODA_resources/HCT116_model_artifacts__20240103_183054__872607.tar)
+
 
 ## Sequence generation
 The tutorials also include a notebook that describes how to mix models with the sequence generation algorithms implemented in CODA: [`tutorials/run_generators.ipynb`](tutorials/run_generators.ipynb)
