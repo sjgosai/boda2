@@ -8,7 +8,7 @@ from tqdm import tqdm
 from ..common import constants, utils
 
 
-class AdaLead_2(nn.Module):
+class AdaLead(nn.Module):
     
     def __init__(self,
                  energy,
