@@ -176,6 +176,23 @@ python /home/ubuntu/boda2/src/generate.py \
     --proposal_path ./test__k562__sa
 ```
 
+This command will run AdaLead with the same objective:
+```
+python /home/ubuntu/boda2/src/generate.py \
+    --params_module PassThroughParameters \
+        --batch_size 256 --n_channels 4 \
+        --length 200 \
+    --energy_module MinGapEnergy \
+        --target_feature 0 --bending_factor 0.0 --a_min -2.0 --a_max 6.0 \
+        --model_artifact gs://tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz \
+    --generator_module AdaLead \
+         --n_steps 20 --rho 2 --n_top_seqs_per_batch 1 \
+         --mu 1 --recomb_rate 0.1 --threshold 0.05 \
+    --energy_threshold -0.5 --max_attempts 4000 \
+    --n_proposals 10 \
+    --proposal_path ./test__k562__al
+```
+
 We have an example of back to back training and design using terminal commands in [run_training_and_design.ipynb](https://github.com/sjgosai/boda2/blob/main/tutorials/run_training_and_design.ipynb).
 
 ## Variant effect prediction
