@@ -5,22 +5,22 @@ import torch.nn as nn
 import random
 from tqdm import tqdm
 
-from boda.common import utils, constants
+from ..common import constants, utils
 
 
-class AdaLead(nn.Module):
+class AdaLead_2(nn.Module):
     
     def __init__(self,
-                 energy_fn,
+                 energy,
                  params,
                  ):
 
         super().__init__()
 
-        self.energy_fn = energy_fn
+        self.energy_fn = energy
         self.params = params
         self.model_cost = 0     
-        self.vocab = boda.common.constants.STANDARD_NT
+        self.vocab = constants.STANDARD_NT
 
         self.batch_size, self.num_classes, self.seq_len = self.params.theta.shape
         self.token_dim = self.params.token_dim
@@ -80,7 +80,7 @@ class AdaLead(nn.Module):
         return -1 * self.energy_fn(input_tensor).detach().cpu().numpy()
 
     def string_list_to_tensor(self, sequence_list):
-        return torch.stack([boda.common.utils.dna2tensor(sequence) for sequence in sequence_list]).to(self.dflt_device)
+        return torch.stack([utils.dna2tensor(sequence) for sequence in sequence_list]).to(self.dflt_device)
 
     def random_string_list(self):
         return [''.join(random.choices(self.vocab, k=self.seq_len)) for _ in range(self.batch_size)]
@@ -221,7 +221,7 @@ class AdaLead(nn.Module):
             batch_idx += 1
         print()
         
-        proposals = torch.stack([boda.common.utils.dna2tensor(proposal) for proposal in proposals[:n_proposals]])
+        proposals = torch.stack([utils.dna2tensor(proposal) for proposal in proposals[:n_proposals]])
         energies = torch.Tensor(energies[:n_proposals])
         acceptance = np.mean(acceptance)
 
