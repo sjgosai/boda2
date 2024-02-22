@@ -184,12 +184,12 @@ class PassThroughParameters(ParamsBase):
         if params_args.left_flank is not None:
             params_args.left_flank = utils.dna2tensor( 
                 params_args.left_flank 
-            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
+            ).unsqueeze(0)
 
         if params_args.right_flank is not None:
             params_args.right_flank= utils.dna2tensor( 
                 params_args.right_flank 
-            ).unsqueeze(0).expand(params_args.data.shape[0], -1, -1)
+            ).unsqueeze(0)
         
         del params_args.batch_size
         del params_args.n_channels
@@ -226,6 +226,8 @@ class PassThroughParameters(ParamsBase):
         self.token_dim = token_dim
         self.cat_axis  = cat_axis
         
+        assert self.batch_dim == 0, "Variable location of batch dim not implmented, must be 0." # need to update eventually
+        
     def add_flanks(self, my_sample):
         """
         Adds flanking sequences to a sample.
@@ -237,14 +239,15 @@ class PassThroughParameters(ParamsBase):
             torch.Tensor: Sample tensor with flanking sequences added.
         """
         pieces = []
+        bsz = my_sample.shape[0]
         
         if self.left_flank is not None:
-            pieces.append( self.left_flank )
+            pieces.append( self.left_flank.expand(bsz, -1, -1) )
             
         pieces.append( my_sample )
         
         if self.right_flank is not None:
-            pieces.append( self.right_flank )
+            pieces.append( self.right_flank.expand(bsz, -1, -1) )
             
         return torch.cat( pieces, axis=self.cat_axis )
     
