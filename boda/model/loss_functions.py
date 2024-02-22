@@ -66,8 +66,8 @@ class MSEKLmixed(nn.Module):
         Returns:
             Tensor: The combined loss tensor.
         """
-        preds_log_prob  = preds   - preds.exp().sum(dim=1,keepdim=True).log()
-        target_log_prob = targets - targets.exp().sum(dim=1,keepdim=True).log()
+        preds_log_prob  = preds   - torch.logsumexp(preds, dim=-1, keepdim=True)
+        target_log_prob = targets - torch.logsumexp(targets, dim=-1, keepdim=True)
         
         MSE_loss = self.MSE(preds, targets)
         KL_loss  = self.KL(preds_log_prob, target_log_prob)
@@ -134,8 +134,8 @@ class L1KLmixed(nn.Module):
         Returns:
             Tensor: The combined loss tensor.
         """
-        preds_log_prob  = preds   - preds.exp().sum(dim=1,keepdim=True).log()
-        target_log_prob = targets - targets.exp().sum(dim=1,keepdim=True).log()
+        preds_log_prob  = preds   - torch.logsumexp(preds, dim=-1, keepdim=True)
+        target_log_prob = targets - torch.logsumexp(targets, dim=-1, keepdim=True)
         
         MSE_loss = self.MSE(preds, targets)
         KL_loss  = self.KL(preds_log_prob, target_log_prob)
@@ -283,7 +283,65 @@ class L1withEntropy(nn.Module):
                         EDE_loss.mul(self.beta)
         
         return combined_loss.div(self.alpha+self.beta)
+    
+class DirichletNLLLoss(nn.Module):
+    
+    def __init__(self, reduction='mean', eps=1e-8):
+        super().__init__()
+        
+        self.reduction = reduction
+        self.eps = eps
+        self.activation= nn.Softplus()
+        
+        assert reduction in ['mean', 'sum', 'none'], "reduction must be 'mean'|'sum'|'none'"
+        
+    def forward(self, preds, targets):
+        
+        preds   = self.activation(preds)
+        targets = targets.clamp(min=self.eps)
+        
+        term1 = torch.lgamma(preds.sum(dim=-1))
+        term2 = torch.lgamma(preds).sum(dim=-1)
+        term3 = torch.xlogy(preds - 1.0, targets).sum(dim=-1)
 
+        #torch.xlogy(self.concentration - 1.0, value).sum(-1)
+        #+ torch.lgamma(self.concentration.sum(-1))
+        #- torch.lgamma(self.concentration).sum(-1)
+
+        result = -term1 + term2 - term3
+        
+        if self.reduction == 'mean':
+            result = result.mean()
+        elif self.reduction == 'sum':
+            result = result.sum()
+        else:
+            result = result
+        
+        return result
+        
+class JeffreysDivLoss(nn.Module):
+    
+    def __init__(self, reduction='batchmean', log_target=False, eps=1e-12):
+        super().__init__()
+        
+        self.reduction = reduction
+        self.log_target= log_target
+        self.eps = eps
+        self.activation= nn.LogSoftmax()
+        self.KL = nn.KLDivLoss(reduction=reduction, log_target=True) # expect all inputs as log-space for symmetric use
+        
+    def forward(self, preds, targets):
+        
+        preds = self.activation(preds)
+        if self.log_target:
+            targets = targets.clip(torch.log(self.eps))
+        else:
+            targets = targets.clip(self.eps)
+            targets = torch.log(targets)
+        
+        return self.KL(preds, targets) + self.KL(targets, preds)
+        
+        
 L1Loss, MSELoss, CrossEntropyLoss, CTCLoss, NLLLoss, PoissonNLLLoss, GaussianNLLLoss, KLDivLoss, BCELoss, BCEWithLogitsLoss, MarginRankingLoss, HingeEmbeddingLoss, MultiLabelMarginLoss, HuberLoss, SmoothL1Loss, SoftMarginLoss, MultiLabelSoftMarginLoss, CosineEmbeddingLoss, MultiMarginLoss, TripletMarginLoss, TripletMarginWithDistanceLoss
 
 def add_criterion_specific_args(parser, criterion_name):
@@ -372,6 +430,11 @@ def add_criterion_specific_args(parser, criterion_name):
         group.add_argument('--reduction', type=str, default='mean', help='Specifies reduction applied when loss is calculated: `"none"`|`"batchmean"`|`"mean"`|`"sum"`. See torch.nn docs for more details.')
         group.add_argument('--alpha', type=float, default=1.0, help='Scaling factor for the MSE loss term.')
         group.add_argument('--beta', type=float, default=1.0, help='Scaling factor for the entropy error loss term.')
+    elif criterion_name == 'DirichletNLLLoss':
+        group.add_argument('--reduction', type=str, default='mean', help='Specifies reduction applied when loss is calculated: `"none"`|`"batchmean"`|`"mean"`|`"sum"`. See torch.nn docs for more details.')
+    elif criterion_name == 'JeffreysDivLoss':
+        group.add_argument('--reduction', type=str, default='mean', help='Specifies reduction applied when loss is calculated: `"none"`|`"batchmean"`|`"mean"`|`"sum"`. See torch.nn docs for more details.')
+        group.add_argument('--log_target', type=utils.str2bool, default=False, help='Specifies whether target is in the log space.')
     else:
         raise RuntimeError(f'{criterion_name} not supported. Try: [L1Loss, CrossEntropyLoss, CTCLoss, NLLLoss, PoissonNLLLoss, GaussianNLLLoss, KLDivLoss, BCELoss, BCEWithLogitsLoss, MarginRankingLoss, HingeEmbeddingLoss, MultiLabelMarginLoss, HuberLoss, SmoothL1Loss, SoftMarginLoss, MultiLabelSoftMarginLoss, CosineEmbeddingLoss, MultiMarginLoss, TripletMarginLoss, TripletMarginWithDistanceLoss, MSEKLmixed, L1KLmixed, MSEwithEntropy, L1withEntropy]')
         
