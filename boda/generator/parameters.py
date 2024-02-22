@@ -242,12 +242,12 @@ class PassThroughParameters(ParamsBase):
         bsz = my_sample.shape[0]
         
         if self.left_flank is not None:
-            pieces.append( self.left_flank.expand(bsz, -1, -1) )
+            pieces.append( self.left_flank.expand(bsz, -1, -1).to(my_sample.device) )
             
         pieces.append( my_sample )
         
         if self.right_flank is not None:
-            pieces.append( self.right_flank.expand(bsz, -1, -1) )
+            pieces.append( self.right_flank.expand(bsz, -1, -1).to(my_sample.device) )
             
         return torch.cat( pieces, axis=self.cat_axis )
     

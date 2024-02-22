@@ -11,13 +11,13 @@ from ..common import constants, utils
 class AdaLead(nn.Module):
     
     def __init__(self,
-                 energy,
+                 energy_fn,
                  params,
                  ):
 
         super().__init__()
 
-        self.energy_fn = energy
+        self.energy_fn = energy_fn
         self.params = params
         self.model_cost = 0     
         self.vocab = constants.STANDARD_NT
