@@ -7,6 +7,235 @@ from tqdm import tqdm
 from boda.common import utils, constants
 
 
+class AdaLead(nn.Module):
+    
+    def __init__(self,
+                 energy,
+                 params,
+                 ):
+
+        super().__init__()
+
+        self.energy_fn = energy
+        self.params = params
+        self.model_cost = 0     
+        self.vocab = boda.common.constants.STANDARD_NT
+
+        self.batch_size, self.num_classes, self.seq_len = self.params.theta.shape
+        self.token_dim = self.params.token_dim
+        self.batch_dim = self.params.batch_dim
+
+        self.dflt_device = self.params.theta.device                  
+        try: self.energy_fn.eval()
+        except: pass
+
+    @staticmethod
+    def add_generator_specific_args(parent_parser):
+        """
+        Static method to add generator-specific arguments to a parser.
+
+        Args:
+            parent_parser (ArgumentParser): Parent argument parser.
+
+        Returns:
+            ArgumentParser: Argument parser with added generator-specific arguments.
+        """
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        group  = parser.add_argument_group('Generator Constructor args')
+        # Empty
+        
+        group  = parser.add_argument_group('Generator Runtime args')
+        group.add_argument('--n_steps', type=int, default=20)
+        group.add_argument('--n_top_seqs_per_batch', type=int)
+        group.add_argument('--mu', type=float, default=1)
+        group.add_argument('--recomb_rate', type=float, default=0.1)
+        group.add_argument('--threshold', type=float, default=0.05)
+        group.add_argument('--rho', type=int, default=2)
+        group.add_argument('--model_queries_per_batch', type=int)
+                          
+        return parser
+
+    @staticmethod
+    def process_args(grouped_args):
+        """
+        Static method to process grouped arguments.
+
+        Args:
+            grouped_args (dict): Dictionary containing grouped arguments.
+
+        Returns:
+            tuple: A tuple containing constructor args and runtime args.
+        """
+        constructor_args = grouped_args['Generator Constructor args']
+        runtime_args     = grouped_args['Generator Runtime args']
+        
+        return constructor_args, runtime_args
+
+
+    def get_fitness(self, seq_str_list):
+        self.model_cost += len(seq_str_list)
+        input_tensor = self.string_list_to_tensor(seq_str_list)
+        input_tensor = self.params(input_tensor.to(self.dflt_device))
+        return -1 * self.energy_fn(input_tensor).detach().cpu().numpy()
+
+    def string_list_to_tensor(self, sequence_list):
+        return torch.stack([boda.common.utils.dna2tensor(sequence) for sequence in sequence_list]).to(self.dflt_device)
+
+    def random_string_list(self):
+        return [''.join(random.choices(self.vocab, k=self.seq_len)) for _ in range(self.batch_size)]
+
+    def generate_random_mutant(self, sequence, mu_rate):
+        return ''.join([random.choice(self.vocab) if random.random() < mu_rate else s for s in sequence])
+
+    def start_from_random_sequences(self, num_sequences):
+        return [''.join(random.choices(self.vocab, k=self.seq_len)) for _ in range(num_sequences)]
+  
+    def recombine_population(self, gen, recomb_rate=0.1):
+        if len(gen) == 1:
+            return gen
+        random.shuffle(gen)
+        ret = []
+        for i in range(0, len(gen) - 1, 2):
+            strA = []
+            strB = []
+            switch = False
+            for ind in range(len(gen[i])):
+                if random.random() < recomb_rate:
+                    switch = not switch
+                if switch:
+                    strA.append(gen[i][ind])
+                    strB.append(gen[i + 1][ind])
+                else:
+                    strB.append(gen[i][ind])
+                    strA.append(gen[i + 1][ind])
+            ret.append("".join(strA))
+            ret.append("".join(strB))
+        return ret
+
+    def propose_sequences(self, initial_sequences, mu=1, recomb_rate=0.1, threshold=0.05,
+                          rho=2, model_queries_per_batch=5000):          
+        measured_sequence_set = set(initial_sequences)
+        measured_fitnesses = self.get_fitness(initial_sequences)
+        
+        top_fitness = measured_fitnesses.max()
+        top_inds = np.argwhere((measured_fitnesses >= top_fitness * (
+                                    1 - np.sign(top_fitness) * threshold)))
+        top_inds = top_inds.reshape(-1).tolist()
+        
+        parents = [initial_sequences[i] for i in top_inds]
+        
+        sequences = {}
+        
+        roots = np.resize(np.array(parents), self.batch_size,)
+
+        self.model_cost = 0 
+        while self.model_cost < model_queries_per_batch:
+            for i in range(rho):
+                roots = self.recombine_population(roots, recomb_rate)
+            root_fitnesses = self.get_fitness(roots)
+
+            nodes = list(enumerate(roots))
+
+            while (len(nodes) > 0
+                    and self.model_cost + self.batch_size
+                    < model_queries_per_batch):
+                child_idxs = []
+                children = []
+                while len(children) < len(nodes):  
+                    idx, node = nodes[len(children)]  
+
+                    child = self.generate_random_mutant(node, mu / len(node))
+                    if (child not in measured_sequence_set and child not in sequences):
+                        child_idxs.append(idx)
+                        children.append(child)
+                fitnesses = self.get_fitness(children).reshape(-1).tolist()
+                sequences.update(zip(children, fitnesses))
+
+                nodes = []
+                for idx, child, fitness in zip(child_idxs, children, fitnesses):
+                    if fitness > root_fitnesses[idx]:
+                        nodes.append((idx, child))
+
+        if len(sequences) == 0:
+            raise ValueError(
+                "No sequences generated. If `model_queries_per_batch` is small, try "
+                "making `batch_size` smaller")
+
+        new_seqs = np.array(list(sequences.keys()))
+        new_fitnesses = np.array(list(sequences.values()))
+        sorted_order = np.argsort(-new_fitnesses)[:self.batch_size]
+
+        return new_seqs[sorted_order], new_fitnesses[sorted_order]
+
+
+    def run(self, pre_provided_sequences=None, num_iterations=30, mu=1, recomb_rate=0.1, threshold=0.05,
+                          rho=2, model_queries_per_batch=5000, desc_str=''):
+        if pre_provided_sequences is None:
+            new_seqs = self.start_from_random_sequences(self.batch_size)
+        else:
+            new_seqs = pre_provided_sequences
+        new_seqs = self.start_from_random_sequences(self.batch_size)
+        pbar = tqdm(range(num_iterations), desc=desc_str, position=0, leave=True)
+        for iteration in pbar:
+            new_seqs, new_fitnesses = self.propose_sequences(new_seqs, mu=mu, recomb_rate=recomb_rate,
+                                                     threshold=threshold, rho=rho,
+                                                     model_queries_per_batch=model_queries_per_batch)
+            mean_fitness = np.mean(new_fitnesses)
+            pbar.set_postfix({'Batch mean fitness': mean_fitness})
+
+        return new_seqs, new_fitnesses
+
+
+    def generate(self, n_proposals=1, energy_threshold=float("Inf"), n_steps=20, n_top_seqs_per_batch=None,
+                 mu=1, recomb_rate=0.1, threshold=0.1, rho=2, model_queries_per_batch=None, max_attempts=10000):
+        
+        if n_top_seqs_per_batch is None:
+            n_top_seqs_per_batch = self.batch_size
+        else:
+            n_top_seqs_per_batch = min(n_top_seqs_per_batch, self.batch_size)
+
+        if model_queries_per_batch is None:
+            model_queries_per_batch = self.batch_size * 10
+
+        print(f'Collecting at most {n_top_seqs_per_batch} sequences per batch', flush=True)
+        
+        proposals = []
+        energies  = []
+        acceptance = []
+        batch_idx = 1
+        attempts = 0
+        print('', flush=True)
+        while (len(proposals) < n_proposals) and (attempts <= max_attempts):
+            desc_str = f'Batch {batch_idx} ({len(proposals)}/{n_proposals} proposals generated )'
+            batch_proposals, batch_fitnesses = self.run(mu=mu, recomb_rate=recomb_rate, num_iterations=n_steps,
+                                                        threshold=threshold, rho=rho, desc_str=desc_str,
+                                                        model_queries_per_batch=model_queries_per_batch)
+            attempts += len(batch_proposals)
+            passing_idxs = np.where(-batch_fitnesses <= energy_threshold)[0]
+            passing_proposals = np.array(batch_proposals)[passing_idxs].tolist()
+            passing_energies = -batch_fitnesses[passing_idxs]
+            proposals.extend(passing_proposals[:n_top_seqs_per_batch])
+            energies.extend(passing_energies[:n_top_seqs_per_batch].tolist())
+            acceptance.append(len(passing_idxs) / self.batch_size)
+            batch_idx += 1
+        print()
+        
+        proposals = torch.stack([boda.common.utils.dna2tensor(proposal) for proposal in proposals[:n_proposals]])
+        energies = torch.Tensor(energies[:n_proposals])
+        acceptance = np.mean(acceptance)
+
+        print(f'{proposals.shape[0]} proposals generated')
+
+        results = {
+            'proposals': proposals,
+            'energies': energies,
+            'acceptance_rate': acceptance
+        }
+        
+        return results
+    
+    
+
 class deprecated_AdaLead(nn.Module):
     """
     Adapt-with-the-Leader (AdaLead) module for sequence optimization.
@@ -343,183 +572,4 @@ class deprecated_AdaLead(nn.Module):
         self.preds = preds
         
         
-class AdaLead(nn.Module):
-    
-    def __init__(self,
-                 energy,
-                 params,
-                 ):
-
-        super().__init__()
-
-        self.energy_fn = energy
-        self.params = params
-        self.model_cost = 0     
-        self.vocab = boda.common.constants.STANDARD_NT
-
-        self.batch_size, self.num_classes, self.seq_len = self.params.theta.shape
-        self.token_dim = self.params.token_dim
-        self.batch_dim = self.params.batch_dim
-
-        self.dflt_device = self.params.theta.device                  
-        try: self.energy_fn.eval()
-        except: pass
-
-    def get_fitness(self, seq_str_list):
-        self.model_cost += len(seq_str_list)
-        input_tensor = self.string_list_to_tensor(seq_str_list)
-        input_tensor = self.params(input_tensor.to(self.dflt_device))
-        return -1 * self.energy_fn(input_tensor).detach().cpu().numpy()
-
-    def string_list_to_tensor(self, sequence_list):
-        return torch.stack([boda.common.utils.dna2tensor(sequence) for sequence in sequence_list]).to(self.dflt_device)
-
-    def random_string_list(self):
-        return [''.join(random.choices(self.vocab, k=self.seq_len)) for _ in range(self.batch_size)]
-
-    def generate_random_mutant(self, sequence, mu_rate):
-        return ''.join([random.choice(self.vocab) if random.random() < mu_rate else s for s in sequence])
-
-    def start_from_random_sequences(self, num_sequences):
-        return [''.join(random.choices(self.vocab, k=self.seq_len)) for _ in range(num_sequences)]
-  
-    def recombine_population(self, gen, recomb_rate=0.1):
-        if len(gen) == 1:
-            return gen
-        random.shuffle(gen)
-        ret = []
-        for i in range(0, len(gen) - 1, 2):
-            strA = []
-            strB = []
-            switch = False
-            for ind in range(len(gen[i])):
-                if random.random() < recomb_rate:
-                    switch = not switch
-                if switch:
-                    strA.append(gen[i][ind])
-                    strB.append(gen[i + 1][ind])
-                else:
-                    strB.append(gen[i][ind])
-                    strA.append(gen[i + 1][ind])
-            ret.append("".join(strA))
-            ret.append("".join(strB))
-        return ret
-
-    def propose_sequences(self, initial_sequences, mu=1, recomb_rate=0.1, threshold=0.05,
-                          rho=2, model_queries_per_batch=5000):          
-        measured_sequence_set = set(initial_sequences)
-        measured_fitnesses = self.get_fitness(initial_sequences)
-        
-        top_fitness = measured_fitnesses.max()
-        top_inds = np.argwhere((measured_fitnesses >= top_fitness * (
-                                    1 - np.sign(top_fitness) * threshold)))
-        top_inds = top_inds.reshape(-1).tolist()
-        
-        parents = [initial_sequences[i] for i in top_inds]
-        
-        sequences = {}
-        
-        roots = np.resize(np.array(parents), self.batch_size,)
-
-        self.model_cost = 0 
-        while self.model_cost < model_queries_per_batch:
-            for i in range(rho):
-                roots = self.recombine_population(roots, recomb_rate)
-            root_fitnesses = self.get_fitness(roots)
-
-            nodes = list(enumerate(roots))
-
-            while (len(nodes) > 0
-                    and self.model_cost + self.batch_size
-                    < model_queries_per_batch):
-                child_idxs = []
-                children = []
-                while len(children) < len(nodes):  
-                    idx, node = nodes[len(children)]  
-
-                    child = self.generate_random_mutant(node, mu / len(node))
-                    if (child not in measured_sequence_set and child not in sequences):
-                        child_idxs.append(idx)
-                        children.append(child)
-                fitnesses = self.get_fitness(children).reshape(-1).tolist()
-                sequences.update(zip(children, fitnesses))
-
-                nodes = []
-                for idx, child, fitness in zip(child_idxs, children, fitnesses):
-                    if fitness > root_fitnesses[idx]:
-                        nodes.append((idx, child))
-
-        if len(sequences) == 0:
-            raise ValueError(
-                "No sequences generated. If `model_queries_per_batch` is small, try "
-                "making `eval_batch_size` smaller")
-
-        new_seqs = np.array(list(sequences.keys()))
-        new_fitnesses = np.array(list(sequences.values()))
-        sorted_order = np.argsort(-new_fitnesses)[:self.batch_size]
-
-        return new_seqs[sorted_order], new_fitnesses[sorted_order]
-
-
-    def run(self, pre_provided_sequences=None, num_iterations=30, mu=1, recomb_rate=0.1, threshold=0.05,
-                          rho=2, model_queries_per_batch=5000, desc_str=''):
-        if pre_provided_sequences is None:
-            new_seqs = self.start_from_random_sequences(self.batch_size)
-        else:
-            new_seqs = pre_provided_sequences
-        new_seqs = self.start_from_random_sequences(self.batch_size)
-        pbar = tqdm(range(num_iterations), desc=desc_str, position=0, leave=True)
-        for iteration in pbar:
-            new_seqs, new_fitnesses = self.propose_sequences(new_seqs, mu=mu, recomb_rate=recomb_rate,
-                                                     threshold=threshold, rho=rho,
-                                                     model_queries_per_batch=model_queries_per_batch)
-            mean_fitness = np.mean(new_fitnesses)
-            pbar.set_postfix({'Batch mean fitness': mean_fitness})
-
-        return new_seqs, new_fitnesses
-
-
-    def generate(self, n_proposals=1, energy_threshold=float("Inf"), n_top_seqs_per_batch=None, num_iterations=20,
-                 mu=1, recomb_rate=0.1, threshold=0.1, rho=2, model_queries_per_batch=5000, max_attempts=10000):
-        
-        if n_top_seqs_per_batch is None:
-            n_top_seqs_per_batch = self.batch_size
-        else:
-            n_top_seqs_per_batch = min(n_top_seqs_per_batch, self.batch_size)
-        print(f'Collecting at most {n_top_seqs_per_batch} sequences per batch', flush=True)
-        
-        proposals = []
-        energies  = []
-        acceptance = []
-        batch_idx = 1
-        attempts = 0
-        print('', flush=True)
-        while (len(proposals) < n_proposals) and (attempts <= max_attempts):
-            desc_str = f'Batch {batch_idx} ({len(proposals)}/{n_proposals} proposals generated )'
-            batch_proposals, batch_fitnesses = self.run(mu=mu, recomb_rate=recomb_rate, num_iterations=num_iterations,
-                                                        threshold=threshold, rho=rho, desc_str=desc_str,
-                                                        model_queries_per_batch=model_queries_per_batch)
-            attempts += len(batch_proposals)
-            passing_idxs = np.where(-batch_fitnesses <= energy_threshold)[0]
-            passing_proposals = np.array(batch_proposals)[passing_idxs].tolist()
-            passing_energies = -batch_fitnesses[passing_idxs]
-            proposals.extend(passing_proposals[:n_top_seqs_per_batch])
-            energies.extend(passing_energies[:n_top_seqs_per_batch].tolist())
-            acceptance.append(len(passing_idxs) / self.batch_size)
-            batch_idx += 1
-        print()
-        
-        proposals = torch.stack([boda.common.utils.dna2tensor(proposal) for proposal in proposals[:n_proposals]])
-        energies = torch.Tensor(energies[:n_proposals])
-        acceptance = np.mean(acceptance)
-
-        print(f'{proposals.shape[0]} proposals generated')
-
-        results = {
-            'proposals': proposals,
-            'energies': energies,
-            'acceptance_rate': acceptance
-        }
-        
-        return results
     
