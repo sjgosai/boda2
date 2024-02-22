@@ -198,7 +198,11 @@ class AdaLead(nn.Module):
         if model_queries_per_batch is None:
             model_queries_per_batch = self.batch_size * 10
 
+        num_batches_needed = int(np.ceil(n_proposals / n_top_seqs_per_batch))
+        min_max_attempts = (num_batches_needed - 1) * n_top_seqs_per_batch + 1
         print(f'Collecting at most {n_top_seqs_per_batch} sequences per batch', flush=True)
+        print(f'At least {num_batches_needed} batches are needed to propose {n_proposals} sequences')
+        print(f'Make sure max_attempts >= {min_max_attempts}')
         
         proposals = []
         energies  = []
@@ -211,7 +215,6 @@ class AdaLead(nn.Module):
             batch_proposals, batch_fitnesses = self.run(mu=mu, recomb_rate=recomb_rate, num_iterations=n_steps,
                                                         threshold=threshold, rho=rho, desc_str=desc_str,
                                                         model_queries_per_batch=model_queries_per_batch)
-            attempts += len(batch_proposals)
             passing_idxs = np.where(-batch_fitnesses <= energy_threshold)[0]
             passing_proposals = np.array(batch_proposals)[passing_idxs].tolist()
             passing_energies = -batch_fitnesses[passing_idxs]
@@ -219,13 +222,17 @@ class AdaLead(nn.Module):
             energies.extend(passing_energies[:n_top_seqs_per_batch].tolist())
             acceptance.append(len(passing_idxs) / self.batch_size)
             batch_idx += 1
+            attempts += n_top_seqs_per_batch
         print()
         
         proposals = torch.stack([utils.dna2tensor(proposal) for proposal in proposals[:n_proposals]])
         energies = torch.Tensor(energies[:n_proposals])
         acceptance = np.mean(acceptance)
 
-        print(f'{proposals.shape[0]} proposals generated')
+        if (len(proposals) < n_proposals) and (attempts >= max_attempts):
+            print(f'Max attempts reached; {proposals.shape[0]} proposals generated')
+        elif len(proposals) >= n_proposals:
+            print(f'{proposals.shape[0]} proposals generated')
 
         results = {
             'proposals': proposals,
