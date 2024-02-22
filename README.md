@@ -51,7 +51,7 @@ git clone https://github.com/sjgosai/boda2.git
 cd boda2/
 
 pip install --upgrade pip==21.3.1
-pip install --no-cache-dir -r boda2/requirements.txt
+pip install --no-cache-dir -r requirements.txt
 pip install -e .
 ```
 
