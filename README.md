@@ -70,12 +70,19 @@ pip install -e .
 Installation time is from the repository is approximately `66.07 seconds` (Feb 23 2024, tested in [Colab](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing)). Properly installing `torch` is highly variable system to system so it wasn't feesible to include in the `requirements.txt`.
 
 # Colab
-CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.google.com/marketplace/product/colab-marketplace-image-public/colab). We were successful using V100s, but not T4s (tested: Feb 16 2024). We partially reproduce two tutorials as examples:
+CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.google.com/marketplace/product/colab-marketplace-image-public/colab). We were successful using V100s, but not T4s (tested: Feb 16 2024). Deployment specs used to test these notebooks are: 
+
+- Type: `n1-highmem-8`
+- GPU: 1x Tesla V100
+- Disk: SSD
+- Disk Size: 500 GB
+
+We partially reproduce two tutorials as examples:
 
 - [Load Malinois](https://colab.research.google.com/drive/1lgNlclsAstrD3uRxhG8swj9BuFDlT68z?usp=sharing)
-- [Train and Design](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing)
+- [Train and Design](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing) (approx total runtime: 13 minutes 51 seconds)
 
-For some reason, you need to restart the runtime before `import boda` will work
+For some reason, you need to restart the runtime before `import boda` will work. 
 
 # Interactive Docker Environments
 CODA has been installed in docker containers which can be downloaded in attached for interactive use. This can be quickly deployed using helper scripts in the repo:
