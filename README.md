@@ -38,14 +38,25 @@ CODA was extensively tested in Google Colab environments and GCP VMs with the fo
 - GPU: 1x Tesla A100
 - GPU-RAM: 40 GB HBM2
 
+or
+
+- Type: `custom-12-65536`
+- CPU: 12 vCPU (Intel Broadwell)
+- RAM: 64 GB
+- GPU: 1x Tesla V100
+- GPU-RAM: 16 GB HBM2
+
 ## Software Requirements
 CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep Learning, ML & HPC
 
 - OS: Ubuntu 20.04.2 LTS
 - CUDA: 11.3
+- Python: 3.7.12
+
+The most recent tested python environment (Feb 23 2024) is provided in `pip_packages.json`.
 
 # Installation Guide
-First install `torch`, then CODA can be installed from the latest version of the GITHUB repo. CODA was developed on `torch==1.13.1`.
+First install `torch` according to the installation guide at https://pytorch.org/, then CODA can be installed from the latest version of the GITHUB repo. CODA was developed on `torch==1.13.1`.
 ```
 git clone https://github.com/sjgosai/boda2.git
 cd boda2/
