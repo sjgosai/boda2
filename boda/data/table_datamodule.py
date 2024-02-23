@@ -6,10 +6,11 @@ from ..common import constants, utils
 
 
 class InputSequences(Dataset):
-    def __init__(self, file_path, left_flank, right_flank, use_revcomp=False, skip_header=False):
+    def __init__(self, file_path, left_flank, right_flank, seq_len=600, use_revcomp=False, skip_header=False):
         self.data = []
         self.left_flank = left_flank
         self.right_flank = right_flank
+        self.seq_len = seq_len
         self.use_revcomp = use_revcomp
         self.skip_header = skip_header
         
@@ -34,10 +35,14 @@ class InputSequences(Dataset):
     def __getitem__(self, index):
         if self.use_revcomp:
             use_index = index // 2
+        else:
+            use_index = index
         sequence, score = self.data[use_index]
         
         # Add left and right flanks to the sequence
-        sequence_with_flanks = self.left_flank + sequence + self.right_flank
+        left_len = (self.seq_len - len(sequence)) // 2
+        right_len= self.seq_len - (len(sequence) + left_len)
+        sequence_with_flanks = self.left_flank[-left_len:] + sequence + self.right_flank[:right_len]
         
         # Encode the sequence using one-hot encoding
         sequence_tensor = self.encode_sequence(sequence_with_flanks)
@@ -83,13 +88,23 @@ class SeqDataModule(LightningDataModule):
         group.add_argument('--val_file', type=str, required=True)
         group.add_argument('--test_file', type=str, required=True)
         group.add_argument('--batch_size', type=int, required=True)
-        group.add_argument('--left_flank', type=str, default=boda.common.constants.MPRA_UPSTREAM[-200:])
-        group.add_argument('--right_flank', type=str, default=boda.common.constants.MPRA_DOWNSTREAM[:200])
+        group.add_argument('--left_flank', type=str, default=constants.MPRA_UPSTREAM)
+        group.add_argument('--right_flank', type=str, default=constants.MPRA_DOWNSTREAM)
+        group.add_argument('--seq_len', type=int, default=600)
         group.add_argument('--use_revcomp', type=utils.str2bool, default=False)
         group.add_argument('--skip_header', type=utils.str2bool, default=False)
         return parser
+    
+    @staticmethod
+    def add_conditional_args(parser, known_args):
+        return parser
+    
+    @staticmethod
+    def process_args(grouped_args):
+        data_args    = grouped_args['Data Module args']
+        return data_args
 
-    def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank='', use_revcomp=False, skip_header=False):
+    def __init__(self, train_file, val_file, test_file, batch_size=10, left_flank='', right_flank='', seq_len=600, use_revcomp=False, skip_header=False):
         super().__init__()
         self.train_file = train_file
         self.val_file = val_file
@@ -97,14 +112,15 @@ class SeqDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.left_flank = left_flank
         self.right_flank = right_flank
+        self.seq_len = seq_len
         self.use_revcomp = use_revcomp
         self.skip_header = skip_header
         
     def setup(self, stage=None):
         # Load the datasets from the files
-        self.train_dataset = InputSequences(self.train_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
-        self.val_dataset = InputSequences(self.val_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
-        self.test_dataset = InputSequences(self.test_file, self.left_flank, self.right_flank, self.use_revcomp, self.skip_header)
+        self.train_dataset = InputSequences(self.train_file, self.left_flank, self.right_flank, self.seq_len, self.use_revcomp, self.skip_header)
+        self.val_dataset = InputSequences(self.val_file, self.left_flank, self.right_flank, self.seq_len, self.use_revcomp, self.skip_header)
+        self.test_dataset = InputSequences(self.test_file, self.left_flank, self.right_flank, self.seq_len, self.use_revcomp, self.skip_header)
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
