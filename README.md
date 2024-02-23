@@ -45,7 +45,7 @@ CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep 
 - CUDA: 11.3
 
 # Installation Guide
-First install `torch`, then CODA can be installed from the latest version of the GITHUB repo.
+First install `torch`, then CODA can be installed from the latest version of the GITHUB repo. CODA was developed on `torch==1.13.1`.
 ```
 git clone https://github.com/sjgosai/boda2.git
 cd boda2/
@@ -74,7 +74,7 @@ bash boda2/src/run_docker_for_dev.sh gcr.io/sabeti-encode/boda devenv 0.2.0 8888
 ```
 Which connects `jupyter lab` to ports `8888` and `6006`.
 
-More containers can be found at `gcr.io/sabeti-encode/boda`.
+More containers can be found at `gcr.io/sabeti-encode/boda`. Use `devenv 0.2.0` if using `A100s` and `devenv 0.1.2` if using `V100s`.
 
 # Interactive usage
 ## Modeling
