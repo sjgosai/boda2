@@ -52,6 +52,7 @@ CODA was designed using the GCP deployment: NVIDIA GPU-Optimized Image for Deep 
 - OS: Ubuntu 20.04.2 LTS
 - CUDA: 11.3
 - Python: 3.7.12
+- PyTorch: 1.13.1
 
 The most recent tested python environment (Feb 23 2024) is provided in `pip_packages.json`.
 
