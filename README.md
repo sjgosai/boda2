@@ -79,7 +79,7 @@ CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.goo
 
 We partially reproduce two tutorials as examples:
 
-- [Load Malinois](https://colab.research.google.com/drive/1lgNlclsAstrD3uRxhG8swj9BuFDlT68z?usp=sharing)
+- [Load Malinois](https://colab.research.google.com/drive/1lgNlclsAstrD3uRxhG8swj9BuFDlT68z?usp=sharing) (approx total runtime: 4 minutes 2 seconds)
 - [Train and Design](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing) (approx total runtime: 13 minutes 51 seconds)
 
 For some reason, you need to restart the runtime before `import boda` will work. 
