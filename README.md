@@ -67,7 +67,7 @@ pip install --no-cache-dir -r requirements.txt
 pip install -e .
 ```
 
-Properly installing `torch` is highly variable system to system so it wasn't feesible to include in the `requirements.txt`.
+Installation time is from the repository is approximately `66.07 seconds` (Feb 23 2024, tested in [Colab](https://colab.research.google.com/drive/1HIvQsSUzhw5an1jwJxh-5FUJaYtKV6Cz?usp=sharing)). Properly installing `torch` is highly variable system to system so it wasn't feesible to include in the `requirements.txt`.
 
 # Colab
 CODA works in Colab notebooks backed with [Custom VMs](https://console.cloud.google.com/marketplace/product/colab-marketplace-image-public/colab). We were successful using V100s, but not T4s (tested: Feb 16 2024). We partially reproduce two tutorials as examples:
