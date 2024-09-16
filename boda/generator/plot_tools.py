@@ -119,7 +119,7 @@ def counts_to_filter(in_tensor):
     motif = ppm_to_pwm( counts_to_ppm( in_tensor ) )
     return motif.unsqueeze(0)
 
-def tensor_to_pandas(in_tensor, tokens=constants.STANDARD_NT, colors=['green','orange','red','blue']):
+def tensor_to_pandas(in_tensor, tokens=constants.STANDARD_NT, colors=['green','blue','orange','red']):
     """
     Convert a tensor of motif scores to a pandas DataFrame for visualization.
 
