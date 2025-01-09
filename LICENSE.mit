@@ -1,4 +1,3 @@
-"""
 MIT License
 
 Copyright (c) 2025 Sagar Gosai
@@ -20,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-"""
-
-from .basset import Basset, BassetVL, BassetEntropyVL, BassetBranched
-
-__all__ = [
-    'Basset', 'BassetVL', 'BassetEntropyVL', 'BassetBranched',
-]

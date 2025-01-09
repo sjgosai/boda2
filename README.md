@@ -1,5 +1,5 @@
 # Computational Optimization of DNA Activity (CODA)
-[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.08.552077v1). For legacy reasons, this repo is currently listed as boda2.
+[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.08.552077v1). For legacy reasons, this repo is currently listed as boda2. The model, model weights, and code defining the model architecture are covered under the MIT license, and the rest is covered under the AGPL-3.0 license.
 
 # Contents
 
