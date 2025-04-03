@@ -1,5 +1,5 @@
 # Computational Optimization of DNA Activity (CODA)
-[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.08.552077v1). For legacy reasons, this repo is currently listed as boda2.
+[Preprint on bioRxiv](https://www.biorxiv.org/content/10.1101/2023.08.08.552077v1). For legacy reasons, this repo is currently listed as boda2. The model, model weights, and code defining the model architecture are covered under the MIT license, and the rest is covered under the AGPL-3.0 license.
 
 # Contents
 
@@ -202,7 +202,7 @@ python /home/ubuntu/boda2/src/generate.py \
         --batch_size 256 --n_channels 4 \
         --length 200 \
     --energy_module MinGapEnergy \
-        --target_feature 0 --bending_factor 0.0 --a_min -2.0 --a_max 6.0 \
+        --target_feature 0 --bending_factor 1.0 --a_min -2.0 --a_max 6.0 \
         --model_artifact gs://tewhey-public-data/CODA_resources/malinois_artifacts__20211113_021200__287348.tar.gz \
     --generator_module AdaLead \
          --n_steps 20 --rho 2 --n_top_seqs_per_batch 1 \
