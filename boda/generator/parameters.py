@@ -662,11 +662,12 @@ class StraightThroughParameters(ParamsBase):
         """
         if x is None:
             x = self.theta
-        logits = self.norm(x)
         if self.logit_mask is not None:
-            masked_logits = logits.detach().mul( self.logit_mask )
-            free_logits   = logits.mul( 1 - self.logit_mask )
-            logits = free_logits + masked_logits
+            masked_logits = x.detach().mul( self.logit_mask )
+            free_logits   = x.mul( 1 - self.logit_mask )
+            x = free_logits + masked_logits
+            
+        logits = self.norm(x)
         return F.softmax(logits / tau, dim=self.token_dim)
         
     def get_sample(self, x=None, tau=1.):
